@@ -1,0 +1,222 @@
+import { z } from 'zod';
+import { 
+  insertUserSchema, 
+  insertDepartmentSchema, 
+  insertClassroomSchema, 
+  insertSubjectSchema, 
+  insertFacultySchema, 
+  insertSectionSchema, 
+  insertTimeSlotSchema,
+  departments,
+  classrooms,
+  subjects,
+  faculty,
+  sections,
+  timeSlots,
+  timetable
+} from './schema';
+
+export const errorSchemas = {
+  validation: z.object({
+    message: z.string(),
+    field: z.string().optional(),
+  }),
+  notFound: z.object({
+    message: z.string(),
+  }),
+  conflict: z.object({
+    message: z.string(),
+  }),
+};
+
+// Request schema for generating timetable
+export const generateTimetableSchema = z.object({
+  departmentId: z.number(),
+  semester: z.number().optional(),
+});
+
+export const api = {
+  auth: {
+    register: {
+      method: 'POST' as const,
+      path: '/api/register' as const,
+      input: insertUserSchema,
+      responses: {
+        201: z.custom<typeof users.$inferSelect>(),
+        400: errorSchemas.validation,
+      },
+    },
+    login: {
+      method: 'POST' as const,
+      path: '/api/login' as const,
+      input: z.object({ username: z.string(), password: z.string() }),
+      responses: {
+        200: z.custom<typeof users.$inferSelect>(),
+        401: z.object({ message: z.string() }),
+      },
+    },
+    logout: {
+      method: 'POST' as const,
+      path: '/api/logout' as const,
+      responses: {
+        200: z.void(),
+      },
+    },
+    me: {
+      method: 'GET' as const,
+      path: '/api/user' as const,
+      responses: {
+        200: z.custom<typeof users.$inferSelect>(),
+        401: z.void(),
+      },
+    },
+  },
+  departments: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/departments' as const,
+      responses: { 200: z.array(z.custom<typeof departments.$inferSelect>()) },
+    },
+    create: {
+      method: 'POST' as const,
+      path: '/api/departments' as const,
+      input: insertDepartmentSchema,
+      responses: { 201: z.custom<typeof departments.$inferSelect>() },
+    },
+    delete: {
+      method: 'DELETE' as const,
+      path: '/api/departments/:id' as const,
+      responses: { 204: z.void() },
+    },
+  },
+  classrooms: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/classrooms' as const,
+      responses: { 200: z.array(z.custom<typeof classrooms.$inferSelect>()) },
+    },
+    create: {
+      method: 'POST' as const,
+      path: '/api/classrooms' as const,
+      input: insertClassroomSchema,
+      responses: { 201: z.custom<typeof classrooms.$inferSelect>() },
+    },
+    delete: {
+      method: 'DELETE' as const,
+      path: '/api/classrooms/:id' as const,
+      responses: { 204: z.void() },
+    },
+  },
+  subjects: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/subjects' as const,
+      responses: { 200: z.array(z.custom<typeof subjects.$inferSelect>()) },
+    },
+    create: {
+      method: 'POST' as const,
+      path: '/api/subjects' as const,
+      input: insertSubjectSchema,
+      responses: { 201: z.custom<typeof subjects.$inferSelect>() },
+    },
+    delete: {
+      method: 'DELETE' as const,
+      path: '/api/subjects/:id' as const,
+      responses: { 204: z.void() },
+    },
+  },
+  faculty: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/faculty' as const,
+      responses: { 200: z.array(z.custom<typeof faculty.$inferSelect>()) },
+    },
+    create: {
+      method: 'POST' as const,
+      path: '/api/faculty' as const,
+      input: insertFacultySchema,
+      responses: { 201: z.custom<typeof faculty.$inferSelect>() },
+    },
+    delete: {
+      method: 'DELETE' as const,
+      path: '/api/faculty/:id' as const,
+      responses: { 204: z.void() },
+    },
+  },
+  sections: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/sections' as const,
+      responses: { 200: z.array(z.custom<typeof sections.$inferSelect>()) },
+    },
+    create: {
+      method: 'POST' as const,
+      path: '/api/sections' as const,
+      input: insertSectionSchema,
+      responses: { 201: z.custom<typeof sections.$inferSelect>() },
+    },
+    delete: {
+      method: 'DELETE' as const,
+      path: '/api/sections/:id' as const,
+      responses: { 204: z.void() },
+    },
+  },
+  timeSlots: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/timeslots' as const,
+      responses: { 200: z.array(z.custom<typeof timeSlots.$inferSelect>()) },
+    },
+    create: {
+      method: 'POST' as const,
+      path: '/api/timeslots' as const,
+      input: insertTimeSlotSchema,
+      responses: { 201: z.custom<typeof timeSlots.$inferSelect>() },
+    },
+    delete: {
+      method: 'DELETE' as const,
+      path: '/api/timeslots/:id' as const,
+      responses: { 204: z.void() },
+    },
+  },
+  timetable: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/timetable' as const,
+      input: z.object({
+        sectionId: z.string().optional(),
+        facultyId: z.string().optional(),
+      }).optional(),
+      responses: { 
+        200: z.array(z.custom<typeof timetable.$inferSelect & {
+          subject: typeof subjects.$inferSelect,
+          faculty: typeof faculty.$inferSelect,
+          classroom: typeof classrooms.$inferSelect,
+          timeSlot: typeof timeSlots.$inferSelect,
+          section: typeof sections.$inferSelect,
+        }>()) 
+      },
+    },
+    generate: {
+      method: 'POST' as const,
+      path: '/api/timetable/generate' as const,
+      input: generateTimetableSchema,
+      responses: {
+        200: z.object({ message: z.string(), count: z.number() }),
+        400: errorSchemas.conflict,
+      },
+    },
+  },
+};
+
+export function buildUrl(path: string, params?: Record<string, string | number>): string {
+  let url = path;
+  if (params) {
+    Object.entries(params).forEach(([key, value]) => {
+      if (url.includes(`:${key}`)) {
+        url = url.replace(`:${key}`, String(value));
+      }
+    });
+  }
+  return url;
+}

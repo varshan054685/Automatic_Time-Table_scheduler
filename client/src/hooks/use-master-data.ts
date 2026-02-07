@@ -1,0 +1,273 @@
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { api, buildUrl } from "@shared/routes";
+import { 
+  type Department, type Classroom, type Subject, type Faculty, 
+  type Section, type TimeSlot, type TimetableEntry
+} from "@shared/schema";
+
+// === DEPARTMENTS ===
+export function useDepartments() {
+  return useQuery({
+    queryKey: [api.departments.list.path],
+    queryFn: async () => {
+      const res = await fetch(api.departments.list.path, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch departments");
+      return api.departments.list.responses[200].parse(await res.json());
+    },
+  });
+}
+
+export function useCreateDepartment() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: any) => {
+      const validated = api.departments.create.input.parse(data);
+      const res = await fetch(api.departments.create.path, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(validated),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to create department");
+      return api.departments.create.responses[201].parse(await res.json());
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: [api.departments.list.path] }),
+  });
+}
+
+export function useDeleteDepartment() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: number) => {
+      const url = buildUrl(api.departments.delete.path, { id });
+      const res = await fetch(url, { method: "DELETE", credentials: "include" });
+      if (!res.ok) throw new Error("Failed to delete department");
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: [api.departments.list.path] }),
+  });
+}
+
+// === CLASSROOMS ===
+export function useClassrooms() {
+  return useQuery({
+    queryKey: [api.classrooms.list.path],
+    queryFn: async () => {
+      const res = await fetch(api.classrooms.list.path, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch classrooms");
+      return api.classrooms.list.responses[200].parse(await res.json());
+    },
+  });
+}
+
+export function useCreateClassroom() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: any) => {
+      const validated = api.classrooms.create.input.parse({
+        ...data,
+        capacity: Number(data.capacity)
+      });
+      const res = await fetch(api.classrooms.create.path, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(validated),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to create classroom");
+      return api.classrooms.create.responses[201].parse(await res.json());
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: [api.classrooms.list.path] }),
+  });
+}
+
+export function useDeleteClassroom() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: number) => {
+      const url = buildUrl(api.classrooms.delete.path, { id });
+      const res = await fetch(url, { method: "DELETE", credentials: "include" });
+      if (!res.ok) throw new Error("Failed to delete classroom");
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: [api.classrooms.list.path] }),
+  });
+}
+
+// === SUBJECTS ===
+export function useSubjects() {
+  return useQuery({
+    queryKey: [api.subjects.list.path],
+    queryFn: async () => {
+      const res = await fetch(api.subjects.list.path, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch subjects");
+      return api.subjects.list.responses[200].parse(await res.json());
+    },
+  });
+}
+
+export function useCreateSubject() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: any) => {
+      const validated = api.subjects.create.input.parse({
+        ...data,
+        weeklyHours: Number(data.weeklyHours),
+        departmentId: Number(data.departmentId)
+      });
+      const res = await fetch(api.subjects.create.path, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(validated),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to create subject");
+      return api.subjects.create.responses[201].parse(await res.json());
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: [api.subjects.list.path] }),
+  });
+}
+
+export function useDeleteSubject() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: number) => {
+      const url = buildUrl(api.subjects.delete.path, { id });
+      const res = await fetch(url, { method: "DELETE", credentials: "include" });
+      if (!res.ok) throw new Error("Failed to delete subject");
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: [api.subjects.list.path] }),
+  });
+}
+
+// === FACULTY ===
+export function useFaculty() {
+  return useQuery({
+    queryKey: [api.faculty.list.path],
+    queryFn: async () => {
+      const res = await fetch(api.faculty.list.path, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch faculty");
+      return api.faculty.list.responses[200].parse(await res.json());
+    },
+  });
+}
+
+export function useCreateFaculty() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: any) => {
+      const validated = api.faculty.create.input.parse({
+        ...data,
+        departmentId: Number(data.departmentId)
+      });
+      const res = await fetch(api.faculty.create.path, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(validated),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to create faculty");
+      return api.faculty.create.responses[201].parse(await res.json());
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: [api.faculty.list.path] }),
+  });
+}
+
+export function useDeleteFaculty() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: number) => {
+      const url = buildUrl(api.faculty.delete.path, { id });
+      const res = await fetch(url, { method: "DELETE", credentials: "include" });
+      if (!res.ok) throw new Error("Failed to delete faculty");
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: [api.faculty.list.path] }),
+  });
+}
+
+// === SECTIONS ===
+export function useSections() {
+  return useQuery({
+    queryKey: [api.sections.list.path],
+    queryFn: async () => {
+      const res = await fetch(api.sections.list.path, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch sections");
+      return api.sections.list.responses[200].parse(await res.json());
+    },
+  });
+}
+
+export function useCreateSection() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: any) => {
+      const validated = api.sections.create.input.parse({
+        ...data,
+        departmentId: Number(data.departmentId),
+        year: Number(data.year),
+        semester: Number(data.semester)
+      });
+      const res = await fetch(api.sections.create.path, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(validated),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to create section");
+      return api.sections.create.responses[201].parse(await res.json());
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: [api.sections.list.path] }),
+  });
+}
+
+export function useDeleteSection() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: number) => {
+      const url = buildUrl(api.sections.delete.path, { id });
+      const res = await fetch(url, { method: "DELETE", credentials: "include" });
+      if (!res.ok) throw new Error("Failed to delete section");
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: [api.sections.list.path] }),
+  });
+}
+
+// === TIME SLOTS ===
+export function useTimeSlots() {
+  return useQuery({
+    queryKey: [api.timeSlots.list.path],
+    queryFn: async () => {
+      const res = await fetch(api.timeSlots.list.path, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch time slots");
+      return api.timeSlots.list.responses[200].parse(await res.json());
+    },
+  });
+}
+
+export function useCreateTimeSlot() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: any) => {
+      const validated = api.timeSlots.create.input.parse(data);
+      const res = await fetch(api.timeSlots.create.path, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(validated),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to create time slot");
+      return api.timeSlots.create.responses[201].parse(await res.json());
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: [api.timeSlots.list.path] }),
+  });
+}
+
+export function useDeleteTimeSlot() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: number) => {
+      const url = buildUrl(api.timeSlots.delete.path, { id });
+      const res = await fetch(url, { method: "DELETE", credentials: "include" });
+      if (!res.ok) throw new Error("Failed to delete time slot");
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: [api.timeSlots.list.path] }),
+  });
+}
