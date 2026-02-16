@@ -1,14 +1,6 @@
 import { Card, CardContent } from "@/components/ui/card";
-import { type LucideIcon } from "lucide-react";
 
-interface StatCardProps {
-  label: string;
-  value: string | number;
-  icon: LucideIcon;
-  colorClass?: string;
-}
-
-export function StatCard({ label, value, icon: Icon, colorClass = "text-primary" }: StatCardProps) {
+export function StatCard({ label, value, icon: Icon, colorClass = "text-primary" }) {
   return (
     <Card className="hover:shadow-lg transition-shadow duration-300 border-l-4 border-l-primary/50">
       <CardContent className="p-6">

@@ -7,18 +7,16 @@ import { Loader2, Download, RefreshCw } from "lucide-react";
 import { useTimetable, useGenerateTimetable } from "@/hooks/use-timetable";
 import { useDepartments, useSections, useTimeSlots } from "@/hooks/use-master-data";
 import { useToast } from "@/hooks/use-toast";
-import { api } from "@shared/routes";
 
 export default function TimetablePage() {
-  const [selectedDept, setSelectedDept] = useState<string>("");
-  const [selectedSection, setSelectedSection] = useState<string>("");
+  const [selectedDept, setSelectedDept] = useState("");
+  const [selectedSection, setSelectedSection] = useState("");
   const { toast } = useToast();
   
   const { data: departments } = useDepartments();
   const { data: sections } = useSections();
   const { data: timeSlots } = useTimeSlots();
   
-  // Filter sections by department if selected
   const filteredSections = sections?.filter(s => 
     !selectedDept || s.departmentId.toString() === selectedDept
   );
@@ -37,7 +35,7 @@ export default function TimetablePage() {
 
     generateMutation.mutate({
       departmentId: parseInt(selectedDept),
-      semester: 1 // Defaulting to 1 for simplicity, could be a dropdown
+      semester: 1
     }, {
       onSuccess: (data) => {
         toast({ title: "Success", description: data.message });
@@ -48,8 +46,7 @@ export default function TimetablePage() {
     });
   };
 
-  // Helper to find entry for a specific day/timeslot
-  const getEntry = (day: string, slotId: number) => {
+  const getEntry = (day, slotId) => {
     return timetable?.find(t => t.timeSlotId === slotId && t.timeSlot.dayOfWeek === day);
   };
 
@@ -72,7 +69,6 @@ export default function TimetablePage() {
             </div>
           </div>
 
-          {/* Controls */}
           <Card className="p-6 bg-white shadow-sm border-slate-100">
             <div className="flex flex-col md:flex-row gap-4 items-end">
               <div className="space-y-2 flex-1">
@@ -117,7 +113,6 @@ export default function TimetablePage() {
             </div>
           </Card>
 
-          {/* Timetable Grid */}
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
             {!selectedSection ? (
               <div className="p-12 text-center text-slate-500">

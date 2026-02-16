@@ -1,9 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, type User } from "@shared/routes";
-import { z } from "zod";
-
-// Zod schema matching the API input for login
-const loginSchema = z.object({ username: z.string(), password: z.string() });
+import { api } from "@shared/routes";
 
 export function useUser() {
   const { data, isLoading, error } = useQuery({
@@ -22,7 +18,7 @@ export function useUser() {
 export function useLogin() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (credentials: z.infer<typeof loginSchema>) => {
+    mutationFn: async (credentials) => {
       const res = await fetch(api.auth.login.path, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -60,7 +56,7 @@ export function useLogout() {
 export function useRegister() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data) => {
       const validated = api.auth.register.input.parse(data);
       const res = await fetch(api.auth.register.path, {
         method: "POST",

@@ -18,12 +18,12 @@ export default function Login() {
   const loginMutation = useLogin();
   const [, setLocation] = useLocation();
 
-  const form = useForm<z.infer<typeof schema>>({
+  const form = useForm({
     resolver: zodResolver(schema),
     defaultValues: { username: "", password: "" },
   });
 
-  function onSubmit(values: z.infer<typeof schema>) {
+  function onSubmit(values) {
     loginMutation.mutate(values, {
       onSuccess: () => setLocation("/"),
     });

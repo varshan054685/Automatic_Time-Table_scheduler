@@ -1,9 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, buildUrl } from "@shared/routes";
-import { 
-  type Department, type Classroom, type Subject, type Faculty, 
-  type Section, type TimeSlot, type TimetableEntry
-} from "@shared/schema";
 
 // === DEPARTMENTS ===
 export function useDepartments() {
@@ -20,7 +16,7 @@ export function useDepartments() {
 export function useCreateDepartment() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data) => {
       const validated = api.departments.create.input.parse(data);
       const res = await fetch(api.departments.create.path, {
         method: "POST",
@@ -38,7 +34,7 @@ export function useCreateDepartment() {
 export function useDeleteDepartment() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (id: number) => {
+    mutationFn: async (id) => {
       const url = buildUrl(api.departments.delete.path, { id });
       const res = await fetch(url, { method: "DELETE", credentials: "include" });
       if (!res.ok) throw new Error("Failed to delete department");
@@ -62,7 +58,7 @@ export function useClassrooms() {
 export function useCreateClassroom() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data) => {
       const validated = api.classrooms.create.input.parse({
         ...data,
         capacity: Number(data.capacity)
@@ -83,7 +79,7 @@ export function useCreateClassroom() {
 export function useDeleteClassroom() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (id: number) => {
+    mutationFn: async (id) => {
       const url = buildUrl(api.classrooms.delete.path, { id });
       const res = await fetch(url, { method: "DELETE", credentials: "include" });
       if (!res.ok) throw new Error("Failed to delete classroom");
@@ -107,7 +103,7 @@ export function useSubjects() {
 export function useCreateSubject() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data) => {
       const validated = api.subjects.create.input.parse({
         ...data,
         weeklyHours: Number(data.weeklyHours),
@@ -129,7 +125,7 @@ export function useCreateSubject() {
 export function useDeleteSubject() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (id: number) => {
+    mutationFn: async (id) => {
       const url = buildUrl(api.subjects.delete.path, { id });
       const res = await fetch(url, { method: "DELETE", credentials: "include" });
       if (!res.ok) throw new Error("Failed to delete subject");
@@ -153,7 +149,7 @@ export function useFaculty() {
 export function useCreateFaculty() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data) => {
       const validated = api.faculty.create.input.parse({
         ...data,
         departmentId: Number(data.departmentId)
@@ -174,7 +170,7 @@ export function useCreateFaculty() {
 export function useDeleteFaculty() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (id: number) => {
+    mutationFn: async (id) => {
       const url = buildUrl(api.faculty.delete.path, { id });
       const res = await fetch(url, { method: "DELETE", credentials: "include" });
       if (!res.ok) throw new Error("Failed to delete faculty");
@@ -198,7 +194,7 @@ export function useSections() {
 export function useCreateSection() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data) => {
       const validated = api.sections.create.input.parse({
         ...data,
         departmentId: Number(data.departmentId),
@@ -221,7 +217,7 @@ export function useCreateSection() {
 export function useDeleteSection() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (id: number) => {
+    mutationFn: async (id) => {
       const url = buildUrl(api.sections.delete.path, { id });
       const res = await fetch(url, { method: "DELETE", credentials: "include" });
       if (!res.ok) throw new Error("Failed to delete section");
@@ -245,7 +241,7 @@ export function useTimeSlots() {
 export function useCreateTimeSlot() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data) => {
       const validated = api.timeSlots.create.input.parse(data);
       const res = await fetch(api.timeSlots.create.path, {
         method: "POST",
@@ -263,7 +259,7 @@ export function useCreateTimeSlot() {
 export function useDeleteTimeSlot() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (id: number) => {
+    mutationFn: async (id) => {
       const url = buildUrl(api.timeSlots.delete.path, { id });
       const res = await fetch(url, { method: "DELETE", credentials: "include" });
       if (!res.ok) throw new Error("Failed to delete time slot");

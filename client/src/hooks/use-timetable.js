@@ -1,8 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@shared/routes";
-import { z } from "zod";
 
-export function useTimetable(filters?: { sectionId?: string; facultyId?: string }) {
+export function useTimetable(filters) {
   const queryKey = [api.timetable.list.path, filters?.sectionId, filters?.facultyId];
   return useQuery({
     queryKey,
@@ -21,7 +20,7 @@ export function useTimetable(filters?: { sectionId?: string; facultyId?: string 
 export function useGenerateTimetable() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (data: z.infer<typeof api.timetable.generate.input>) => {
+    mutationFn: async (data) => {
       const res = await fetch(api.timetable.generate.path, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -31,7 +30,6 @@ export function useGenerateTimetable() {
       
       if (!res.ok) {
         if (res.status === 400) {
-           // Handle conflict/error message properly
            const error = await res.json();
            throw new Error(error.message || "Conflict in generation");
         }
