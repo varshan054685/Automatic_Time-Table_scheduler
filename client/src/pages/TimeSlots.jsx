@@ -1,44 +1,36 @@
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Sidebar } from "@/components/Sidebar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Trash2 } from "lucide-react";
-import { useFaculty, useDepartments, useCreateFaculty, useDeleteFaculty } from "@/hooks/use-master-data";
+import { useTimeSlots, useCreateTimeSlot, useDeleteTimeSlot } from "@/hooks/use-master-data";
 import { useToast } from "@/hooks/use-toast";
 import { api } from "@shared/routes";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-const formSchema = api.faculty.create.input.extend({
-  departmentId: z.coerce.number() // Ensure number conversion
-});
-
-export default function Faculty() {
+export default function TimeSlots() {
   const [open, setOpen] = useState(false);
   const { toast } = useToast();
-  
-  const { data: facultyList, isLoading } = useFaculty();
-  const { data: departments } = useDepartments();
-  
-  const createMutation = useCreateFaculty();
-  const deleteMutation = useDeleteFaculty();
+  const { data: timeSlots, isLoading } = useTimeSlots();
+  const createMutation = useCreateTimeSlot();
+  const deleteMutation = useDeleteTimeSlot();
 
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
-    defaultValues: { name: "", email: "", departmentId: undefined },
+  const form = useForm({
+    resolver: zodResolver(api.timeSlots.create.input),
+    defaultValues: { dayOfWeek: "Monday", startTime: "09:00", endTime: "10:00", label: "Period 1" },
   });
 
-  const onSubmit = (values: z.infer<typeof formSchema>) => {
+  const onSubmit = (values) => {
     createMutation.mutate(values, {
       onSuccess: () => {
         setOpen(false);
         form.reset();
-        toast({ title: "Success", description: "Faculty added successfully" });
+        toast({ title: "Success", description: "Time slot created successfully" });
       },
       onError: (error) => {
         toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -46,13 +38,11 @@ export default function Faculty() {
     });
   };
 
-  const handleDelete = (id: number) => {
-    if (confirm("Are you sure you want to remove this faculty member?")) {
+  const handleDelete = (id) => {
+    if (confirm("Are you sure you want to delete this time slot?")) {
       deleteMutation.mutate(id);
     }
   };
-
-  const getDeptName = (id: number) => departments?.find(d => d.id === id)?.name || "Unknown";
 
   return (
     <div className="flex min-h-screen bg-slate-50/50">
@@ -61,59 +51,37 @@ export default function Faculty() {
         <div className="max-w-5xl mx-auto space-y-6">
           <div className="flex justify-between items-center">
             <div>
-              <h1 className="text-3xl font-display font-bold text-slate-900">Faculty</h1>
-              <p className="text-slate-500 mt-1">Manage teaching staff.</p>
+              <h1 className="text-3xl font-display font-bold text-slate-900">Time Slots</h1>
+              <p className="text-slate-500 mt-1">Manage class periods.</p>
             </div>
             
             <Dialog open={open} onOpenChange={setOpen}>
               <DialogTrigger asChild>
                 <Button className="gap-2 shadow-lg shadow-primary/20">
-                  <Plus className="w-4 h-4" /> Add Faculty
+                  <Plus className="w-4 h-4" /> Add Time Slot
                 </Button>
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Add Faculty Member</DialogTitle>
+                  <DialogTitle>Add Time Slot</DialogTitle>
                 </DialogHeader>
                 <Form {...form}>
                   <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                     <FormField
                       control={form.control}
-                      name="name"
+                      name="dayOfWeek"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Full Name</FormLabel>
-                          <FormControl><Input placeholder="Dr. John Doe" {...field} /></FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="email"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Email</FormLabel>
-                          <FormControl><Input type="email" placeholder="john@college.edu" {...field} value={field.value || ''} /></FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="departmentId"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Department</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value?.toString()}>
+                          <FormLabel>Day</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value}>
                             <FormControl>
                               <SelectTrigger>
-                                <SelectValue placeholder="Select Department" />
+                                <SelectValue placeholder="Select Day" />
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              {departments?.map(d => (
-                                <SelectItem key={d.id} value={d.id.toString()}>{d.name}</SelectItem>
+                              {["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"].map(day => (
+                                <SelectItem key={day} value={day}>{day}</SelectItem>
                               ))}
                             </SelectContent>
                           </Select>
@@ -121,8 +89,41 @@ export default function Faculty() {
                         </FormItem>
                       )}
                     />
+                    <FormField
+                      control={form.control}
+                      name="label"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Label</FormLabel>
+                          <FormControl><Input placeholder="Period 1" {...field} /></FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="startTime"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Start Time</FormLabel>
+                          <FormControl><Input placeholder="09:00" {...field} /></FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="endTime"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>End Time</FormLabel>
+                          <FormControl><Input placeholder="10:00" {...field} /></FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                     <Button type="submit" className="w-full" disabled={createMutation.isPending}>
-                      {createMutation.isPending ? "Adding..." : "Add Faculty"}
+                      {createMutation.isPending ? "Creating..." : "Create Time Slot"}
                     </Button>
                   </form>
                 </Form>
@@ -134,29 +135,29 @@ export default function Faculty() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Department</TableHead>
-                  <TableHead>Email</TableHead>
+                  <TableHead>Day</TableHead>
+                  <TableHead>Label</TableHead>
+                  <TableHead>Time Range</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading ? (
                   <TableRow><TableCell colSpan={4} className="text-center py-8">Loading...</TableCell></TableRow>
-                ) : facultyList?.length === 0 ? (
-                  <TableRow><TableCell colSpan={4} className="text-center py-8 text-muted-foreground">No faculty found</TableCell></TableRow>
+                ) : timeSlots?.length === 0 ? (
+                  <TableRow><TableCell colSpan={4} className="text-center py-8 text-muted-foreground">No time slots found</TableCell></TableRow>
                 ) : (
-                  facultyList?.map((f) => (
-                    <TableRow key={f.id}>
-                      <TableCell className="font-medium">{f.name}</TableCell>
-                      <TableCell>{getDeptName(f.departmentId)}</TableCell>
-                      <TableCell className="text-muted-foreground">{f.email || '-'}</TableCell>
+                  timeSlots?.map((slot) => (
+                    <TableRow key={slot.id}>
+                      <TableCell className="font-medium">{slot.dayOfWeek}</TableCell>
+                      <TableCell>{slot.label}</TableCell>
+                      <TableCell>{slot.startTime} - {slot.endTime}</TableCell>
                       <TableCell className="text-right">
                         <Button 
                           variant="ghost" 
                           size="icon" 
                           className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                          onClick={() => handleDelete(f.id)}
+                          onClick={() => handleDelete(slot.id)}
                         >
                           <Trash2 className="w-4 h-4" />
                         </Button>

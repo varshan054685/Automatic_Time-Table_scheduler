@@ -1,41 +1,38 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useForm } from "react-hook-form";
-import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Sidebar } from "@/components/Sidebar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Search, ArrowUpDown } from "lucide-react";
 import { useClassrooms, useCreateClassroom, useDeleteClassroom } from "@/hooks/use-master-data";
 import { useToast } from "@/hooks/use-toast";
 import { api } from "@shared/routes";
-
-const formSchema = api.classrooms.create.input.extend({
-    capacity: z.coerce.number()
-});
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export default function Classrooms() {
   const [open, setOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   const { toast } = useToast();
   const { data: classrooms, isLoading } = useClassrooms();
   const createMutation = useCreateClassroom();
   const deleteMutation = useDeleteClassroom();
 
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
-    defaultValues: { roomNumber: "", capacity: 60, type: "lecture" },
+  const form = useForm({
+    resolver: zodResolver(api.classrooms.create.input),
+    defaultValues: { roomNumber: "", capacity: 0, type: "lecture" },
   });
 
-  const onSubmit = (values: z.infer<typeof formSchema>) => {
+  const onSubmit = (values) => {
     createMutation.mutate(values, {
       onSuccess: () => {
         setOpen(false);
         form.reset();
-        toast({ title: "Success", description: "Classroom added successfully" });
+        toast({ title: "Success", description: "Classroom created successfully" });
       },
       onError: (error) => {
         toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -43,11 +40,40 @@ export default function Classrooms() {
     });
   };
 
-  const handleDelete = (id: number) => {
+  const handleDelete = (id) => {
     if (confirm("Are you sure you want to delete this classroom?")) {
       deleteMutation.mutate(id);
     }
   };
+
+  const handleSort = (key) => {
+    let direction = 'asc';
+    if (sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const filteredAndSortedClassrooms = useMemo(() => {
+    if (!classrooms) return [];
+    
+    let result = classrooms.filter(room => 
+      room.roomNumber.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    if (sortConfig.key) {
+      result.sort((a, b) => {
+        if (a[sortConfig.key] < b[sortConfig.key]) {
+          return sortConfig.direction === 'asc' ? -1 : 1;
+        }
+        if (a[sortConfig.key] > b[sortConfig.key]) {
+          return sortConfig.direction === 'asc' ? 1 : -1;
+        }
+        return 0;
+      });
+    }
+    return result;
+  }, [classrooms, searchTerm, sortConfig]);
 
   return (
     <div className="flex min-h-screen bg-slate-50/50">
@@ -57,7 +83,7 @@ export default function Classrooms() {
           <div className="flex justify-between items-center">
             <div>
               <h1 className="text-3xl font-display font-bold text-slate-900">Classrooms</h1>
-              <p className="text-slate-500 mt-1">Manage room allocation.</p>
+              <p className="text-slate-500 mt-1">Manage physical teaching spaces.</p>
             </div>
             
             <Dialog open={open} onOpenChange={setOpen}>
@@ -89,7 +115,7 @@ export default function Classrooms() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Capacity</FormLabel>
-                          <FormControl><Input type="number" {...field} /></FormControl>
+                          <FormControl><Input type="number" {...field} onChange={e => field.onChange(parseInt(e.target.value))} /></FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
@@ -107,8 +133,8 @@ export default function Classrooms() {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              <SelectItem value="lecture">Lecture Hall</SelectItem>
-                              <SelectItem value="lab">Laboratory</SelectItem>
+                              <SelectItem value="lecture">Lecture</SelectItem>
+                              <SelectItem value="lab">Lab</SelectItem>
                             </SelectContent>
                           </Select>
                           <FormMessage />
@@ -116,7 +142,7 @@ export default function Classrooms() {
                       )}
                     />
                     <Button type="submit" className="w-full" disabled={createMutation.isPending}>
-                      {createMutation.isPending ? "Adding..." : "Add Classroom"}
+                      {createMutation.isPending ? "Creating..." : "Create Classroom"}
                     </Button>
                   </form>
                 </Form>
@@ -124,12 +150,28 @@ export default function Classrooms() {
             </Dialog>
           </div>
 
+          <div className="flex items-center gap-4 mb-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <Input 
+                placeholder="Search classrooms..." 
+                className="pl-10" 
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+          </div>
+
           <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Room #</TableHead>
-                  <TableHead>Capacity</TableHead>
+                  <TableHead className="cursor-pointer hover:bg-slate-50" onClick={() => handleSort('roomNumber')}>
+                    <div className="flex items-center gap-2">Room Number <ArrowUpDown className="w-3 h-3" /></div>
+                  </TableHead>
+                  <TableHead className="cursor-pointer hover:bg-slate-50" onClick={() => handleSort('capacity')}>
+                    <div className="flex items-center gap-2">Capacity <ArrowUpDown className="w-3 h-3" /></div>
+                  </TableHead>
                   <TableHead>Type</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -137,12 +179,12 @@ export default function Classrooms() {
               <TableBody>
                 {isLoading ? (
                   <TableRow><TableCell colSpan={4} className="text-center py-8">Loading...</TableCell></TableRow>
-                ) : classrooms?.length === 0 ? (
+                ) : filteredAndSortedClassrooms.length === 0 ? (
                   <TableRow><TableCell colSpan={4} className="text-center py-8 text-muted-foreground">No classrooms found</TableCell></TableRow>
                 ) : (
-                  classrooms?.map((room) => (
+                  filteredAndSortedClassrooms.map((room) => (
                     <TableRow key={room.id}>
-                      <TableCell className="font-bold">{room.roomNumber}</TableCell>
+                      <TableCell className="font-medium">{room.roomNumber}</TableCell>
                       <TableCell>{room.capacity}</TableCell>
                       <TableCell className="capitalize">{room.type}</TableCell>
                       <TableCell className="text-right">

@@ -1,6 +1,5 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useForm } from "react-hook-form";
-import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Sidebar } from "@/components/Sidebar";
 import { Button } from "@/components/ui/button";
@@ -8,26 +7,26 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Trash2, Building2 } from "lucide-react";
+import { Plus, Trash2, Search, ArrowUpDown } from "lucide-react";
 import { useDepartments, useCreateDepartment, useDeleteDepartment } from "@/hooks/use-master-data";
 import { useToast } from "@/hooks/use-toast";
 import { api } from "@shared/routes";
 
-const formSchema = api.departments.create.input;
-
 export default function Departments() {
   const [open, setOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   const { toast } = useToast();
   const { data: departments, isLoading } = useDepartments();
   const createMutation = useCreateDepartment();
   const deleteMutation = useDeleteDepartment();
 
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
+  const form = useForm({
+    resolver: zodResolver(api.departments.create.input),
     defaultValues: { name: "", code: "" },
   });
 
-  const onSubmit = (values: z.infer<typeof formSchema>) => {
+  const onSubmit = (values) => {
     createMutation.mutate(values, {
       onSuccess: () => {
         setOpen(false);
@@ -40,11 +39,41 @@ export default function Departments() {
     });
   };
 
-  const handleDelete = (id: number) => {
+  const handleDelete = (id) => {
     if (confirm("Are you sure you want to delete this department?")) {
       deleteMutation.mutate(id);
     }
   };
+
+  const handleSort = (key) => {
+    let direction = 'asc';
+    if (sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const filteredAndSortedDepartments = useMemo(() => {
+    if (!departments) return [];
+    
+    let result = departments.filter(dept => 
+      dept.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      dept.code.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    if (sortConfig.key) {
+      result.sort((a, b) => {
+        if (a[sortConfig.key] < b[sortConfig.key]) {
+          return sortConfig.direction === 'asc' ? -1 : 1;
+        }
+        if (a[sortConfig.key] > b[sortConfig.key]) {
+          return sortConfig.direction === 'asc' ? 1 : -1;
+        }
+        return 0;
+      });
+    }
+    return result;
+  }, [departments, searchTerm, sortConfig]);
 
   return (
     <div className="flex min-h-screen bg-slate-50/50">
@@ -100,22 +129,38 @@ export default function Departments() {
             </Dialog>
           </div>
 
+          <div className="flex items-center gap-4 mb-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <Input 
+                placeholder="Search departments..." 
+                className="pl-10" 
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+          </div>
+
           <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Code</TableHead>
-                  <TableHead>Department Name</TableHead>
+                  <TableHead className="cursor-pointer hover:bg-slate-50" onClick={() => handleSort('code')}>
+                    <div className="flex items-center gap-2">Code <ArrowUpDown className="w-3 h-3" /></div>
+                  </TableHead>
+                  <TableHead className="cursor-pointer hover:bg-slate-50" onClick={() => handleSort('name')}>
+                    <div className="flex items-center gap-2">Department Name <ArrowUpDown className="w-3 h-3" /></div>
+                  </TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading ? (
                   <TableRow><TableCell colSpan={3} className="text-center py-8">Loading...</TableCell></TableRow>
-                ) : departments?.length === 0 ? (
+                ) : filteredAndSortedDepartments.length === 0 ? (
                   <TableRow><TableCell colSpan={3} className="text-center py-8 text-muted-foreground">No departments found</TableCell></TableRow>
                 ) : (
-                  departments?.map((dept) => (
+                  filteredAndSortedDepartments.map((dept) => (
                     <TableRow key={dept.id}>
                       <TableCell className="font-mono">{dept.code}</TableCell>
                       <TableCell className="font-medium">{dept.name}</TableCell>
