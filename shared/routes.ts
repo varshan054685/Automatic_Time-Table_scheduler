@@ -42,7 +42,7 @@ export const api = {
       path: '/api/register' as const,
       input: insertUserSchema,
       responses: {
-        201: z.custom<typeof users.$inferSelect>(),
+        201: z.any(),
         400: errorSchemas.validation,
       },
     },
@@ -51,7 +51,7 @@ export const api = {
       path: '/api/login' as const,
       input: z.object({ username: z.string(), password: z.string() }),
       responses: {
-        200: z.custom<typeof users.$inferSelect>(),
+        200: z.any(),
         401: z.object({ message: z.string() }),
       },
     },
@@ -66,7 +66,7 @@ export const api = {
       method: 'GET' as const,
       path: '/api/user' as const,
       responses: {
-        200: z.custom<typeof users.$inferSelect>(),
+        200: z.any(),
         401: z.void(),
       },
     },
@@ -75,13 +75,19 @@ export const api = {
     list: {
       method: 'GET' as const,
       path: '/api/departments' as const,
-      responses: { 200: z.array(z.custom<typeof departments.$inferSelect>()) },
+      responses: { 200: z.array(z.any()) },
     },
     create: {
       method: 'POST' as const,
       path: '/api/departments' as const,
       input: insertDepartmentSchema,
-      responses: { 201: z.custom<typeof departments.$inferSelect>() },
+      responses: { 201: z.any() },
+    },
+    update: {
+      method: 'PATCH' as const,
+      path: '/api/departments/:id' as const,
+      input: insertDepartmentSchema.partial(),
+      responses: { 200: z.any() },
     },
     delete: {
       method: 'DELETE' as const,
@@ -93,13 +99,19 @@ export const api = {
     list: {
       method: 'GET' as const,
       path: '/api/classrooms' as const,
-      responses: { 200: z.array(z.custom<typeof classrooms.$inferSelect>()) },
+      responses: { 200: z.array(z.any()) },
     },
     create: {
       method: 'POST' as const,
       path: '/api/classrooms' as const,
       input: insertClassroomSchema,
-      responses: { 201: z.custom<typeof classrooms.$inferSelect>() },
+      responses: { 201: z.any() },
+    },
+    update: {
+      method: 'PATCH' as const,
+      path: '/api/classrooms/:id' as const,
+      input: insertClassroomSchema.partial(),
+      responses: { 200: z.any() },
     },
     delete: {
       method: 'DELETE' as const,
@@ -111,13 +123,19 @@ export const api = {
     list: {
       method: 'GET' as const,
       path: '/api/subjects' as const,
-      responses: { 200: z.array(z.custom<typeof subjects.$inferSelect>()) },
+      responses: { 200: z.array(z.any()) },
     },
     create: {
       method: 'POST' as const,
       path: '/api/subjects' as const,
       input: insertSubjectSchema,
-      responses: { 201: z.custom<typeof subjects.$inferSelect>() },
+      responses: { 201: z.any() },
+    },
+    update: {
+      method: 'PATCH' as const,
+      path: '/api/subjects/:id' as const,
+      input: insertSubjectSchema.partial(),
+      responses: { 200: z.any() },
     },
     delete: {
       method: 'DELETE' as const,
@@ -129,13 +147,19 @@ export const api = {
     list: {
       method: 'GET' as const,
       path: '/api/faculty' as const,
-      responses: { 200: z.array(z.custom<typeof faculty.$inferSelect>()) },
+      responses: { 200: z.array(z.any()) },
     },
     create: {
       method: 'POST' as const,
       path: '/api/faculty' as const,
       input: insertFacultySchema,
-      responses: { 201: z.custom<typeof faculty.$inferSelect>() },
+      responses: { 201: z.any() },
+    },
+    update: {
+      method: 'PATCH' as const,
+      path: '/api/faculty/:id' as const,
+      input: insertFacultySchema.partial(),
+      responses: { 200: z.any() },
     },
     delete: {
       method: 'DELETE' as const,
@@ -147,13 +171,19 @@ export const api = {
     list: {
       method: 'GET' as const,
       path: '/api/sections' as const,
-      responses: { 200: z.array(z.custom<typeof sections.$inferSelect>()) },
+      responses: { 200: z.array(z.any()) },
     },
     create: {
       method: 'POST' as const,
       path: '/api/sections' as const,
       input: insertSectionSchema,
-      responses: { 201: z.custom<typeof sections.$inferSelect>() },
+      responses: { 201: z.any() },
+    },
+    update: {
+      method: 'PATCH' as const,
+      path: '/api/sections/:id' as const,
+      input: insertSectionSchema.partial(),
+      responses: { 200: z.any() },
     },
     delete: {
       method: 'DELETE' as const,
@@ -165,13 +195,19 @@ export const api = {
     list: {
       method: 'GET' as const,
       path: '/api/timeslots' as const,
-      responses: { 200: z.array(z.custom<typeof timeSlots.$inferSelect>()) },
+      responses: { 200: z.array(z.any()) },
     },
     create: {
       method: 'POST' as const,
       path: '/api/timeslots' as const,
       input: insertTimeSlotSchema,
-      responses: { 201: z.custom<typeof timeSlots.$inferSelect>() },
+      responses: { 201: z.any() },
+    },
+    update: {
+      method: 'PATCH' as const,
+      path: '/api/timeslots/:id' as const,
+      input: insertTimeSlotSchema.partial(),
+      responses: { 200: z.any() },
     },
     delete: {
       method: 'DELETE' as const,
@@ -188,13 +224,7 @@ export const api = {
         facultyId: z.string().optional(),
       }).optional(),
       responses: { 
-        200: z.array(z.custom<typeof timetable.$inferSelect & {
-          subject: typeof subjects.$inferSelect,
-          faculty: typeof faculty.$inferSelect,
-          classroom: typeof classrooms.$inferSelect,
-          timeSlot: typeof timeSlots.$inferSelect,
-          section: typeof sections.$inferSelect,
-        }>()) 
+        200: z.array(z.any()) 
       },
     },
     generate: {

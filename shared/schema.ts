@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, jsonb, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations } from "drizzle-orm";
@@ -17,6 +17,7 @@ export const departments = pgTable("departments", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   code: text("code").notNull().unique(),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 export const classrooms = pgTable("classrooms", {
@@ -24,6 +25,7 @@ export const classrooms = pgTable("classrooms", {
   roomNumber: text("room_number").notNull().unique(),
   capacity: integer("capacity").notNull(),
   type: text("type").default("lecture"), // lecture, lab
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 export const subjects = pgTable("subjects", {
@@ -33,6 +35,7 @@ export const subjects = pgTable("subjects", {
   weeklyHours: integer("weekly_hours").notNull(),
   departmentId: integer("department_id").notNull(), // Foreign key to departments
   type: text("type").default("theory"), // theory, lab
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 export const faculty = pgTable("faculty", {
@@ -42,6 +45,7 @@ export const faculty = pgTable("faculty", {
   email: text("email"),
   // JSON array of blocked time slots or preferences
   availability: jsonb("availability").$type<string[]>().default([]), 
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 export const sections = pgTable("sections", {
@@ -50,6 +54,7 @@ export const sections = pgTable("sections", {
   year: integer("year").notNull(),
   semester: integer("semester").notNull(),
   departmentId: integer("department_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 export const timeSlots = pgTable("time_slots", {

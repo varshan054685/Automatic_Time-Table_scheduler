@@ -21,6 +21,10 @@ export async function registerRoutes(
     const dept = await storage.createDepartment(req.body);
     res.status(201).json(dept);
   });
+  app.patch(api.departments.update.path, async (req, res) => {
+    const dept = await storage.updateDepartment(parseInt(req.params.id), req.body);
+    res.json(dept);
+  });
   app.delete(api.departments.delete.path, async (req, res) => {
     await storage.deleteDepartment(parseInt(req.params.id));
     res.status(204).send();
@@ -34,6 +38,10 @@ export async function registerRoutes(
   app.post(api.classrooms.create.path, async (req, res) => {
     const room = await storage.createClassroom(req.body);
     res.status(201).json(room);
+  });
+  app.patch(api.classrooms.update.path, async (req, res) => {
+    const room = await storage.updateClassroom(parseInt(req.params.id), req.body);
+    res.json(room);
   });
   app.delete(api.classrooms.delete.path, async (req, res) => {
     await storage.deleteClassroom(parseInt(req.params.id));
@@ -49,6 +57,10 @@ export async function registerRoutes(
     const subj = await storage.createSubject(req.body);
     res.status(201).json(subj);
   });
+  app.patch(api.subjects.update.path, async (req, res) => {
+    const subj = await storage.updateSubject(parseInt(req.params.id), req.body);
+    res.json(subj);
+  });
   app.delete(api.subjects.delete.path, async (req, res) => {
     await storage.deleteSubject(parseInt(req.params.id));
     res.status(204).send();
@@ -62,6 +74,10 @@ export async function registerRoutes(
   app.post(api.faculty.create.path, async (req, res) => {
     const fac = await storage.createFaculty(req.body);
     res.status(201).json(fac);
+  });
+  app.patch(api.faculty.update.path, async (req, res) => {
+    const fac = await storage.updateFaculty(parseInt(req.params.id), req.body);
+    res.json(fac);
   });
   app.delete(api.faculty.delete.path, async (req, res) => {
     await storage.deleteFaculty(parseInt(req.params.id));
@@ -77,6 +93,10 @@ export async function registerRoutes(
     const sec = await storage.createSection(req.body);
     res.status(201).json(sec);
   });
+  app.patch(api.sections.update.path, async (req, res) => {
+    const sec = await storage.updateSection(parseInt(req.params.id), req.body);
+    res.json(sec);
+  });
   app.delete(api.sections.delete.path, async (req, res) => {
     await storage.deleteSection(parseInt(req.params.id));
     res.status(204).send();
@@ -90,6 +110,10 @@ export async function registerRoutes(
   app.post(api.timeSlots.create.path, async (req, res) => {
     const slot = await storage.createTimeSlot(req.body);
     res.status(201).json(slot);
+  });
+  app.patch(api.timeSlots.update.path, async (req, res) => {
+    const slot = await storage.updateTimeSlot(parseInt(req.params.id), req.body);
+    res.json(slot);
   });
   app.delete(api.timeSlots.delete.path, async (req, res) => {
     await storage.deleteTimeSlot(parseInt(req.params.id));
