@@ -21,8 +21,8 @@ export default function Dashboard() {
   return (
     <div className="flex min-h-screen bg-slate-50/50">
       <Sidebar />
-      <main className="flex-1 ml-64 p-8">
-        <div className="max-w-7xl mx-auto space-y-8 animate-in">
+      <main className="flex-1 lg:ml-64 p-4 lg:p-8">
+        <div className="max-w-7xl mx-auto space-y-8 animate-in pt-12 lg:pt-0">
           <div>
             <h1 className="text-3xl font-display font-bold text-slate-900">Dashboard</h1>
             <p className="text-slate-500 mt-1">Overview of college resources and statistics.</p>

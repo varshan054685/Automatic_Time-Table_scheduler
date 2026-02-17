@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { 
   LayoutDashboard, 
@@ -8,15 +9,18 @@ import {
   CalendarDays, 
   Clock,
   LogOut,
-  Calendar
+  Calendar,
+  Menu,
+  X
 } from "lucide-react";
 import { useLogout } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const navItems = [
   { label: "Dashboard", href: "/", icon: LayoutDashboard },
   { label: "Departments", href: "/departments", icon: Building2 },
-  { label: "Classrooms", href: "/classrooms", icon: Users }, // Using Users icon as generic placeholder, but Classrooms is specific
+  { label: "Classrooms", href: "/classrooms", icon: Users }, 
   { label: "Subjects", href: "/subjects", icon: BookOpen },
   { label: "Faculty", href: "/faculty", icon: GraduationCap },
   { label: "Sections", href: "/sections", icon: Users },
@@ -27,10 +31,14 @@ const navItems = [
 export function Sidebar() {
   const [location] = useLocation();
   const logoutMutation = useLogout();
+  const isMobile = useIsMobile();
+  const [isOpen, setIsOpen] = useState(false);
 
-  return (
-    <div className="h-screen w-64 bg-slate-900 text-white flex flex-col fixed left-0 top-0 border-r border-slate-800">
-      <div className="p-6 border-b border-slate-800">
+  const toggleSidebar = () => setIsOpen(!isOpen);
+
+  const sidebarContent = (
+    <div className={`h-screen w-64 bg-slate-900 text-white flex flex-col fixed left-0 top-0 border-r border-slate-800 z-50 transition-transform duration-300 ${isMobile && !isOpen ? '-translate-x-full' : 'translate-x-0'}`}>
+      <div className="p-6 border-b border-slate-800 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Calendar className="w-8 h-8 text-primary" />
           <div>
@@ -38,13 +46,18 @@ export function Sidebar() {
             <p className="text-xs text-slate-400">Scheduler Admin</p>
           </div>
         </div>
+        {isMobile && (
+          <Button variant="ghost" size="icon" onClick={toggleSidebar}>
+            <X className="w-6 h-6" />
+          </Button>
+        )}
       </div>
 
       <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
         {navItems.map((item) => {
           const isActive = location === item.href;
           return (
-            <Link key={item.href} href={item.href}>
+            <Link key={item.href} href={item.href} onClick={() => isMobile && setIsOpen(false)}>
               <div 
                 className={`
                   flex items-center gap-3 px-4 py-3 rounded-lg cursor-pointer transition-all duration-200
@@ -73,5 +86,24 @@ export function Sidebar() {
         </Button>
       </div>
     </div>
+  );
+
+  return (
+    <>
+      {isMobile && (
+        <div className="fixed top-4 left-4 z-40">
+          <Button variant="outline" size="icon" onClick={toggleSidebar} className="bg-white shadow-md">
+            <Menu className="w-6 h-6" />
+          </Button>
+        </div>
+      )}
+      {sidebarContent}
+      {isMobile && isOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-40" 
+          onClick={toggleSidebar}
+        />
+      )}
+    </>
   );
 }

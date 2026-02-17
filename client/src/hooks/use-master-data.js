@@ -31,6 +31,24 @@ export function useCreateDepartment() {
   });
 }
 
+export function useUpdateDepartment() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...data }) => {
+      const url = buildUrl(api.departments.update.path, { id });
+      const res = await fetch(url, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to update department");
+      return res.json();
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: [api.departments.list.path] }),
+  });
+}
+
 export function useDeleteDepartment() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -71,6 +89,24 @@ export function useCreateClassroom() {
       });
       if (!res.ok) throw new Error("Failed to create classroom");
       return api.classrooms.create.responses[201].parse(await res.json());
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: [api.classrooms.list.path] }),
+  });
+}
+
+export function useUpdateClassroom() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...data }) => {
+      const url = buildUrl(api.classrooms.update.path, { id });
+      const res = await fetch(url, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...data, capacity: Number(data.capacity) }),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to update classroom");
+      return res.json();
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: [api.classrooms.list.path] }),
   });
@@ -122,6 +158,28 @@ export function useCreateSubject() {
   });
 }
 
+export function useUpdateSubject() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...data }) => {
+      const url = buildUrl(api.subjects.update.path, { id });
+      const res = await fetch(url, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...data,
+          weeklyHours: Number(data.weeklyHours),
+          departmentId: Number(data.departmentId)
+        }),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to update subject");
+      return res.json();
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: [api.subjects.list.path] }),
+  });
+}
+
 export function useDeleteSubject() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -162,6 +220,24 @@ export function useCreateFaculty() {
       });
       if (!res.ok) throw new Error("Failed to create faculty");
       return api.faculty.create.responses[201].parse(await res.json());
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: [api.faculty.list.path] }),
+  });
+}
+
+export function useUpdateFaculty() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...data }) => {
+      const url = buildUrl(api.faculty.update.path, { id });
+      const res = await fetch(url, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...data, departmentId: Number(data.departmentId) }),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to update faculty");
+      return res.json();
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: [api.faculty.list.path] }),
   });
@@ -214,6 +290,29 @@ export function useCreateSection() {
   });
 }
 
+export function useUpdateSection() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...data }) => {
+      const url = buildUrl(api.sections.update.path, { id });
+      const res = await fetch(url, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...data,
+          departmentId: Number(data.departmentId),
+          year: Number(data.year),
+          semester: Number(data.semester)
+        }),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to update section");
+      return res.json();
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: [api.sections.list.path] }),
+  });
+}
+
 export function useDeleteSection() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -251,6 +350,24 @@ export function useCreateTimeSlot() {
       });
       if (!res.ok) throw new Error("Failed to create time slot");
       return api.timeSlots.create.responses[201].parse(await res.json());
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: [api.timeSlots.list.path] }),
+  });
+}
+
+export function useUpdateTimeSlot() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...data }) => {
+      const url = buildUrl(api.timeSlots.update.path, { id });
+      const res = await fetch(url, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to update time slot");
+      return res.json();
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: [api.timeSlots.list.path] }),
   });

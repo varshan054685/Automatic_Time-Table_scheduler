@@ -7,18 +7,21 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Trash2, Search, ArrowUpDown } from "lucide-react";
-import { useDepartments, useCreateDepartment, useDeleteDepartment } from "@/hooks/use-master-data";
+import { Plus, Trash2, Search, ArrowUpDown, Pencil, Upload } from "lucide-react";
+import { useDepartments, useCreateDepartment, useUpdateDepartment, useDeleteDepartment } from "@/hooks/use-master-data";
 import { useToast } from "@/hooks/use-toast";
 import { api } from "@shared/routes";
+import * as XLSX from "xlsx";
 
 export default function Departments() {
   const [open, setOpen] = useState(false);
+  const [editingId, setEditingId] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   const { toast } = useToast();
   const { data: departments, isLoading } = useDepartments();
   const createMutation = useCreateDepartment();
+  const updateMutation = useUpdateDepartment();
   const deleteMutation = useDeleteDepartment();
 
   const form = useForm({
@@ -27,22 +30,62 @@ export default function Departments() {
   });
 
   const onSubmit = (values) => {
-    createMutation.mutate(values, {
-      onSuccess: () => {
-        setOpen(false);
-        form.reset();
-        toast({ title: "Success", description: "Department created successfully" });
-      },
-      onError: (error) => {
-        toast({ title: "Error", description: error.message, variant: "destructive" });
-      }
-    });
+    if (editingId) {
+      updateMutation.mutate({ id: editingId, ...values }, {
+        onSuccess: () => {
+          setOpen(false);
+          setEditingId(null);
+          form.reset();
+          toast({ title: "Success", description: "Department updated successfully" });
+        },
+        onError: (error) => {
+          toast({ title: "Error", description: error.message, variant: "destructive" });
+        }
+      });
+    } else {
+      createMutation.mutate(values, {
+        onSuccess: () => {
+          setOpen(false);
+          form.reset();
+          toast({ title: "Success", description: "Department created successfully" });
+        },
+        onError: (error) => {
+          toast({ title: "Error", description: error.message, variant: "destructive" });
+        }
+      });
+    }
+  };
+
+  const handleEdit = (dept) => {
+    setEditingId(dept.id);
+    form.reset({ name: dept.name, code: dept.code });
+    setOpen(true);
   };
 
   const handleDelete = (id) => {
     if (confirm("Are you sure you want to delete this department?")) {
       deleteMutation.mutate(id);
     }
+  };
+
+  const handleImport = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const bstr = evt.target.result;
+      const wb = XLSX.read(bstr, { type: "binary" });
+      const wsname = wb.SheetNames[0];
+      const ws = wb.Sheets[wsname];
+      const data = XLSX.utils.sheet_to_json(ws);
+      data.forEach(item => {
+        if (item.name && item.code) {
+          createMutation.mutate({ name: item.name, code: String(item.code) });
+        }
+      });
+      toast({ title: "Import Started", description: `Processing ${data.length} records...` });
+    };
+    reader.readAsBinaryString(file);
   };
 
   const handleSort = (key) => {
@@ -78,55 +121,72 @@ export default function Departments() {
   return (
     <div className="flex min-h-screen bg-slate-50/50">
       <Sidebar />
-      <main className="flex-1 ml-64 p-8">
-        <div className="max-w-5xl mx-auto space-y-6">
+      <main className="flex-1 lg:ml-64 p-4 lg:p-8">
+        <div className="max-w-5xl mx-auto space-y-6 pt-12 lg:pt-0">
           <div className="flex justify-between items-center">
             <div>
               <h1 className="text-3xl font-display font-bold text-slate-900">Departments</h1>
               <p className="text-slate-500 mt-1">Manage academic departments.</p>
             </div>
             
-            <Dialog open={open} onOpenChange={setOpen}>
-              <DialogTrigger asChild>
-                <Button className="gap-2 shadow-lg shadow-primary/20">
-                  <Plus className="w-4 h-4" /> Add Department
+            <div className="flex gap-2">
+              <div className="relative">
+                <Input
+                  type="file"
+                  accept=".xlsx, .xls"
+                  className="hidden"
+                  id="import-excel"
+                  onChange={handleImport}
+                />
+                <Button variant="outline" className="gap-2" asChild>
+                  <label htmlFor="import-excel" className="cursor-pointer">
+                    <Upload className="w-4 h-4" /> Import Excel
+                  </label>
                 </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Add Department</DialogTitle>
-                </DialogHeader>
-                <Form {...form}>
-                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                    <FormField
-                      control={form.control}
-                      name="name"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Name</FormLabel>
-                          <FormControl><Input placeholder="Computer Science" {...field} /></FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="code"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Code</FormLabel>
-                          <FormControl><Input placeholder="CSE" {...field} /></FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <Button type="submit" className="w-full" disabled={createMutation.isPending}>
-                      {createMutation.isPending ? "Creating..." : "Create Department"}
-                    </Button>
-                  </form>
-                </Form>
-              </DialogContent>
-            </Dialog>
+              </div>
+
+              <Dialog open={open} onOpenChange={(v) => { setOpen(v); if(!v) { setEditingId(null); form.reset(); } }}>
+                <DialogTrigger asChild>
+                  <Button className="gap-2 shadow-lg shadow-primary/20">
+                    <Plus className="w-4 h-4" /> Add Department
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>{editingId ? "Edit Department" : "Add Department"}</DialogTitle>
+                  </DialogHeader>
+                  <Form {...form}>
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                      <FormField
+                        control={form.control}
+                        name="name"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Name</FormLabel>
+                            <FormControl><Input placeholder="Computer Science" {...field} /></FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="code"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Code</FormLabel>
+                            <FormControl><Input placeholder="CSE" {...field} /></FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <Button type="submit" className="w-full" disabled={createMutation.isPending || updateMutation.isPending}>
+                        {editingId ? (updateMutation.isPending ? "Updating..." : "Update Department") : (createMutation.isPending ? "Creating..." : "Create Department")}
+                      </Button>
+                    </form>
+                  </Form>
+                </DialogContent>
+              </Dialog>
+            </div>
           </div>
 
           <div className="flex items-center gap-4 mb-4">
@@ -165,14 +225,24 @@ export default function Departments() {
                       <TableCell className="font-mono">{dept.code}</TableCell>
                       <TableCell className="font-medium">{dept.name}</TableCell>
                       <TableCell className="text-right">
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                          onClick={() => handleDelete(dept.id)}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
+                        <div className="flex justify-end gap-2">
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="text-slate-500 hover:text-primary hover:bg-primary/10"
+                            onClick={() => handleEdit(dept)}
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                            onClick={() => handleDelete(dept.id)}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))
