@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Sidebar } from "@/components/Sidebar";
@@ -7,12 +7,89 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Trash2, Search, ArrowUpDown, Pencil, Upload } from "lucide-react";
+import { Plus, Trash2, Search, ArrowUpDown, Pencil, Upload, Loader2 } from "lucide-react";
 import { useSubjects, useCreateSubject, useUpdateSubject, useDeleteSubject, useDepartments } from "@/hooks/use-master-data";
 import { useToast } from "@/hooks/use-toast";
 import { api } from "@shared/routes";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import * as XLSX from "xlsx";
+
+function SubjectImport({ departments, onImportComplete }) {
+  const [isImporting, setIsImporting] = useState(false);
+  const fileInputRef = useRef(null);
+  const { toast } = useToast();
+  const createMutation = useCreateSubject();
+
+  const handleImport = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setIsImporting(true);
+    const reader = new FileReader();
+
+    reader.onload = async (evt) => {
+      try {
+        const bstr = evt.target.result;
+        const wb = XLSX.read(bstr, { type: "binary" });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json(ws);
+
+        let successCount = 0;
+        let errorCount = 0;
+
+        for (const item of data) {
+          const name = item["Name"] || item.name;
+          const code = item["Code"] || item.code;
+          const hours = item["Weekly Hours"] || item.weeklyHours;
+          const deptSearch = item["Department"] || item.department || item.departmentCode;
+
+          if (name && code) {
+            const dept = departments?.find(d => d.name === deptSearch || d.code === deptSearch);
+            try {
+              await createMutation.mutateAsync({ 
+                name, 
+                code: String(code), 
+                weeklyHours: Number(hours || 0),
+                departmentId: dept ? dept.id : Number(item.departmentId || 0),
+                type: "theory"
+              });
+              successCount++;
+            } catch (err) {
+              errorCount++;
+            }
+          }
+        }
+
+        toast({ 
+          title: "Import Complete", 
+          description: `Successfully imported ${successCount} subjects.${errorCount > 0 ? ` Failed to import ${errorCount} records.` : ""}`,
+          variant: errorCount > 0 ? "destructive" : "default"
+        });
+        
+        if (onImportComplete) onImportComplete();
+      } catch (error) {
+        toast({ title: "Import Failed", description: "Failed to read Excel file", variant: "destructive" });
+      } finally {
+        setIsImporting(false);
+        if (fileInputRef.current) fileInputRef.current.value = "";
+      }
+    };
+    reader.readAsBinaryString(file);
+  };
+
+  return (
+    <div className="relative">
+      <Input type="file" accept=".xlsx, .xls" className="hidden" id="import-excel" ref={fileInputRef} onChange={handleImport} disabled={isImporting} />
+      <Button variant="outline" className="gap-2" asChild disabled={isImporting}>
+        <label htmlFor="import-excel" className="cursor-pointer">
+          {isImporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+          {isImporting ? "Importing..." : "Import Excel"}
+        </label>
+      </Button>
+    </div>
+  );
+}
 
 export default function Subjects() {
   const [open, setOpen] = useState(false);
@@ -20,7 +97,7 @@ export default function Subjects() {
   const [searchTerm, setSearchTerm] = useState("");
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   const { toast } = useToast();
-  const { data: subjects, isLoading } = useSubjects();
+  const { data: subjects, isLoading, refetch } = useSubjects();
   const { data: departments } = useDepartments();
   const createMutation = useCreateSubject();
   const updateMutation = useUpdateSubject();
@@ -70,33 +147,6 @@ export default function Subjects() {
     }
   };
 
-  const handleImport = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      const bstr = evt.target.result;
-      const wb = XLSX.read(bstr, { type: "binary" });
-      const wsname = wb.SheetNames[0];
-      const ws = wb.Sheets[wsname];
-      const data = XLSX.utils.sheet_to_json(ws);
-      data.forEach(item => {
-        if (item.name && item.code) {
-          const dept = departments?.find(d => d.name === item.department || d.code === item.departmentCode);
-          createMutation.mutate({ 
-            name: item.name, 
-            code: String(item.code), 
-            weeklyHours: Number(item.weeklyHours || 0),
-            departmentId: dept ? dept.id : Number(item.departmentId || 0),
-            type: "theory"
-          });
-        }
-      });
-      toast({ title: "Import Started", description: `Processing ${data.length} records...` });
-    };
-    reader.readAsBinaryString(file);
-  };
-
   const handleSort = (key) => {
     let direction = 'asc';
     if (sortConfig.key === key && sortConfig.direction === 'asc') {
@@ -139,20 +189,7 @@ export default function Subjects() {
             </div>
             
             <div className="flex gap-2">
-              <div className="relative">
-                <Input
-                  type="file"
-                  accept=".xlsx, .xls"
-                  className="hidden"
-                  id="import-excel"
-                  onChange={handleImport}
-                />
-                <Button variant="outline" className="gap-2" asChild>
-                  <label htmlFor="import-excel" className="cursor-pointer">
-                    <Upload className="w-4 h-4" /> Import Excel
-                  </label>
-                </Button>
-              </div>
+              <SubjectImport departments={departments} onImportComplete={refetch} />
 
               <Dialog open={open} onOpenChange={(v) => { setOpen(v); if(!v) { setEditingId(null); form.reset(); } }}>
                 <DialogTrigger asChild>
