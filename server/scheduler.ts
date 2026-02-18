@@ -39,71 +39,63 @@ export async function generateTimetable(departmentId: number, semester?: number)
     
     for (const subject of subjects) {
       const requiredSlots = subject.weeklyHours;
-      let slotsAssigned = 0;
-
-      // Find faculty for this subject (naive: just pick the first one in the dept, or random)
-      // In real app: Faculty-Subject mapping.
-      const availableFaculty = faculty.filter(f => f.departmentId === departmentId);
-      if (availableFaculty.length === 0) continue; 
       
-      // Simple round-robin or random assignment of faculty to subject/section
-      const assignedFaculty = availableFaculty[Math.floor(Math.random() * availableFaculty.length)];
+      // Use assigned faculty/section from subject if available
+      const targetFaculty = subject.facultyId ? faculty.find(f => f.id === subject.facultyId) : null;
+      const targetSection = subject.sectionId ? relevantSections.find(s => s.id === subject.sectionId) : null;
 
-      for (const slot of timeSlots) {
-        if (slotsAssigned >= requiredSlots) break;
+      // If subject is tied to a specific section, only schedule for that section
+      const sectionsToSchedule = targetSection ? [targetSection] : relevantSections;
 
-        // Check availability
-        // 1. Is Section free? (We are building it, so we check DB + local cache if we had one. 
-        //    Since we cleared DB, we can just check if we already assigned this slot to this section in this run? 
-        //    Wait, we need to check against OTHER allocations made in this transaction. 
-        //    For simplicity, let's query DB for global conflicts or keep a local set.)
+      for (const currentSection of sectionsToSchedule) {
+        let slotsAssigned = 0;
         
-        // 2. Is Faculty free?
-        // 3. Is Room free?
+        // Find faculty for this subject
+        const availableFaculty = faculty.filter(f => f.departmentId === departmentId);
+        if (availableFaculty.length === 0 && !targetFaculty) continue; 
         
-        // Let's try to find a room
-        let assignedRoom = null;
-        for (const room of classrooms) {
-          // Check if room is taken at this slot by anyone
-          // This requires checking the *current* state of the schedule, including what we just added.
-          // Since we are writing to DB sequentially, let's just do a naive "try insert" or check.
-          // PERFORMANCE WARNING: This is N^3 DB calls. 
-          // For a "Lite" app, let's just proceed.
-          
-          const existingRoomEntry = (await storage.getTimetable(undefined, undefined))
-            .find(t => t.timeSlotId === slot.id && t.classroomId === room.id);
-            
-          if (!existingRoomEntry) {
-            assignedRoom = room;
-            break;
+        const assignedFaculty = targetFaculty || availableFaculty[Math.floor(Math.random() * availableFaculty.length)];
+
+        for (const slot of timeSlots) {
+          if (slotsAssigned >= requiredSlots) break;
+
+          // Check availability
+          // 1. Is Section free?
+          const sectionTimetable = await storage.getTimetable(currentSection.id, undefined);
+          const sectionBusy = sectionTimetable.find(t => t.timeSlotId === slot.id);
+          if (sectionBusy) continue;
+
+          // 2. Is Faculty free?
+          const facultyTimetable = await storage.getTimetable(undefined, assignedFaculty.id);
+          const facultyBusy = facultyTimetable.find(t => t.timeSlotId === slot.id);
+          if (facultyBusy) continue;
+        
+          // 3. Is Room free?
+          let assignedRoom = null;
+          const allTimetable = await storage.getTimetable(undefined, undefined);
+          for (const room of classrooms) {
+            const roomBusy = allTimetable.find(t => t.timeSlotId === slot.id && t.classroomId === room.id);
+              
+            if (!roomBusy) {
+              assignedRoom = room;
+              break;
+            }
           }
+
+          if (!assignedRoom) continue;
+
+          // Create Entry
+          await storage.createTimetableEntry({
+            sectionId: currentSection.id,
+            subjectId: subject.id,
+            facultyId: assignedFaculty.id,
+            classroomId: assignedRoom.id,
+            timeSlotId: slot.id,
+          });
+
+          slotsAssigned++;
+          scheduledCount++;
         }
-
-        if (!assignedRoom) continue; // No rooms available for this slot
-
-        // Check faculty availability
-        const existingFacultyEntry = (await storage.getTimetable(undefined, assignedFaculty.id))
-            .find(t => t.timeSlotId === slot.id);
-        
-        if (existingFacultyEntry) continue; // Faculty busy
-
-        // Check section availability
-        const existingSectionEntry = (await storage.getTimetable(section.id, undefined))
-            .find(t => t.timeSlotId === slot.id);
-
-        if (existingSectionEntry) continue; // Section busy
-
-        // Create Entry
-        await storage.createTimetableEntry({
-          sectionId: section.id,
-          subjectId: subject.id,
-          facultyId: assignedFaculty.id,
-          classroomId: assignedRoom.id,
-          timeSlotId: slot.id,
-        });
-
-        slotsAssigned++;
-        scheduledCount++;
       }
     }
   }

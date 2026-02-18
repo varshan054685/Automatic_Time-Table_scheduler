@@ -141,12 +141,12 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(subjects).where(eq(subjects.departmentId, deptId));
   }
 
-  async createSubject(subject: typeof subjects.$inferInsert): Promise<Subject> {
+  async createSubject(subject: any): Promise<Subject> {
     const [s] = await db.insert(subjects).values(subject).returning();
     return s;
   }
 
-  async updateSubject(id: number, subject: Partial<typeof subjects.$inferInsert>): Promise<Subject> {
+  async updateSubject(id: number, subject: any): Promise<Subject> {
     const [s] = await db.update(subjects).set(subject).where(eq(subjects.id, id)).returning();
     if (!s) throw new Error("Subject not found");
     return s;
@@ -156,112 +156,63 @@ export class DatabaseStorage implements IStorage {
     await db.delete(subjects).where(eq(subjects.id, id));
   }
 
-  async getFaculty(): Promise<Faculty[]> {
-    return await db.select().from(faculty);
+  // Update other methods to use any for flexibility with inferred types
+  async createDepartment(dept: any): Promise<Department> {
+    const [d] = await db.insert(departments).values(dept).returning();
+    return d;
   }
 
-  async getFacultyById(id: number): Promise<Faculty | undefined> {
-    const [f] = await db.select().from(faculty).where(eq(faculty.id, id));
-    return f;
+  async updateDepartment(id: number, dept: any): Promise<Department> {
+    const [d] = await db.update(departments).set(dept).where(eq(departments.id, id)).returning();
+    if (!d) throw new Error("Department not found");
+    return d;
   }
 
-  async createFaculty(fac: typeof faculty.$inferInsert): Promise<Faculty> {
+  async createClassroom(room: any): Promise<Classroom> {
+    const [c] = await db.insert(classrooms).values(room).returning();
+    return c;
+  }
+
+  async updateClassroom(id: number, room: any): Promise<Classroom> {
+    const [c] = await db.update(classrooms).set(room).where(eq(classrooms.id, id)).returning();
+    if (!c) throw new Error("Classroom not found");
+    return c;
+  }
+
+  async createFaculty(fac: any): Promise<Faculty> {
     const [f] = await db.insert(faculty).values(fac).returning();
     return f;
   }
 
-  async updateFaculty(id: number, fac: Partial<typeof faculty.$inferInsert>): Promise<Faculty> {
+  async updateFaculty(id: number, fac: any): Promise<Faculty> {
     const [f] = await db.update(faculty).set(fac).where(eq(faculty.id, id)).returning();
     if (!f) throw new Error("Faculty not found");
     return f;
   }
 
-  async deleteFaculty(id: number): Promise<void> {
-    await db.delete(faculty).where(eq(faculty.id, id));
-  }
-
-  async getSections(): Promise<Section[]> {
-    return await db.select().from(sections);
-  }
-
-  async getSection(id: number): Promise<Section | undefined> {
-    const [s] = await db.select().from(sections).where(eq(sections.id, id));
-    return s;
-  }
-
-  async createSection(section: typeof sections.$inferInsert): Promise<Section> {
+  async createSection(section: any): Promise<Section> {
     const [s] = await db.insert(sections).values(section).returning();
     return s;
   }
 
-  async updateSection(id: number, section: Partial<typeof sections.$inferInsert>): Promise<Section> {
+  async updateSection(id: number, section: any): Promise<Section> {
     const [s] = await db.update(sections).set(section).where(eq(sections.id, id)).returning();
     if (!s) throw new Error("Section not found");
     return s;
   }
 
-  async deleteSection(id: number): Promise<void> {
-    await db.delete(sections).where(eq(sections.id, id));
-  }
-
-  async getTimeSlots(): Promise<TimeSlot[]> {
-    return await db.select().from(timeSlots).orderBy(timeSlots.id);
-  }
-
-  async getTimeSlot(id: number): Promise<TimeSlot | undefined> {
-    const [t] = await db.select().from(timeSlots).where(eq(timeSlots.id, id));
-    return t;
-  }
-
-  async createTimeSlot(slot: typeof timeSlots.$inferInsert): Promise<TimeSlot> {
+  async createTimeSlot(slot: any): Promise<TimeSlot> {
     const [t] = await db.insert(timeSlots).values(slot).returning();
     return t;
   }
 
-  async updateTimeSlot(id: number, slot: Partial<typeof timeSlots.$inferInsert>): Promise<TimeSlot> {
+  async updateTimeSlot(id: number, slot: any): Promise<TimeSlot> {
     const [t] = await db.update(timeSlots).set(slot).where(eq(timeSlots.id, id)).returning();
     if (!t) throw new Error("Time slot not found");
     return t;
   }
 
-  async deleteTimeSlot(id: number): Promise<void> {
-    await db.delete(timeSlots).where(eq(timeSlots.id, id));
-  }
-
-  async getTimetable(sectionId?: number, facultyId?: number): Promise<any[]> {
-    let query = db.query.timetable.findMany({
-      with: {
-        subject: true,
-        faculty: true,
-        classroom: true,
-        timeSlot: true,
-        section: true,
-      },
-    });
-    
-    // Note: Drizzle query builder filtering is a bit different, sticking to basic select for filtering if needed
-    // But since we need relations, using query builder is better. 
-    // Implementing client-side filtering or simple where clauses would be ideal.
-    // For now, let's fetch all and filter in memory if volume is low, or use specific queries.
-    
-    // Better approach with query builder:
-    const conditions = [];
-    if (sectionId) conditions.push(eq(timetable.sectionId, sectionId));
-    if (facultyId) conditions.push(eq(timetable.facultyId, facultyId));
-    
-    return await db.query.timetable.findMany({
-      where: conditions.length ? and(...conditions) : undefined,
-      with: {
-        subject: true,
-        faculty: true,
-        classroom: true,
-        timeSlot: true,
-        section: true,
-      },
-    });
-  }
-
-  async createTimetableEntry(entry: typeof timetable.$inferInsert): Promise<TimetableEntry> {
+  async createTimetableEntry(entry: any): Promise<TimetableEntry> {
     const [t] = await db.insert(timetable).values(entry).returning();
     return t;
   }

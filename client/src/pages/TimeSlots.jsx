@@ -5,19 +5,143 @@ import { Sidebar } from "@/components/Sidebar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Trash2, Pencil } from "lucide-react";
+import { Plus, Trash2, Pencil, Calendar } from "lucide-react";
 import { useTimeSlots, useCreateTimeSlot, useUpdateTimeSlot, useDeleteTimeSlot } from "@/hooks/use-master-data";
 import { useToast } from "@/hooks/use-toast";
 import { api } from "@shared/routes";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+
+const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+
+function BulkTimeSlotDialog({ onSuccess }) {
+  const [open, setOpen] = useState(false);
+  const { toast } = useToast();
+  const createMutation = useCreateTimeSlot();
+  
+  const form = useForm({
+    defaultValues: {
+      days: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
+      label: "Period 1",
+      startTime: "09:00",
+      endTime: "10:00"
+    }
+  });
+
+  const onSubmit = async (values) => {
+    try {
+      for (const day of values.days) {
+        await createMutation.mutateAsync({
+          dayOfWeek: day,
+          label: values.label,
+          startTime: values.startTime,
+          endTime: values.endTime
+        });
+      }
+      toast({ title: "Success", description: `Added slots for ${values.days.length} days` });
+      setOpen(false);
+      onSuccess();
+    } catch (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="outline" className="gap-2">
+          <Calendar className="w-4 h-4" /> Bulk Add Week
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Add Slot for Multiple Days</DialogTitle>
+        </DialogHeader>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <FormField
+              control={form.control}
+              name="days"
+              render={() => (
+                <FormItem>
+                  <FormLabel>Working Days</FormLabel>
+                  <div className="grid grid-cols-2 gap-2">
+                    {DAYS.map((day) => (
+                      <FormField
+                        key={day}
+                        control={form.control}
+                        name="days"
+                        render={({ field }) => (
+                          <FormItem key={day} className="flex flex-row items-start space-x-3 space-y-0">
+                            <FormControl>
+                              <Checkbox
+                                checked={field.value?.includes(day)}
+                                onCheckedChange={(checked) => {
+                                  return checked
+                                    ? field.onChange([...field.value, day])
+                                    : field.onChange(field.value?.filter((value) => value !== day))
+                                }}
+                              />
+                            </FormControl>
+                            <FormLabel className="font-normal">{day}</FormLabel>
+                          </FormItem>
+                        )}
+                      />
+                    ))}
+                  </div>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="label"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Label</FormLabel>
+                  <FormControl><Input placeholder="Period 1" {...field} /></FormControl>
+                </FormItem>
+              )}
+            />
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="startTime"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Start Time</FormLabel>
+                    <FormControl><Input placeholder="09:00" {...field} /></FormControl>
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="endTime"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>End Time</FormLabel>
+                    <FormControl><Input placeholder="10:00" {...field} /></FormControl>
+                  </FormItem>
+                )}
+              />
+            </div>
+            <Button type="submit" className="w-full" disabled={createMutation.isPending}>
+              {createMutation.isPending ? "Creating..." : "Create for Selected Days"}
+            </Button>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 export default function TimeSlots() {
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const { toast } = useToast();
-  const { data: timeSlots, isLoading } = useTimeSlots();
+  const { data: timeSlots, isLoading, refetch } = useTimeSlots();
   const createMutation = useCreateTimeSlot();
   const updateMutation = useUpdateTimeSlot();
   const deleteMutation = useDeleteTimeSlot();
@@ -77,84 +201,86 @@ export default function TimeSlots() {
               <p className="text-slate-500 mt-1">Manage class periods.</p>
             </div>
             
-            <Dialog open={open} onOpenChange={(v) => { setOpen(v); if(!v) { setEditingId(null); form.reset(); } }}>
-              <DialogTrigger asChild>
-                <Button className="gap-2 shadow-lg shadow-primary/20">
-                  <Plus className="w-4 h-4" /> Add Time Slot
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>{editingId ? "Edit Time Slot" : "Add Time Slot"}</DialogTitle>
-                </DialogHeader>
-                <Form {...form}>
-                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                    <FormField
-                      control={form.control}
-                      name="dayOfWeek"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Day</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value}>
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select Day" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"].map(day => (
-                                <SelectItem key={day} value={day}>{day}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="label"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Label</FormLabel>
-                          <FormControl><Input placeholder="Period 1" {...field} /></FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="startTime"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Start Time</FormLabel>
-                          <FormControl><Input placeholder="09:00" {...field} /></FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="endTime"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>End Time</FormLabel>
-                          <FormControl><Input placeholder="10:00" {...field} /></FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <Button type="submit" className="w-full" disabled={createMutation.isPending || updateMutation.isPending}>
-                      {editingId ? (updateMutation.isPending ? "Updating..." : "Update Time Slot") : (createMutation.isPending ? "Creating..." : "Create Time Slot")}
-                    </Button>
-                  </form>
-                </Form>
-              </DialogContent>
-            </Dialog>
+            <div className="flex gap-2">
+              <BulkTimeSlotDialog onSuccess={refetch} />
+              <Dialog open={open} onOpenChange={(v) => { setOpen(v); if(!v) { setEditingId(null); form.reset(); } }}>
+                <DialogTrigger asChild>
+                  <Button className="gap-2 shadow-lg shadow-primary/20">
+                    <Plus className="w-4 h-4" /> Add Single Slot
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>{editingId ? "Edit Time Slot" : "Add Time Slot"}</DialogTitle>
+                  </DialogHeader>
+                  <Form {...form}>
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                      <FormField
+                        control={form.control}
+                        name="dayOfWeek"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Day</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value}>
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select Day" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"].map(day => (
+                                  <SelectItem key={day} value={day}>{day}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="label"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Label</FormLabel>
+                            <FormControl><Input placeholder="Period 1" {...field} /></FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="startTime"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Start Time</FormLabel>
+                            <FormControl><Input placeholder="09:00" {...field} /></FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="endTime"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>End Time</FormLabel>
+                            <FormControl><Input placeholder="10:00" {...field} /></FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <Button type="submit" className="w-full" disabled={createMutation.isPending || updateMutation.isPending}>
+                        {editingId ? (updateMutation.isPending ? "Updating..." : "Update Time Slot") : (createMutation.isPending ? "Creating..." : "Create Time Slot")}
+                      </Button>
+                    </form>
+                  </Form>
+                </DialogContent>
+              </Dialog>
+            </div>
           </div>
-
-          <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
-            <Table>
+            <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+              <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Day</TableHead>

@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Trash2, Search, ArrowUpDown, Pencil, Upload, Loader2 } from "lucide-react";
-import { useSubjects, useCreateSubject, useUpdateSubject, useDeleteSubject, useDepartments } from "@/hooks/use-master-data";
+import { useSubjects, useCreateSubject, useUpdateSubject, useDeleteSubject, useDepartments, useFaculty, useSections } from "@/hooks/use-master-data";
 import { useToast } from "@/hooks/use-toast";
 import { api } from "@shared/routes";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -99,18 +99,27 @@ export default function Subjects() {
   const { toast } = useToast();
   const { data: subjects, isLoading, refetch } = useSubjects();
   const { data: departments } = useDepartments();
+  const { data: faculty } = useFaculty();
+  const { data: sections } = useSections();
   const createMutation = useCreateSubject();
   const updateMutation = useUpdateSubject();
   const deleteMutation = useDeleteSubject();
 
   const form = useForm({
     resolver: zodResolver(api.subjects.create.input),
-    defaultValues: { name: "", code: "", weeklyHours: 0, departmentId: 0, type: "theory" },
+    defaultValues: { name: "", code: "", weeklyHours: 0, departmentId: 0, facultyId: 0, sectionId: 0, type: "theory" },
   });
 
   const onSubmit = (values) => {
+    // Convert IDs to numbers if they are strings from Select
+    const submissionData = {
+      ...values,
+      departmentId: Number(values.departmentId),
+      facultyId: values.facultyId ? Number(values.facultyId) : null,
+      sectionId: values.sectionId ? Number(values.sectionId) : null,
+    };
     if (editingId) {
-      updateMutation.mutate({ id: editingId, ...values }, {
+      updateMutation.mutate({ id: editingId, ...submissionData }, {
         onSuccess: () => {
           setOpen(false);
           setEditingId(null);
@@ -251,6 +260,52 @@ export default function Subjects() {
                               <SelectContent>
                                 {departments?.map(dept => (
                                   <SelectItem key={dept.id} value={dept.id.toString()}>{dept.name}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="facultyId"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Default Faculty</FormLabel>
+                            <Select onValueChange={(val) => field.onChange(parseInt(val))} value={field.value?.toString()}>
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select Faculty (Optional)" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="0">None</SelectItem>
+                                {faculty?.filter(f => f.departmentId === form.watch("departmentId")).map(f => (
+                                  <SelectItem key={f.id} value={f.id.toString()}>{f.name}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="sectionId"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Target Section</FormLabel>
+                            <Select onValueChange={(val) => field.onChange(parseInt(val))} value={field.value?.toString()}>
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select Section (Optional)" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="0">None</SelectItem>
+                                {sections?.filter(s => s.departmentId === form.watch("departmentId")).map(s => (
+                                  <SelectItem key={s.id} value={s.id.toString()}>{s.name} (Sem {s.semester})</SelectItem>
                                 ))}
                               </SelectContent>
                             </Select>

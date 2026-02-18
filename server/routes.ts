@@ -108,12 +108,20 @@ export async function registerRoutes(
     res.json(slots);
   });
   app.post(api.timeSlots.create.path, async (req, res) => {
-    const slot = await storage.createTimeSlot(req.body);
-    res.status(201).json(slot);
+    try {
+      const slot = await storage.createTimeSlot(req.body);
+      res.status(201).json(slot);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
   });
   app.patch(api.timeSlots.update.path, async (req, res) => {
-    const slot = await storage.updateTimeSlot(parseInt(req.params.id), req.body);
-    res.json(slot);
+    try {
+      const slot = await storage.updateTimeSlot(parseInt(req.params.id), req.body);
+      res.json(slot);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
   });
   app.delete(api.timeSlots.delete.path, async (req, res) => {
     await storage.deleteTimeSlot(parseInt(req.params.id));

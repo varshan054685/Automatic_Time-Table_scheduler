@@ -33,9 +33,12 @@ export default function TimetablePage() {
       return;
     }
 
+    const semester = prompt("Enter semester number (e.g. 1, 2, 3):", "1");
+    if (semester === null) return;
+
     generateMutation.mutate({
       departmentId: parseInt(selectedDept),
-      semester: 1
+      semester: parseInt(semester)
     }, {
       onSuccess: (data) => {
         toast({ title: "Success", description: data.message });

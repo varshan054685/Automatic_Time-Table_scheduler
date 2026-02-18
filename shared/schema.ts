@@ -34,6 +34,8 @@ export const subjects = pgTable("subjects", {
   name: text("name").notNull(),
   weeklyHours: integer("weekly_hours").notNull(),
   departmentId: integer("department_id").notNull(), // Foreign key to departments
+  facultyId: integer("faculty_id"), // Default faculty
+  sectionId: integer("section_id"), // Primary section
   type: text("type").default("theory"), // theory, lab
   createdAt: timestamp("created_at").defaultNow(),
 });
