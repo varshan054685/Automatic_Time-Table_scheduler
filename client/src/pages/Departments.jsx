@@ -214,7 +214,7 @@ export default function Departments() {
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>Name</FormLabel>
-                            <FormControl><Input placeholder="Computer Science" {...field} /></FormControl>
+                            <FormControl><Input placeholder="Computer Science" {...field} data-testid="input-department-name" /></FormControl>
                             <FormMessage />
                           </FormItem>
                         )}
@@ -225,12 +225,12 @@ export default function Departments() {
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>Code</FormLabel>
-                            <FormControl><Input placeholder="CSE" {...field} /></FormControl>
+                            <FormControl><Input placeholder="CSE" {...field} data-testid="input-department-code" /></FormControl>
                             <FormMessage />
                           </FormItem>
                         )}
                       />
-                      <Button type="submit" className="w-full" disabled={createMutation.isPending || updateMutation.isPending}>
+                      <Button type="submit" className="w-full" disabled={createMutation.isPending || updateMutation.isPending} data-testid="button-submit-department">
                         {editingId ? (updateMutation.isPending ? "Updating..." : "Update Department") : (createMutation.isPending ? "Creating..." : "Create Department")}
                       </Button>
                     </form>
