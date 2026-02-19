@@ -68,38 +68,70 @@ export async function registerRoutes(
 
   // Faculty
   app.get(api.faculty.list.path, async (req, res) => {
-    const facs = await storage.getFaculty();
-    res.json(facs);
+    try {
+      const facs = await storage.getFaculty();
+      res.json(facs);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
   });
   app.post(api.faculty.create.path, async (req, res) => {
-    const fac = await storage.createFaculty(req.body);
-    res.status(201).json(fac);
+    try {
+      const fac = await storage.createFaculty(req.body);
+      res.status(201).json(fac);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
   });
   app.patch(api.faculty.update.path, async (req, res) => {
-    const fac = await storage.updateFaculty(parseInt(req.params.id), req.body);
-    res.json(fac);
+    try {
+      const fac = await storage.updateFaculty(parseInt(req.params.id), req.body);
+      res.json(fac);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
   });
   app.delete(api.faculty.delete.path, async (req, res) => {
-    await storage.deleteFaculty(parseInt(req.params.id));
-    res.status(204).send();
+    try {
+      await storage.deleteFaculty(parseInt(req.params.id));
+      res.status(204).send();
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
   });
 
   // Sections
   app.get(api.sections.list.path, async (req, res) => {
-    const secs = await storage.getSections();
-    res.json(secs);
+    try {
+      const secs = await storage.getSections();
+      res.json(secs);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
   });
   app.post(api.sections.create.path, async (req, res) => {
-    const sec = await storage.createSection(req.body);
-    res.status(201).json(sec);
+    try {
+      const sec = await storage.createSection(req.body);
+      res.status(201).json(sec);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
   });
   app.patch(api.sections.update.path, async (req, res) => {
-    const sec = await storage.updateSection(parseInt(req.params.id), req.body);
-    res.json(sec);
+    try {
+      const sec = await storage.updateSection(parseInt(req.params.id), req.body);
+      res.json(sec);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
   });
   app.delete(api.sections.delete.path, async (req, res) => {
-    await storage.deleteSection(parseInt(req.params.id));
-    res.status(204).send();
+    try {
+      await storage.deleteSection(parseInt(req.params.id));
+      res.status(204).send();
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
   });
 
   // TimeSlots

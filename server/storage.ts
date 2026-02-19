@@ -10,54 +10,54 @@ export interface IStorage {
   // Auth
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
-  createUser(user: InsertUser): Promise<User>;
+  createUser(user: any): Promise<User>;
 
   // Departments
   getDepartments(): Promise<Department[]>;
   getDepartment(id: number): Promise<Department | undefined>;
-  createDepartment(dept: typeof departments.$inferInsert): Promise<Department>;
-  updateDepartment(id: number, dept: Partial<typeof departments.$inferInsert>): Promise<Department>;
+  createDepartment(dept: any): Promise<Department>;
+  updateDepartment(id: number, dept: any): Promise<Department>;
   deleteDepartment(id: number): Promise<void>;
 
   // Classrooms
   getClassrooms(): Promise<Classroom[]>;
   getClassroom(id: number): Promise<Classroom | undefined>;
-  createClassroom(room: typeof classrooms.$inferInsert): Promise<Classroom>;
-  updateClassroom(id: number, room: Partial<typeof classrooms.$inferInsert>): Promise<Classroom>;
+  createClassroom(room: any): Promise<Classroom>;
+  updateClassroom(id: number, room: any): Promise<Classroom>;
   deleteClassroom(id: number): Promise<void>;
 
   // Subjects
   getSubjects(): Promise<Subject[]>;
   getSubject(id: number): Promise<Subject | undefined>;
   getSubjectsByDepartment(deptId: number): Promise<Subject[]>;
-  createSubject(subject: typeof subjects.$inferInsert): Promise<Subject>;
-  updateSubject(id: number, subject: Partial<typeof subjects.$inferInsert>): Promise<Subject>;
+  createSubject(subject: any): Promise<Subject>;
+  updateSubject(id: number, subject: any): Promise<Subject>;
   deleteSubject(id: number): Promise<void>;
 
   // Faculty
   getFaculty(): Promise<Faculty[]>;
   getFacultyById(id: number): Promise<Faculty | undefined>;
-  createFaculty(fac: typeof faculty.$inferInsert): Promise<Faculty>;
-  updateFaculty(id: number, fac: Partial<typeof faculty.$inferInsert>): Promise<Faculty>;
+  createFaculty(fac: any): Promise<Faculty>;
+  updateFaculty(id: number, fac: any): Promise<Faculty>;
   deleteFaculty(id: number): Promise<void>;
 
   // Sections
   getSections(): Promise<Section[]>;
   getSection(id: number): Promise<Section | undefined>;
-  createSection(section: typeof sections.$inferInsert): Promise<Section>;
-  updateSection(id: number, section: Partial<typeof sections.$inferInsert>): Promise<Section>;
+  createSection(section: any): Promise<Section>;
+  updateSection(id: number, section: any): Promise<Section>;
   deleteSection(id: number): Promise<void>;
 
   // TimeSlots
   getTimeSlots(): Promise<TimeSlot[]>;
   getTimeSlot(id: number): Promise<TimeSlot | undefined>;
-  createTimeSlot(slot: typeof timeSlots.$inferInsert): Promise<TimeSlot>;
-  updateTimeSlot(id: number, slot: Partial<typeof timeSlots.$inferInsert>): Promise<TimeSlot>;
+  createTimeSlot(slot: any): Promise<TimeSlot>;
+  updateTimeSlot(id: number, slot: any): Promise<TimeSlot>;
   deleteTimeSlot(id: number): Promise<void>;
 
   // Timetable
-  getTimetable(sectionId?: number, facultyId?: number): Promise<any[]>; // Returns enriched data
-  createTimetableEntry(entry: typeof timetable.$inferInsert): Promise<TimetableEntry>;
+  getTimetable(sectionId?: number, facultyId?: number): Promise<any[]>;
+  createTimetableEntry(entry: any): Promise<TimetableEntry>;
   clearTimetable(sectionId: number): Promise<void>;
   
   // For scheduler
@@ -89,12 +89,12 @@ export class DatabaseStorage implements IStorage {
     return d;
   }
 
-  async createDepartment(dept: typeof departments.$inferInsert): Promise<Department> {
+  async createDepartment(dept: any): Promise<Department> {
     const [d] = await db.insert(departments).values(dept).returning();
     return d;
   }
 
-  async updateDepartment(id: number, dept: Partial<typeof departments.$inferInsert>): Promise<Department> {
+  async updateDepartment(id: number, dept: any): Promise<Department> {
     const [d] = await db.update(departments).set(dept).where(eq(departments.id, id)).returning();
     if (!d) throw new Error("Department not found");
     return d;
@@ -113,12 +113,12 @@ export class DatabaseStorage implements IStorage {
     return c;
   }
 
-  async createClassroom(room: typeof classrooms.$inferInsert): Promise<Classroom> {
+  async createClassroom(room: any): Promise<Classroom> {
     const [c] = await db.insert(classrooms).values(room).returning();
     return c;
   }
 
-  async updateClassroom(id: number, room: Partial<typeof classrooms.$inferInsert>): Promise<Classroom> {
+  async updateClassroom(id: number, room: any): Promise<Classroom> {
     const [c] = await db.update(classrooms).set(room).where(eq(classrooms.id, id)).returning();
     if (!c) throw new Error("Classroom not found");
     return c;
@@ -156,27 +156,13 @@ export class DatabaseStorage implements IStorage {
     await db.delete(subjects).where(eq(subjects.id, id));
   }
 
-  // Update other methods to use any for flexibility with inferred types
-  async createDepartment(dept: any): Promise<Department> {
-    const [d] = await db.insert(departments).values(dept).returning();
-    return d;
+  async getFaculty(): Promise<Faculty[]> {
+    return await db.select().from(faculty);
   }
 
-  async updateDepartment(id: number, dept: any): Promise<Department> {
-    const [d] = await db.update(departments).set(dept).where(eq(departments.id, id)).returning();
-    if (!d) throw new Error("Department not found");
-    return d;
-  }
-
-  async createClassroom(room: any): Promise<Classroom> {
-    const [c] = await db.insert(classrooms).values(room).returning();
-    return c;
-  }
-
-  async updateClassroom(id: number, room: any): Promise<Classroom> {
-    const [c] = await db.update(classrooms).set(room).where(eq(classrooms.id, id)).returning();
-    if (!c) throw new Error("Classroom not found");
-    return c;
+  async getFacultyById(id: number): Promise<Faculty | undefined> {
+    const [f] = await db.select().from(faculty).where(eq(faculty.id, id));
+    return f;
   }
 
   async createFaculty(fac: any): Promise<Faculty> {
@@ -190,6 +176,19 @@ export class DatabaseStorage implements IStorage {
     return f;
   }
 
+  async deleteFaculty(id: number): Promise<void> {
+    await db.delete(faculty).where(eq(faculty.id, id));
+  }
+
+  async getSections(): Promise<Section[]> {
+    return await db.select().from(sections);
+  }
+
+  async getSection(id: number): Promise<Section | undefined> {
+    const [s] = await db.select().from(sections).where(eq(sections.id, id));
+    return s;
+  }
+
   async createSection(section: any): Promise<Section> {
     const [s] = await db.insert(sections).values(section).returning();
     return s;
@@ -199,6 +198,19 @@ export class DatabaseStorage implements IStorage {
     const [s] = await db.update(sections).set(section).where(eq(sections.id, id)).returning();
     if (!s) throw new Error("Section not found");
     return s;
+  }
+
+  async deleteSection(id: number): Promise<void> {
+    await db.delete(sections).where(eq(sections.id, id));
+  }
+
+  async getTimeSlots(): Promise<TimeSlot[]> {
+    return await db.select().from(timeSlots).orderBy(timeSlots.id);
+  }
+
+  async getTimeSlot(id: number): Promise<TimeSlot | undefined> {
+    const [t] = await db.select().from(timeSlots).where(eq(timeSlots.id, id));
+    return t;
   }
 
   async createTimeSlot(slot: any): Promise<TimeSlot> {
@@ -212,6 +224,27 @@ export class DatabaseStorage implements IStorage {
     return t;
   }
 
+  async deleteTimeSlot(id: number): Promise<void> {
+    await db.delete(timeSlots).where(eq(timeSlots.id, id));
+  }
+
+  async getTimetable(sectionId?: number, facultyId?: number): Promise<any[]> {
+    const conditions = [];
+    if (sectionId) conditions.push(eq(timetable.sectionId, sectionId));
+    if (facultyId) conditions.push(eq(timetable.facultyId, facultyId));
+    
+    return await db.query.timetable.findMany({
+      where: conditions.length ? and(...conditions) : undefined,
+      with: {
+        subject: true,
+        faculty: true,
+        classroom: true,
+        timeSlot: true,
+        section: true,
+      },
+    });
+  }
+
   async createTimetableEntry(entry: any): Promise<TimetableEntry> {
     const [t] = await db.insert(timetable).values(entry).returning();
     return t;
@@ -222,8 +255,6 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAllAllocatedSlots(departmentId: number): Promise<TimetableEntry[]> {
-    // Return all slots to check for global conflicts (room, faculty)
-    // In a real app we'd filter by semester/year too
     return await db.select().from(timetable);
   }
 }
