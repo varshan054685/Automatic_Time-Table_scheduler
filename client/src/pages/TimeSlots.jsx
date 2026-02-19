@@ -47,6 +47,10 @@ function BulkTimeSlotDialog({ onSuccess, editingSlot = null, onClose }) {
         toast({ title: "Success", description: "Time slot updated" });
       } else {
         const numDays = parseInt(values.numDays);
+        if (isNaN(numDays) || numDays < 1 || numDays > 7) {
+          toast({ title: "Error", description: "Please enter a valid number of days (1-7)", variant: "destructive" });
+          return;
+        }
         const selectedDays = DAYS.slice(0, numDays);
         for (const day of selectedDays) {
           await createMutation.mutateAsync({
@@ -74,11 +78,11 @@ function BulkTimeSlotDialog({ onSuccess, editingSlot = null, onClose }) {
             name="numDays"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Number of Working Days (starting from Monday)</FormLabel>
+                <FormLabel>How many working days?</FormLabel>
                 <FormControl>
-                  <Input type="number" min="1" max="7" {...field} onChange={e => field.onChange(parseInt(e.target.value))} />
+                  <Input type="number" min="1" max="7" {...field} onChange={e => field.onChange(e.target.value)} />
                 </FormControl>
-                <FormDescription>Enter 5 for Mon-Fri, 6 for Mon-Sat, etc.</FormDescription>
+                <FormDescription>Example: 5 for Monday to Friday</FormDescription>
                 <FormMessage />
               </FormItem>
             )}

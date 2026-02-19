@@ -49,11 +49,34 @@ export default function TimetablePage() {
     });
   };
 
-  const getEntry = (day, slotId) => {
-    return timetable?.find(t => t.timeSlotId === slotId && t.timeSlot.dayOfWeek === day);
+  const getEntry = (day, slotLabel, slotStartTime) => {
+    return timetable?.find(t => 
+      t.timeSlot.label === slotLabel && 
+      t.timeSlot.startTime === slotStartTime && 
+      t.timeSlot.dayOfWeek === day
+    );
   };
 
-  const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
+  const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+  
+  // Get unique time slots by label and time to create columns
+  const uniqueSlots = useMemo(() => {
+    if (!timeSlots) return [];
+    const seen = new Set();
+    return timeSlots
+      .filter(slot => {
+        const key = `${slot.label}-${slot.startTime}-${slot.endTime}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
+      .sort((a, b) => a.startTime.localeCompare(b.startTime));
+  }, [timeSlots]);
+
+  // Filter days that actually have slots
+  const activeDays = days.filter(day => 
+    timeSlots?.some(slot => slot.dayOfWeek === day)
+  );
 
   return (
     <div className="flex min-h-screen bg-slate-50/50">
@@ -131,8 +154,8 @@ export default function TimetablePage() {
                   <thead className="bg-slate-50 border-b border-slate-200">
                     <tr>
                       <th className="px-4 py-3 text-left font-semibold text-slate-700 w-32 border-r border-slate-200">Day / Time</th>
-                      {timeSlots?.sort((a,b) => a.id - b.id).map(slot => (
-                        <th key={slot.id} className="px-4 py-3 text-center font-semibold text-slate-700 min-w-[160px] border-r border-slate-200 last:border-0">
+                      {uniqueSlots.map((slot, idx) => (
+                        <th key={idx} className="px-4 py-3 text-center font-semibold text-slate-700 min-w-[160px] border-r border-slate-200 last:border-0">
                           <div className="text-xs text-slate-500 uppercase tracking-wider mb-1">{slot.label}</div>
                           <div>{slot.startTime} - {slot.endTime}</div>
                         </th>
@@ -140,15 +163,15 @@ export default function TimetablePage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {days.map(day => (
+                    {activeDays.map(day => (
                       <tr key={day} className="border-b border-slate-100 hover:bg-slate-50/50">
                         <td className="px-4 py-4 font-medium text-slate-700 bg-slate-50/30 border-r border-slate-200">
                           {day}
                         </td>
-                        {timeSlots?.sort((a,b) => a.id - b.id).map(slot => {
-                          const entry = getEntry(day, slot.id);
+                        {uniqueSlots.map((slot, idx) => {
+                          const entry = getEntry(day, slot.label, slot.startTime);
                           return (
-                            <td key={slot.id} className="px-4 py-4 border-r border-slate-200 last:border-0 relative group">
+                            <td key={idx} className="px-4 py-4 border-r border-slate-200 last:border-0 relative group">
                               {entry ? (
                                 <div className="text-center">
                                   <div className="font-bold text-primary mb-1">{entry.subject.name}</div>
@@ -175,3 +198,5 @@ export default function TimetablePage() {
     </div>
   );
 }
+
+import { useMemo } from "react";
