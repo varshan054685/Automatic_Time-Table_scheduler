@@ -43,9 +43,9 @@ export const subjects = pgTable("subjects", {
 export const faculty = pgTable("faculty", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
-  departmentId: integer("department_id").notNull(), // Foreign key to departments
+  code: text("code").notNull().unique(), // Added code field
+  departmentId: integer("department_id").notNull(),
   email: text("email"),
-  // JSON array of blocked time slots or preferences
   availability: jsonb("availability").$type<string[]>().default([]), 
   createdAt: timestamp("created_at").defaultNow(),
 });

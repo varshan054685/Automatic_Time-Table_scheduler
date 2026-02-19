@@ -111,12 +111,11 @@ export default function Subjects() {
   });
 
   const onSubmit = (values) => {
-    // Convert IDs to numbers if they are strings from Select
     const submissionData = {
       ...values,
       departmentId: Number(values.departmentId),
-      facultyId: values.facultyId ? Number(values.facultyId) : null,
-      sectionId: values.sectionId ? Number(values.sectionId) : null,
+      facultyId: values.facultyId && values.facultyId !== "0" ? Number(values.facultyId) : null,
+      sectionId: values.sectionId && values.sectionId !== "0" ? Number(values.sectionId) : null,
     };
     if (editingId) {
       updateMutation.mutate({ id: editingId, ...submissionData }, {
@@ -131,7 +130,7 @@ export default function Subjects() {
         }
       });
     } else {
-      createMutation.mutate(values, {
+      createMutation.mutate(submissionData, {
         onSuccess: () => {
           setOpen(false);
           form.reset();
@@ -146,7 +145,15 @@ export default function Subjects() {
 
   const handleEdit = (subject) => {
     setEditingId(subject.id);
-    form.reset({ name: subject.name, code: subject.code, weeklyHours: subject.weeklyHours, departmentId: subject.departmentId, type: subject.type || "theory" });
+    form.reset({ 
+      name: subject.name, 
+      code: subject.code, 
+      weeklyHours: subject.weeklyHours, 
+      departmentId: subject.departmentId, 
+      facultyId: subject.facultyId || 0,
+      sectionId: subject.sectionId || 0,
+      type: subject.type || "theory" 
+    });
     setOpen(true);
   };
 
@@ -185,6 +192,8 @@ export default function Subjects() {
     }
     return result;
   }, [subjects, searchTerm, sortConfig]);
+
+  const watchedDeptId = Number(form.watch("departmentId"));
 
   return (
     <div className="flex min-h-screen bg-slate-50/50">
@@ -281,7 +290,7 @@ export default function Subjects() {
                               </FormControl>
                               <SelectContent>
                                 <SelectItem value="0">None</SelectItem>
-                                {faculty?.filter(f => f.departmentId === form.watch("departmentId")).map(f => (
+                                {faculty?.filter(f => Number(f.departmentId) === watchedDeptId).map(f => (
                                   <SelectItem key={f.id} value={f.id.toString()}>{f.name}</SelectItem>
                                 ))}
                               </SelectContent>
@@ -304,7 +313,7 @@ export default function Subjects() {
                               </FormControl>
                               <SelectContent>
                                 <SelectItem value="0">None</SelectItem>
-                                {sections?.filter(s => s.departmentId === form.watch("departmentId")).map(s => (
+                                {sections?.filter(s => Number(s.departmentId) === watchedDeptId).map(s => (
                                   <SelectItem key={s.id} value={s.id.toString()}>{s.name} (Sem {s.semester})</SelectItem>
                                 ))}
                               </SelectContent>

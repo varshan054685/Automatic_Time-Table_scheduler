@@ -77,7 +77,11 @@ export async function registerRoutes(
   });
   app.post(api.faculty.create.path, async (req, res) => {
     try {
-      const fac = await storage.createFaculty(req.body);
+      const data = req.body;
+      if (!data.code) {
+        data.code = `FAC${Date.now()}`;
+      }
+      const fac = await storage.createFaculty(data);
       res.status(201).json(fac);
     } catch (error: any) {
       res.status(400).json({ message: error.message });

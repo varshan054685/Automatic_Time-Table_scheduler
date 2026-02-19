@@ -41,6 +41,7 @@ function FacultyImport({ departments, onImportComplete }) {
         for (const item of data) {
           const name = item["Name"] || item.name;
           const email = item["Email"] || item.email;
+          const code = item["Code"] || item.code || `FAC${Date.now()}${successCount}`;
           const deptSearch = item["Department"] || item.department || item.departmentCode;
 
           if (name) {
@@ -48,6 +49,7 @@ function FacultyImport({ departments, onImportComplete }) {
             try {
               await createMutation.mutateAsync({ 
                 name, 
+                code,
                 email: email || "", 
                 departmentId: dept ? dept.id : Number(item.departmentId || 0),
                 availability: []
@@ -103,12 +105,16 @@ export default function Faculty() {
 
   const form = useForm({
     resolver: zodResolver(api.faculty.create.input),
-    defaultValues: { name: "", departmentId: 0, email: "", availability: [] },
+    defaultValues: { name: "", code: "", departmentId: 0, email: "", availability: [] },
   });
 
   const onSubmit = (values) => {
+    const data = {
+      ...values,
+      departmentId: Number(values.departmentId)
+    };
     if (editingId) {
-      updateMutation.mutate({ id: editingId, ...values }, {
+      updateMutation.mutate({ id: editingId, ...data }, {
         onSuccess: () => {
           setOpen(false);
           setEditingId(null);
@@ -120,7 +126,7 @@ export default function Faculty() {
         }
       });
     } else {
-      createMutation.mutate(values, {
+      createMutation.mutate(data, {
         onSuccess: () => {
           setOpen(false);
           form.reset();
@@ -135,7 +141,7 @@ export default function Faculty() {
 
   const handleEdit = (f) => {
     setEditingId(f.id);
-    form.reset({ name: f.name, departmentId: f.departmentId, email: f.email || "", availability: f.availability || [] });
+    form.reset({ name: f.name, code: f.code || "", departmentId: f.departmentId, email: f.email || "", availability: f.availability || [] });
     setOpen(true);
   };
 
@@ -158,6 +164,7 @@ export default function Faculty() {
     
     let result = faculty.filter(f => 
       f.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      f.code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       f.email?.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
@@ -208,6 +215,17 @@ export default function Faculty() {
                           <FormItem>
                             <FormLabel>Full Name</FormLabel>
                             <FormControl><Input placeholder="Dr. Alice Johnson" {...field} /></FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="code"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Faculty Code</FormLabel>
+                            <FormControl><Input placeholder="FAC001" {...field} /></FormControl>
                             <FormMessage />
                           </FormItem>
                         )}
@@ -271,6 +289,9 @@ export default function Faculty() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="cursor-pointer hover:bg-slate-50" onClick={() => handleSort('code')}>
+                    <div className="flex items-center gap-2">Code <ArrowUpDown className="w-3 h-3" /></div>
+                  </TableHead>
                   <TableHead className="cursor-pointer hover:bg-slate-50" onClick={() => handleSort('name')}>
                     <div className="flex items-center gap-2">Name <ArrowUpDown className="w-3 h-3" /></div>
                   </TableHead>
@@ -283,12 +304,13 @@ export default function Faculty() {
               </TableHeader>
               <TableBody>
                 {isLoading ? (
-                  <TableRow><TableCell colSpan={4} className="text-center py-8">Loading...</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={5} className="text-center py-8">Loading...</TableCell></TableRow>
                 ) : filteredAndSortedFaculty.length === 0 ? (
-                  <TableRow><TableCell colSpan={4} className="text-center py-8 text-muted-foreground">No faculty found</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">No faculty found</TableCell></TableRow>
                 ) : (
                   filteredAndSortedFaculty.map((f) => (
                     <TableRow key={f.id}>
+                      <TableCell className="font-mono">{f.code}</TableCell>
                       <TableCell className="font-medium">{f.name}</TableCell>
                       <TableCell>{f.email}</TableCell>
                       <TableCell>{departments?.find(d => d.id === f.departmentId)?.name || 'Unknown'}</TableCell>
