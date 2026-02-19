@@ -5,13 +5,12 @@ import { Sidebar } from "@/components/Sidebar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Trash2, Pencil, Calendar, Upload, Download } from "lucide-react";
 import { useTimeSlots, useCreateTimeSlot, useUpdateTimeSlot, useDeleteTimeSlot } from "@/hooks/use-master-data";
 import { useToast } from "@/hooks/use-toast";
 import { api } from "@shared/routes";
-import { Checkbox } from "@/components/ui/checkbox";
 import * as XLSX from "xlsx";
 
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
@@ -23,12 +22,12 @@ function BulkTimeSlotDialog({ onSuccess, editingSlot = null, onClose }) {
   
   const form = useForm({
     defaultValues: editingSlot ? {
-      days: [editingSlot.dayOfWeek],
+      numDays: 1,
       label: editingSlot.label,
       startTime: editingSlot.startTime,
       endTime: editingSlot.endTime
     } : {
-      days: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
+      numDays: 5,
       label: "Period 1",
       startTime: "09:00",
       endTime: "10:00"
@@ -40,14 +39,16 @@ function BulkTimeSlotDialog({ onSuccess, editingSlot = null, onClose }) {
       if (editingSlot) {
         await updateMutation.mutateAsync({
           id: editingSlot.id,
-          dayOfWeek: values.days[0],
+          dayOfWeek: editingSlot.dayOfWeek,
           label: values.label,
           startTime: values.startTime,
           endTime: values.endTime
         });
         toast({ title: "Success", description: "Time slot updated" });
       } else {
-        for (const day of values.days) {
+        const numDays = parseInt(values.numDays);
+        const selectedDays = DAYS.slice(0, numDays);
+        for (const day of selectedDays) {
           await createMutation.mutateAsync({
             dayOfWeek: day,
             label: values.label,
@@ -55,7 +56,7 @@ function BulkTimeSlotDialog({ onSuccess, editingSlot = null, onClose }) {
             endTime: values.endTime
           });
         }
-        toast({ title: "Success", description: `Added slots for ${values.days.length} days` });
+        toast({ title: "Success", description: `Added slots for ${numDays} days` });
       }
       onSuccess();
       if (onClose) onClose();
@@ -70,34 +71,14 @@ function BulkTimeSlotDialog({ onSuccess, editingSlot = null, onClose }) {
         {!editingSlot && (
           <FormField
             control={form.control}
-            name="days"
-            render={() => (
+            name="numDays"
+            render={({ field }) => (
               <FormItem>
-                <FormLabel>Working Days</FormLabel>
-                <div className="grid grid-cols-2 gap-2">
-                  {DAYS.map((day) => (
-                    <FormField
-                      key={day}
-                      control={form.control}
-                      name="days"
-                      render={({ field }) => (
-                        <FormItem key={day} className="flex flex-row items-start space-x-3 space-y-0">
-                          <FormControl>
-                            <Checkbox
-                              checked={field.value?.includes(day)}
-                              onCheckedChange={(checked) => {
-                                return checked
-                                  ? field.onChange([...field.value, day])
-                                  : field.onChange(field.value?.filter((value) => value !== day))
-                              }}
-                            />
-                          </FormControl>
-                          <FormLabel className="font-normal">{day}</FormLabel>
-                        </FormItem>
-                      )}
-                    />
-                  ))}
-                </div>
+                <FormLabel>Number of Working Days (starting from Monday)</FormLabel>
+                <FormControl>
+                  <Input type="number" min="1" max="7" {...field} onChange={e => field.onChange(parseInt(e.target.value))} />
+                </FormControl>
+                <FormDescription>Enter 5 for Mon-Fri, 6 for Mon-Sat, etc.</FormDescription>
                 <FormMessage />
               </FormItem>
             )}
@@ -212,12 +193,12 @@ export default function TimeSlots() {
               <Dialog open={bulkOpen} onOpenChange={setBulkOpen}>
                 <DialogTrigger asChild>
                   <Button className="gap-2 shadow-lg shadow-primary/20">
-                    <Calendar className="w-4 h-4" /> Add Weekly Slots
+                    <Calendar className="w-4 h-4" /> Add Time Slot
                   </Button>
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
-                    <DialogTitle>Add Weekly Slots</DialogTitle>
+                    <DialogTitle>Add Time Slot</DialogTitle>
                   </DialogHeader>
                   <BulkTimeSlotDialog onSuccess={refetch} onClose={() => setBulkOpen(false)} />
                 </DialogContent>
@@ -269,7 +250,11 @@ export default function TimeSlots() {
                 ) : timeSlots?.length === 0 ? (
                   <TableRow><TableCell colSpan={4} className="text-center py-8 text-muted-foreground">No time slots found</TableCell></TableRow>
                 ) : (
-                  timeSlots?.map((slot) => (
+                  timeSlots?.sort((a,b) => {
+                    const dayOrder = { "Monday":1, "Tuesday":2, "Wednesday":3, "Thursday":4, "Friday":5, "Saturday":6, "Sunday":7 };
+                    if (dayOrder[a.dayOfWeek] !== dayOrder[b.dayOfWeek]) return dayOrder[a.dayOfWeek] - dayOrder[b.dayOfWeek];
+                    return a.startTime.localeCompare(b.startTime);
+                  }).map((slot) => (
                     <TableRow key={slot.id}>
                       <TableCell className="font-medium">{slot.dayOfWeek}</TableCell>
                       <TableCell>{slot.label}</TableCell>
