@@ -3,26 +3,33 @@ import { Sidebar } from "@/components/Sidebar";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card } from "@/components/ui/card";
-import { Loader2, Download, RefreshCw } from "lucide-react";
+import { Loader2, Download, RefreshCw, User } from "lucide-react";
 import { useTimetable, useGenerateTimetable } from "@/hooks/use-timetable";
-import { useDepartments, useSections, useTimeSlots } from "@/hooks/use-master-data";
+import { useDepartments, useSections, useTimeSlots, useFaculty } from "@/hooks/use-master-data";
 import { useToast } from "@/hooks/use-toast";
 
 export default function TimetablePage() {
   const [selectedDept, setSelectedDept] = useState("");
   const [selectedSection, setSelectedSection] = useState("");
+  const [selectedFaculty, setSelectedFaculty] = useState("");
   const { toast } = useToast();
   
   const { data: departments } = useDepartments();
   const { data: sections } = useSections();
   const { data: timeSlots } = useTimeSlots();
+  const { data: faculty } = useFaculty();
   
   const filteredSections = sections?.filter(s => 
     !selectedDept || s.departmentId.toString() === selectedDept
   );
 
+  const filteredFaculty = faculty?.filter(f =>
+    !selectedDept || f.departmentId.toString() === selectedDept
+  );
+
   const { data: timetable, isLoading: isLoadingTimetable } = useTimetable({
-    sectionId: selectedSection
+    sectionId: selectedSection,
+    facultyId: selectedFaculty
   });
 
   const generateMutation = useGenerateTimetable();
@@ -109,53 +116,83 @@ export default function TimetablePage() {
           </div>
 
           <Card className="p-6 bg-white shadow-sm border-slate-100">
-            <div className="flex flex-col md:flex-row gap-4 items-end">
-              <div className="space-y-2 flex-1">
-                <label className="text-sm font-medium">Department</label>
-                <Select value={selectedDept} onValueChange={setSelectedDept}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select Department" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {departments?.map(d => (
-                      <SelectItem key={d.id} value={d.id.toString()}>{d.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+            <div className="flex flex-col gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Department</label>
+                  <Select value={selectedDept} onValueChange={(val) => {
+                    setSelectedDept(val);
+                    setSelectedSection("");
+                    setSelectedFaculty("");
+                  }}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select Department" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {departments?.map(d => (
+                        <SelectItem key={d.id} value={d.id.toString()}>{d.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Section/Class View</label>
+                  <Select value={selectedSection} onValueChange={(val) => {
+                    setSelectedSection(val);
+                    setSelectedFaculty("");
+                  }}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select Class" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">None</SelectItem>
+                      {filteredSections?.map(s => (
+                        <SelectItem key={s.id} value={s.id.toString()}>{s.name} (Sem {s.semester})</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Faculty View</label>
+                  <Select value={selectedFaculty} onValueChange={(val) => {
+                    setSelectedFaculty(val);
+                    setSelectedSection("");
+                  }}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select Faculty" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">None</SelectItem>
+                      {filteredFaculty?.map(f => (
+                        <SelectItem key={f.id} value={f.id.toString()}>{f.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
-              <div className="space-y-2 flex-1">
-                <label className="text-sm font-medium">Section/Class (View Only)</label>
-                <Select value={selectedSection} onValueChange={setSelectedSection}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select Class to View" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {filteredSections?.map(s => (
-                      <SelectItem key={s.id} value={s.id.toString()}>{s.name} (Sem {s.semester})</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <div className="flex justify-end">
+                <Button 
+                  onClick={handleGenerate} 
+                  disabled={!selectedDept || generateMutation.isPending}
+                  className="bg-primary hover:bg-primary/90 text-white min-w-[140px]"
+                >
+                  {generateMutation.isPending ? (
+                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Generating...</>
+                  ) : (
+                    <><RefreshCw className="w-4 h-4 mr-2" /> Generate New</>
+                  )}
+                </Button>
               </div>
-
-              <Button 
-                onClick={handleGenerate} 
-                disabled={!selectedDept || generateMutation.isPending}
-                className="bg-primary hover:bg-primary/90 text-white min-w-[140px]"
-              >
-                {generateMutation.isPending ? (
-                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Generating...</>
-                ) : (
-                  <><RefreshCw className="w-4 h-4 mr-2" /> Generate New</>
-                )}
-              </Button>
             </div>
           </Card>
 
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-            {!selectedSection ? (
+            {(!selectedSection && !selectedFaculty) ? (
               <div className="p-12 text-center text-slate-500">
-                <p>Select a class section above to view its timetable</p>
+                <p>Select a Class or Faculty above to view the timetable</p>
               </div>
             ) : isLoadingTimetable ? (
               <div className="p-12 flex justify-center">
@@ -189,7 +226,16 @@ export default function TimetablePage() {
                               {entry ? (
                                 <div className="text-center">
                                   <div className="font-bold text-primary mb-1">{entry.subject.name}</div>
-                                  <div className="text-xs text-slate-500">{entry.faculty.name}</div>
+                                  {selectedSection && (
+                                    <div className="text-xs text-slate-500 flex items-center justify-center gap-1">
+                                      <User className="w-3 h-3" /> {entry.faculty.name}
+                                    </div>
+                                  )}
+                                  {selectedFaculty && (
+                                    <div className="text-xs text-slate-500">
+                                      Section: {entry.section.name}
+                                    </div>
+                                  )}
                                   <div className="text-xs text-slate-400 mt-1 px-2 py-0.5 rounded-full bg-slate-100 inline-block">
                                     Room {entry.classroom.roomNumber}
                                   </div>
