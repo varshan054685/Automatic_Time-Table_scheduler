@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Sidebar } from "@/components/Sidebar";
@@ -11,9 +11,67 @@ import { Plus, Trash2, Pencil, Calendar, Upload, Download } from "lucide-react";
 import { useTimeSlots, useCreateTimeSlot, useUpdateTimeSlot, useDeleteTimeSlot } from "@/hooks/use-master-data";
 import { useToast } from "@/hooks/use-toast";
 import { api } from "@shared/routes";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import * as XLSX from "xlsx";
 
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+
+function TimePicker({ value, onChange }) {
+  const [hours, minutes] = value.split(":");
+  const hNum = parseInt(hours);
+  const isPM = hNum >= 12;
+  const displayHours = hNum % 12 || 12;
+
+  const updateTime = (newH, newM, newIsPM) => {
+    let finalH = parseInt(newH) % 12;
+    if (newIsPM) finalH += 12;
+    const timeStr = `${finalH.toString().padStart(2, '0')}:${newM.toString().padStart(2, '0')}`;
+    onChange(timeStr);
+  };
+
+  return (
+    <div className="flex items-center gap-1">
+      <Select value={displayHours.toString()} onValueChange={(h) => updateTime(h, minutes, isPM)}>
+        <SelectTrigger className="w-[70px]">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {Array.from({ length: 12 }, (_, i) => i + 1).map(h => (
+            <SelectItem key={h} value={h.toString()}>{h}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <span className="text-slate-400">:</span>
+      <Select value={minutes} onValueChange={(m) => updateTime(displayHours, m, isPM)}>
+        <SelectTrigger className="w-[70px]">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {["00", "05", "10", "15", "20", "25", "30", "35", "40", "45", "50", "55"].map(m => (
+            <SelectItem key={m} value={m}>{m}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <div className="flex border rounded-md overflow-hidden ml-1">
+        <button
+          type="button"
+          className={`px-2 py-1 text-xs ${!isPM ? 'bg-primary text-white' : 'bg-white text-slate-600'}`}
+          onClick={() => updateTime(displayHours, minutes, false)}
+        >
+          AM
+        </button>
+        <button
+          type="button"
+          className={`px-2 py-1 text-xs ${isPM ? 'bg-primary text-white' : 'bg-white text-slate-600'}`}
+          onClick={() => updateTime(displayHours, minutes, true)}
+        >
+          PM
+        </button>
+      </div>
+    </div>
+  );
+}
 
 function BulkTimeSlotDialog({ onSuccess, editingSlot = null, onClose }) {
   const { toast } = useToast();
@@ -22,12 +80,12 @@ function BulkTimeSlotDialog({ onSuccess, editingSlot = null, onClose }) {
   
   const form = useForm({
     defaultValues: editingSlot ? {
-      numDays: 1,
+      days: [editingSlot.dayOfWeek],
       label: editingSlot.label,
       startTime: editingSlot.startTime,
       endTime: editingSlot.endTime
     } : {
-      numDays: 5,
+      days: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
       label: "Period 1",
       startTime: "09:00",
       endTime: "10:00"
@@ -39,20 +97,18 @@ function BulkTimeSlotDialog({ onSuccess, editingSlot = null, onClose }) {
       if (editingSlot) {
         await updateMutation.mutateAsync({
           id: editingSlot.id,
-          dayOfWeek: editingSlot.dayOfWeek,
+          dayOfWeek: values.days[0],
           label: values.label,
           startTime: values.startTime,
           endTime: values.endTime
         });
         toast({ title: "Success", description: "Time slot updated" });
       } else {
-        const numDays = parseInt(values.numDays);
-        if (isNaN(numDays) || numDays < 1 || numDays > 7) {
-          toast({ title: "Error", description: "Please enter a valid number of days (1-7)", variant: "destructive" });
+        if (values.days.length === 0) {
+          toast({ title: "Error", description: "Please select at least one day", variant: "destructive" });
           return;
         }
-        const selectedDays = DAYS.slice(0, numDays);
-        for (const day of selectedDays) {
+        for (const day of values.days) {
           await createMutation.mutateAsync({
             dayOfWeek: day,
             label: values.label,
@@ -60,7 +116,7 @@ function BulkTimeSlotDialog({ onSuccess, editingSlot = null, onClose }) {
             endTime: values.endTime
           });
         }
-        toast({ title: "Success", description: `Added slots for ${numDays} days` });
+        toast({ title: "Success", description: `Added slots for ${values.days.length} days` });
       }
       onSuccess();
       if (onClose) onClose();
@@ -72,22 +128,40 @@ function BulkTimeSlotDialog({ onSuccess, editingSlot = null, onClose }) {
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-        {!editingSlot && (
-          <FormField
-            control={form.control}
-            name="numDays"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>How many working days?</FormLabel>
-                <FormControl>
-                  <Input type="number" min="1" max="7" {...field} onChange={e => field.onChange(e.target.value)} />
-                </FormControl>
-                <FormDescription>Example: 5 for Monday to Friday</FormDescription>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        )}
+        <FormField
+          control={form.control}
+          name="days"
+          render={() => (
+            <FormItem>
+              <FormLabel>Select Days</FormLabel>
+              <div className="grid grid-cols-2 gap-2">
+                {DAYS.map((day) => (
+                  <FormField
+                    key={day}
+                    control={form.control}
+                    name="days"
+                    render={({ field }) => (
+                      <FormItem key={day} className="flex flex-row items-start space-x-3 space-y-0">
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value?.includes(day)}
+                            onCheckedChange={(checked) => {
+                              return checked
+                                ? field.onChange([...field.value, day])
+                                : field.onChange(field.value?.filter((value) => value !== day))
+                            }}
+                          />
+                        </FormControl>
+                        <FormLabel className="font-normal">{day}</FormLabel>
+                      </FormItem>
+                    )}
+                  />
+                ))}
+              </div>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
         <FormField
           control={form.control}
           name="label"
@@ -98,14 +172,16 @@ function BulkTimeSlotDialog({ onSuccess, editingSlot = null, onClose }) {
             </FormItem>
           )}
         />
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4">
           <FormField
             control={form.control}
             name="startTime"
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Start Time</FormLabel>
-                <FormControl><Input placeholder="09:00" {...field} /></FormControl>
+                <FormControl>
+                  <TimePicker value={field.value} onChange={field.onChange} />
+                </FormControl>
               </FormItem>
             )}
           />
@@ -115,7 +191,9 @@ function BulkTimeSlotDialog({ onSuccess, editingSlot = null, onClose }) {
             render={({ field }) => (
               <FormItem>
                 <FormLabel>End Time</FormLabel>
-                <FormControl><Input placeholder="10:00" {...field} /></FormControl>
+                <FormControl>
+                  <TimePicker value={field.value} onChange={field.onChange} />
+                </FormControl>
               </FormItem>
             )}
           />
@@ -182,6 +260,27 @@ export default function TimeSlots() {
     reader.readAsBinaryString(file);
   };
 
+  const uniquePeriods = useMemo(() => {
+    if (!timeSlots) return [];
+    const seen = new Set();
+    return timeSlots
+      .filter(slot => {
+        const key = `${slot.label}-${slot.startTime}-${slot.endTime}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
+      .sort((a, b) => a.startTime.localeCompare(b.startTime));
+  }, [timeSlots]);
+
+  const formatTime = (time24) => {
+    const [h, m] = time24.split(":");
+    const hNum = parseInt(h);
+    const ampm = hNum >= 12 ? 'PM' : 'AM';
+    const h12 = hNum % 12 || 12;
+    return `${h12}:${m} ${ampm}`;
+  };
+
   return (
     <div className="flex min-h-screen bg-slate-50/50">
       <Sidebar />
@@ -242,7 +341,6 @@ export default function TimeSlots() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Day</TableHead>
                   <TableHead>Label</TableHead>
                   <TableHead>Time Range</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
@@ -250,19 +348,14 @@ export default function TimeSlots() {
               </TableHeader>
               <TableBody>
                 {isLoading ? (
-                  <TableRow><TableCell colSpan={4} className="text-center py-8">Loading...</TableCell></TableRow>
-                ) : timeSlots?.length === 0 ? (
-                  <TableRow><TableCell colSpan={4} className="text-center py-8 text-muted-foreground">No time slots found</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={3} className="text-center py-8">Loading...</TableCell></TableRow>
+                ) : uniquePeriods.length === 0 ? (
+                  <TableRow><TableCell colSpan={3} className="text-center py-8 text-muted-foreground">No time slots found</TableCell></TableRow>
                 ) : (
-                  timeSlots?.sort((a,b) => {
-                    const dayOrder = { "Monday":1, "Tuesday":2, "Wednesday":3, "Thursday":4, "Friday":5, "Saturday":6, "Sunday":7 };
-                    if (dayOrder[a.dayOfWeek] !== dayOrder[b.dayOfWeek]) return dayOrder[a.dayOfWeek] - dayOrder[b.dayOfWeek];
-                    return a.startTime.localeCompare(b.startTime);
-                  }).map((slot) => (
-                    <TableRow key={slot.id}>
-                      <TableCell className="font-medium">{slot.dayOfWeek}</TableCell>
-                      <TableCell>{slot.label}</TableCell>
-                      <TableCell>{slot.startTime} - {slot.endTime}</TableCell>
+                  uniquePeriods.map((slot, idx) => (
+                    <TableRow key={idx}>
+                      <TableCell className="font-medium">{slot.label}</TableCell>
+                      <TableCell>{formatTime(slot.startTime)} - {formatTime(slot.endTime)}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
                           <Button 
@@ -277,7 +370,11 @@ export default function TimeSlots() {
                             variant="ghost" 
                             size="icon" 
                             className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                            onClick={() => handleDelete(slot.id)}
+                            onClick={() => {
+                              if(confirm(`Delete all instances of ${slot.label}?`)) {
+                                timeSlots.filter(s => s.label === slot.label && s.startTime === slot.startTime).forEach(s => deleteMutation.mutate(s.id));
+                              }
+                            }}
                           >
                             <Trash2 className="w-4 h-4" />
                           </Button>

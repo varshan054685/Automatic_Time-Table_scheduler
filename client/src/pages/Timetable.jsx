@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -49,34 +49,47 @@ export default function TimetablePage() {
     });
   };
 
-  const getEntry = (day, slotLabel, slotStartTime) => {
+  const getEntry = (day, slotId) => {
     return timetable?.find(t => 
-      t.timeSlot.label === slotLabel && 
-      t.timeSlot.startTime === slotStartTime && 
+      t.timeSlotId === slotId && 
       t.timeSlot.dayOfWeek === day
     );
   };
 
   const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
   
-  // Get unique time slots by label and time to create columns
   const uniqueSlots = useMemo(() => {
     if (!timeSlots) return [];
-    const seen = new Set();
-    return timeSlots
-      .filter(slot => {
-        const key = `${slot.label}-${slot.startTime}-${slot.endTime}`;
-        if (seen.has(key)) return false;
-        seen.add(key);
-        return true;
-      })
-      .sort((a, b) => a.startTime.localeCompare(b.startTime));
+    
+    const slotsByTime = new Map();
+    timeSlots.forEach(slot => {
+      const key = `${slot.label}-${slot.startTime}-${slot.endTime}`;
+      if (!slotsByTime.has(key)) {
+        slotsByTime.set(key, {
+          label: slot.label,
+          startTime: slot.startTime,
+          endTime: slot.endTime,
+          idsByDay: {}
+        });
+      }
+      slotsByTime.get(key).idsByDay[slot.dayOfWeek] = slot.id;
+    });
+
+    return Array.from(slotsByTime.values()).sort((a, b) => a.startTime.localeCompare(b.startTime));
   }, [timeSlots]);
 
-  // Filter days that actually have slots
   const activeDays = days.filter(day => 
     timeSlots?.some(slot => slot.dayOfWeek === day)
   );
+
+  const formatTime = (time24) => {
+    if (!time24) return "";
+    const [h, m] = time24.split(":");
+    const hNum = parseInt(h);
+    const ampm = hNum >= 12 ? 'PM' : 'AM';
+    const h12 = hNum % 12 || 12;
+    return `${h12}:${m} ${ampm}`;
+  };
 
   return (
     <div className="flex min-h-screen bg-slate-50/50">
@@ -157,7 +170,7 @@ export default function TimetablePage() {
                       {uniqueSlots.map((slot, idx) => (
                         <th key={idx} className="px-4 py-3 text-center font-semibold text-slate-700 min-w-[160px] border-r border-slate-200 last:border-0">
                           <div className="text-xs text-slate-500 uppercase tracking-wider mb-1">{slot.label}</div>
-                          <div>{slot.startTime} - {slot.endTime}</div>
+                          <div>{formatTime(slot.startTime)} - {formatTime(slot.endTime)}</div>
                         </th>
                       ))}
                     </tr>
@@ -169,7 +182,8 @@ export default function TimetablePage() {
                           {day}
                         </td>
                         {uniqueSlots.map((slot, idx) => {
-                          const entry = getEntry(day, slot.label, slot.startTime);
+                          const slotIdForDay = slot.idsByDay[day];
+                          const entry = slotIdForDay ? getEntry(day, slotIdForDay) : null;
                           return (
                             <td key={idx} className="px-4 py-4 border-r border-slate-200 last:border-0 relative group">
                               {entry ? (
@@ -198,5 +212,3 @@ export default function TimetablePage() {
     </div>
   );
 }
-
-import { useMemo } from "react";
