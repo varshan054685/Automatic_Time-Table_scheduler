@@ -60,12 +60,12 @@ All CRUD pages follow the same pattern: list table, add form/modal, edit form/mo
 - `routes.ts` — API route path definitions, request/response schemas, and a `buildUrl` helper for parameterized paths
 
 ### Key Scripts
-- `npm run dev` — Development server with Vite HMR
+- `npm run dev` — Development server with Vite HMR and Python microservice
 - `npm run build` — Production build (Vite for client, esbuild for server)
 - `npm start` — Run production build
 - `npm run db:push` — Push schema changes to database
 - `npm run check` — TypeScript type checking
-- `python3 -m uvicorn python-service.app:app --host 0.0.0.0 --port 8000` — Start Python microservice
+- `python3 -m uvicorn python-service.app:app --host 0.0.0.0 --port 8000` — Start Python microservice directly
 
 ### Seed Data
 - `server/seed.ts` provides initial data: admin/staff users, sample departments (CS, ME), classrooms, subjects, faculty, sections, and time slots
