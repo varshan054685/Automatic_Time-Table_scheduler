@@ -65,6 +65,7 @@ All CRUD pages follow the same pattern: list table, add form/modal, edit form/mo
 - `npm start` — Run production build
 - `npm run db:push` — Push schema changes to database
 - `npm run check` — TypeScript type checking
+- `python3 -m uvicorn python-service.app:app --host 0.0.0.0 --port 8000` — Start Python microservice
 
 ### Seed Data
 - `server/seed.ts` provides initial data: admin/staff users, sample departments (CS, ME), classrooms, subjects, faculty, sections, and time slots
