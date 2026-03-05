@@ -5,12 +5,24 @@ import { setupAuth } from "./auth";
 import { api } from "@shared/routes";
 import { generateTimetable } from "./scheduler";
 import { z } from "zod";
+import axios from "axios";
 
 export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
   setupAuth(app);
+
+  // Python Service Integration
+  app.get(api.timetable.generatePython.path, async (req, res) => {
+    try {
+      const response = await axios.get("http://localhost:8000/generate");
+      res.json(response.data);
+    } catch (error: any) {
+      console.error("Error calling Python service:", error.message);
+      res.status(500).json({ message: "Failed to connect to Python service" });
+    }
+  });
 
   // Departments
   app.get(api.departments.list.path, async (req, res) => {

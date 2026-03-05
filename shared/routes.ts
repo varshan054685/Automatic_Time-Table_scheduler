@@ -236,6 +236,14 @@ export const api = {
         400: errorSchemas.conflict,
       },
     },
+    generatePython: {
+      method: 'GET' as const,
+      path: '/api/generate-timetable' as const,
+      responses: {
+        200: z.any(),
+        500: z.object({ message: z.string() }),
+      },
+    },
   },
 };
 
