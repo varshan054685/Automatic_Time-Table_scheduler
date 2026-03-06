@@ -7,13 +7,14 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Trash2, Pencil, Calendar, Upload, Download } from "lucide-react";
+import { Plus, Trash2, Pencil, Calendar, Upload, Download, Loader2 } from "lucide-react";
 import { useTimeSlots, useCreateTimeSlot, useUpdateTimeSlot, useDeleteTimeSlot } from "@/hooks/use-master-data";
 import { useToast } from "@/hooks/use-toast";
 import { api } from "@shared/routes";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import * as XLSX from "xlsx";
+import { useRef } from "react";
 
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
@@ -206,6 +207,93 @@ function BulkTimeSlotDialog({ onSuccess, editingSlot = null, onClose }) {
   );
 }
 
+function TimeSlotImport({ timeSlots, onImportComplete }) {
+  const [isImporting, setIsImporting] = useState(false);
+  const fileInputRef = useRef(null);
+  const { toast } = useToast();
+  const createMutation = useCreateTimeSlot();
+
+  const handleImport = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setIsImporting(true);
+    const reader = new FileReader();
+
+    reader.onload = async (evt) => {
+      try {
+        const bstr = evt.target.result;
+        const wb = XLSX.read(bstr, { type: "binary" });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json(ws);
+
+        let successCount = 0;
+        let errorCount = 0;
+
+        for (const item of data) {
+          const dayOfWeek = item.Day || item.dayOfWeek;
+          const label = item.Label || item.label;
+          const startTime = item["Start Time"] || item.startTime;
+          const endTime = item["End Time"] || item.endTime;
+
+          if (dayOfWeek && label && startTime && endTime) {
+            // Check for duplicate time slot
+            const isDuplicate = timeSlots?.some(s => 
+              s.dayOfWeek === dayOfWeek && 
+              s.startTime === startTime && 
+              s.endTime === endTime
+            );
+
+            if (isDuplicate) {
+              errorCount++;
+              continue;
+            }
+
+            try {
+              await createMutation.mutateAsync({
+                dayOfWeek,
+                label,
+                startTime,
+                endTime
+              });
+              successCount++;
+            } catch (err) {
+              errorCount++;
+            }
+          }
+        }
+
+        toast({ 
+          title: "Import Complete", 
+          description: `Successfully imported ${successCount} time slots.${errorCount > 0 ? ` Skipped/Failed ${errorCount} records.` : ""}`,
+          variant: errorCount > 0 ? "default" : "default"
+        });
+        
+        if (onImportComplete) onImportComplete();
+      } catch (error) {
+        toast({ title: "Import Failed", description: "Failed to read Excel file", variant: "destructive" });
+      } finally {
+        setIsImporting(false);
+        if (fileInputRef.current) fileInputRef.current.value = "";
+      }
+    };
+    reader.readAsBinaryString(file);
+  };
+
+  return (
+    <div className="relative">
+      <Input type="file" accept=".xlsx, .xls" className="hidden" id="import-excel" ref={fileInputRef} onChange={handleImport} disabled={isImporting} />
+      <Button variant="outline" className="gap-2" asChild disabled={isImporting}>
+        <label htmlFor="import-excel" className="cursor-pointer">
+          {isImporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+          {isImporting ? "Importing..." : "Import Excel"}
+        </label>
+      </Button>
+    </div>
+  );
+}
+
 export default function TimeSlots() {
   const [bulkOpen, setBulkOpen] = useState(false);
   const [editSlot, setEditSlot] = useState(null);
@@ -234,30 +322,7 @@ export default function TimeSlots() {
   };
 
   const handleImport = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = async (evt) => {
-      try {
-        const bstr = evt.target.result;
-        const wb = XLSX.read(bstr, { type: "binary" });
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        const data = XLSX.utils.sheet_to_json(ws);
-        for (const item of data) {
-          await createMutation.mutateAsync({
-            dayOfWeek: item.Day || item.dayOfWeek,
-            label: item.Label || item.label,
-            startTime: item["Start Time"] || item.startTime,
-            endTime: item["End Time"] || item.endTime
-          });
-        }
-        toast({ title: "Success", description: "Imported time slots" });
-        refetch();
-      } catch (err) {
-        toast({ title: "Error", description: err.message, variant: "destructive" });
-      }
-    };
-    reader.readAsBinaryString(file);
+    // This is replaced by TimeSlotImport component
   };
 
   const uniquePeriods = useMemo(() => {
@@ -311,14 +376,7 @@ export default function TimeSlots() {
                 <Download className="w-4 h-4" /> Export Excel
               </Button>
 
-              <div className="relative">
-                <Input type="file" accept=".xlsx, .xls" className="hidden" id="import-timeslots" onChange={handleImport} />
-                <Button variant="outline" className="gap-2" asChild>
-                  <label htmlFor="import-timeslots" className="cursor-pointer">
-                    <Upload className="w-4 h-4" /> Import Excel
-                  </label>
-                </Button>
-              </div>
+              <TimeSlotImport timeSlots={timeSlots} onImportComplete={refetch} />
             </div>
           </div>
 

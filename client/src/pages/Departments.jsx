@@ -38,10 +38,20 @@ function DepartmentImport({ onImportComplete }) {
         let errorCount = 0;
 
         for (const item of data) {
-          const name = item["Department Name"] || item.name;
-          const code = item["Department Code"] || item.code;
+          const name = item["Department Name"] || item.name || item.Name;
+          const code = item["Department Code"] || item.code || item.Code;
 
           if (name && code) {
+            const exists = departments?.some(d => d.name === name || d.code === String(code));
+            if (exists) {
+              toast({ 
+                title: "Import Skip", 
+                description: `Department ${name} (${code}) already exists.`,
+                variant: "destructive"
+              });
+              errorCount++;
+              continue;
+            }
             try {
               await createMutation.mutateAsync({ name, code: String(code) });
               successCount++;

@@ -14,7 +14,7 @@ import { api } from "@shared/routes";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import * as XLSX from "xlsx";
 
-function SectionImport({ departments, onImportComplete }) {
+function SectionImport({ departments, sections, onImportComplete }) {
   const [isImporting, setIsImporting] = useState(false);
   const fileInputRef = useRef(null);
   const { toast } = useToast();
@@ -46,12 +46,32 @@ function SectionImport({ departments, onImportComplete }) {
 
           if (name) {
             const dept = departments?.find(d => d.name === deptSearch || d.code === deptSearch);
+            const deptId = dept ? dept.id : Number(item.departmentId || 0);
+
+            // Check for duplicate section in the same department
+            const isDuplicate = sections?.some(s => 
+              s.name === name && 
+              s.departmentId === deptId &&
+              Number(s.year) === Number(year || 1) &&
+              Number(s.semester) === Number(semester || 1)
+            );
+
+            if (isDuplicate) {
+              toast({
+                title: "Skipped Duplicate",
+                description: `Section "${name}" already exists for this department/year/semester.`,
+                variant: "destructive"
+              });
+              errorCount++;
+              continue;
+            }
+
             try {
               await createMutation.mutateAsync({ 
                 name, 
                 year: Number(year || 1), 
                 semester: Number(semester || 1),
-                departmentId: dept ? dept.id : Number(item.departmentId || 0)
+                departmentId: deptId
               });
               successCount++;
             } catch (err) {
@@ -187,7 +207,7 @@ export default function Sections() {
             </div>
             
             <div className="flex gap-2">
-              <SectionImport departments={departments} onImportComplete={refetch} />
+              <SectionImport departments={departments} sections={sections} onImportComplete={refetch} />
 
               <Dialog open={open} onOpenChange={(v) => { setOpen(v); if(!v) { setEditingId(null); form.reset(); } }}>
                 <DialogTrigger asChild>

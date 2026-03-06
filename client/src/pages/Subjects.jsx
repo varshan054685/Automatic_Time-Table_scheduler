@@ -14,7 +14,7 @@ import { api } from "@shared/routes";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import * as XLSX from "xlsx";
 
-function SubjectImport({ departments, onImportComplete }) {
+function SubjectImport({ departments, subjects, onImportComplete }) {
   const [isImporting, setIsImporting] = useState(false);
   const fileInputRef = useRef(null);
   const { toast } = useToast();
@@ -39,12 +39,22 @@ function SubjectImport({ departments, onImportComplete }) {
         let errorCount = 0;
 
         for (const item of data) {
-          const name = item["Name"] || item.name;
-          const code = item["Code"] || item.code;
-          const hours = item["Weekly Hours"] || item.weeklyHours;
-          const deptSearch = item["Department"] || item.department || item.departmentCode;
+          const name = item["Subject Name"] || item.name || item.Name;
+          const code = item["Subject Code"] || item.code || item.Code;
+          const hours = item["Weekly Hours"] || item.weeklyHours || item.WeeklyHours;
+          const deptSearch = item["Department"] || item.department || item.departmentCode || item.DepartmentCode;
 
           if (name && code) {
+            const exists = subjects?.some(s => s.code === String(code));
+            if (exists) {
+              toast({ 
+                title: "Import Skip", 
+                description: `Subject ${name} (${code}) already exists.`,
+                variant: "destructive"
+              });
+              errorCount++;
+              continue;
+            }
             const dept = departments?.find(d => d.name === deptSearch || d.code === deptSearch);
             try {
               await createMutation.mutateAsync({ 
@@ -207,7 +217,7 @@ export default function Subjects() {
             </div>
             
             <div className="flex gap-2">
-              <SubjectImport departments={departments} onImportComplete={refetch} />
+              <SubjectImport departments={departments} subjects={subjects} onImportComplete={refetch} />
 
               <Dialog open={open} onOpenChange={(v) => { setOpen(v); if(!v) { setEditingId(null); form.reset(); } }}>
                 <DialogTrigger asChild>

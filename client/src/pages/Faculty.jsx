@@ -14,7 +14,7 @@ import { api } from "@shared/routes";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import * as XLSX from "xlsx";
 
-function FacultyImport({ departments, onImportComplete }) {
+function FacultyImport({ departments, faculty, onImportComplete }) {
   const [isImporting, setIsImporting] = useState(false);
   const fileInputRef = useRef(null);
   const { toast } = useToast();
@@ -41,15 +41,31 @@ function FacultyImport({ departments, onImportComplete }) {
         for (const item of data) {
           const name = item["Name"] || item.name;
           const email = item["Email"] || item.email;
-          const code = item["Code"] || item.code || `FAC${Date.now()}${successCount}`;
+          const code = item["Code"] || item.code;
           const deptSearch = item["Department"] || item.department || item.departmentCode;
 
           if (name) {
+            // Check for duplicates by code or email
+            const isDuplicate = faculty?.some(f => 
+              (code && f.code === code) || 
+              (email && f.email === email)
+            );
+
+            if (isDuplicate) {
+              toast({
+                title: "Skipped Duplicate",
+                description: `Faculty with code/email "${code || email}" already exists.`,
+                variant: "destructive"
+              });
+              errorCount++;
+              continue;
+            }
+
             const dept = departments?.find(d => d.name === deptSearch || d.code === deptSearch);
             try {
               await createMutation.mutateAsync({ 
                 name, 
-                code,
+                code: code || `FAC${Date.now()}${successCount}`,
                 email: email || "", 
                 departmentId: dept ? dept.id : Number(item.departmentId || 0),
                 availability: []
@@ -194,7 +210,7 @@ export default function Faculty() {
             </div>
             
             <div className="flex gap-2">
-              <FacultyImport departments={departments} onImportComplete={refetch} />
+              <FacultyImport departments={departments} faculty={faculty} onImportComplete={refetch} />
 
               <Dialog open={open} onOpenChange={(v) => { setOpen(v); if(!v) { setEditingId(null); form.reset(); } }}>
                 <DialogTrigger asChild>

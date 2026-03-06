@@ -39,16 +39,26 @@ function ClassroomImport({ onImportComplete }) {
         let errorCount = 0;
 
         for (const item of data) {
-          const roomNumber = item["Room Number"] || item.roomNumber;
-          const capacity = item["Capacity"] || item.capacity;
-          const type = item["Type"] || item.type;
+          const roomNumber = item["Room Number"] || item.roomNumber || item.RoomNumber;
+          const capacity = item["Capacity"] || item.capacity || item.Capacity;
+          const type = item["Type"] || item.type || item.Type;
 
           if (roomNumber) {
+            const exists = classrooms?.some(c => c.roomNumber === String(roomNumber));
+            if (exists) {
+              toast({ 
+                title: "Import Skip", 
+                description: `Classroom ${roomNumber} already exists.`,
+                variant: "destructive"
+              });
+              errorCount++;
+              continue;
+            }
             try {
               await createMutation.mutateAsync({ 
                 roomNumber: String(roomNumber), 
                 capacity: Number(capacity || 0), 
-                type: type === "lab" ? "lab" : "lecture" 
+                type: String(type || "lecture").toLowerCase() === "lab" ? "lab" : "lecture" 
               });
               successCount++;
             } catch (err) {
