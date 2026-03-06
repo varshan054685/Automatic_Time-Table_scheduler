@@ -11,7 +11,8 @@ import {
   LogOut,
   Calendar,
   Menu,
-  X
+  X,
+  School
 } from "lucide-react";
 import { useLogout } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
