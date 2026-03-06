@@ -14,7 +14,7 @@ import { api } from "@shared/routes";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import * as XLSX from "xlsx";
 
-function ClassroomImport({ onImportComplete }) {
+function ClassroomImport({ classrooms, onImportComplete }) {
   const [isImporting, setIsImporting] = useState(false);
   const fileInputRef = useRef(null);
   const { toast } = useToast();
@@ -46,11 +46,6 @@ function ClassroomImport({ onImportComplete }) {
           if (roomNumber) {
             const exists = classrooms?.some(c => c.roomNumber === String(roomNumber));
             if (exists) {
-              toast({ 
-                title: "Import Skip", 
-                description: `Classroom ${roomNumber} already exists.`,
-                variant: "destructive"
-              });
               errorCount++;
               continue;
             }
@@ -69,8 +64,8 @@ function ClassroomImport({ onImportComplete }) {
 
         toast({ 
           title: "Import Complete", 
-          description: `Successfully imported ${successCount} classrooms.${errorCount > 0 ? ` Failed to import ${errorCount} records.` : ""}`,
-          variant: errorCount > 0 ? "destructive" : "default"
+          description: `Successfully imported ${successCount} classrooms.${errorCount > 0 ? ` Skipped/Failed ${errorCount} records.` : ""}`,
+          variant: errorCount > 0 ? "default" : "default"
         });
         
         if (onImportComplete) onImportComplete();
@@ -193,7 +188,7 @@ export default function Classrooms() {
             </div>
             
             <div className="flex gap-2">
-              <ClassroomImport onImportComplete={refetch} />
+              <ClassroomImport classrooms={classrooms} onImportComplete={refetch} />
 
               <Dialog open={open} onOpenChange={(v) => { setOpen(v); if(!v) { setEditingId(null); form.reset(); } }}>
                 <DialogTrigger asChild>

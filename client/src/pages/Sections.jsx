@@ -39,7 +39,7 @@ function SectionImport({ departments, sections, onImportComplete }) {
         let errorCount = 0;
 
         for (const item of data) {
-          const name = item["Name"] || item.name;
+          const name = item["Section Name"] || item["Name"] || item.name;
           const year = item["Year"] || item.year;
           const semester = item["Semester"] || item.semester;
           const deptSearch = item["Department"] || item.department || item.departmentCode;
@@ -51,17 +51,12 @@ function SectionImport({ departments, sections, onImportComplete }) {
             // Check for duplicate section in the same department
             const isDuplicate = sections?.some(s => 
               s.name === name && 
-              s.departmentId === deptId &&
+              Number(s.departmentId) === Number(deptId) &&
               Number(s.year) === Number(year || 1) &&
               Number(s.semester) === Number(semester || 1)
             );
 
             if (isDuplicate) {
-              toast({
-                title: "Skipped Duplicate",
-                description: `Section "${name}" already exists for this department/year/semester.`,
-                variant: "destructive"
-              });
               errorCount++;
               continue;
             }
@@ -71,7 +66,7 @@ function SectionImport({ departments, sections, onImportComplete }) {
                 name, 
                 year: Number(year || 1), 
                 semester: Number(semester || 1),
-                departmentId: deptId
+                departmentId: Number(deptId)
               });
               successCount++;
             } catch (err) {
@@ -82,8 +77,8 @@ function SectionImport({ departments, sections, onImportComplete }) {
 
         toast({ 
           title: "Import Complete", 
-          description: `Successfully imported ${successCount} sections.${errorCount > 0 ? ` Failed to import ${errorCount} records.` : ""}`,
-          variant: errorCount > 0 ? "destructive" : "default"
+          description: `Successfully imported ${successCount} sections.${errorCount > 0 ? ` Skipped/Failed ${errorCount} records.` : ""}`,
+          variant: errorCount > 0 ? "default" : "default"
         });
         
         if (onImportComplete) onImportComplete();

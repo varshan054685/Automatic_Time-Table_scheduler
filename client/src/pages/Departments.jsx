@@ -13,7 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { api } from "@shared/routes";
 import * as XLSX from "xlsx";
 
-function DepartmentImport({ onImportComplete }) {
+function DepartmentImport({ departments, onImportComplete }) {
   const [isImporting, setIsImporting] = useState(false);
   const fileInputRef = useRef(null);
   const { toast } = useToast();
@@ -44,11 +44,6 @@ function DepartmentImport({ onImportComplete }) {
           if (name && code) {
             const exists = departments?.some(d => d.name === name || d.code === String(code));
             if (exists) {
-              toast({ 
-                title: "Import Skip", 
-                description: `Department ${name} (${code}) already exists.`,
-                variant: "destructive"
-              });
               errorCount++;
               continue;
             }
@@ -56,7 +51,6 @@ function DepartmentImport({ onImportComplete }) {
               await createMutation.mutateAsync({ name, code: String(code) });
               successCount++;
             } catch (err) {
-              console.error("Failed to import row:", item, err);
               errorCount++;
             }
           }
@@ -64,25 +58,18 @@ function DepartmentImport({ onImportComplete }) {
 
         toast({ 
           title: "Import Complete", 
-          description: `Successfully imported ${successCount} departments.${errorCount > 0 ? ` Failed to import ${errorCount} records.` : ""}`,
-          variant: errorCount > 0 ? "destructive" : "default"
+          description: `Successfully imported ${successCount} departments.${errorCount > 0 ? ` Skipped/Failed ${errorCount} records.` : ""}`,
+          variant: errorCount > 0 ? "default" : "default"
         });
         
         if (onImportComplete) onImportComplete();
       } catch (error) {
-        console.error("Import error:", error);
         toast({ title: "Import Failed", description: "Failed to read Excel file", variant: "destructive" });
       } finally {
         setIsImporting(false);
         if (fileInputRef.current) fileInputRef.current.value = "";
       }
     };
-
-    reader.onerror = () => {
-      setIsImporting(false);
-      toast({ title: "Import Failed", description: "Failed to read file", variant: "destructive" });
-    };
-
     reader.readAsBinaryString(file);
   };
 
@@ -204,7 +191,7 @@ export default function Departments() {
             </div>
             
             <div className="flex gap-2">
-              <DepartmentImport onImportComplete={refetch} />
+              <DepartmentImport departments={departments} onImportComplete={refetch} />
 
               <Dialog open={open} onOpenChange={(v) => { setOpen(v); if(!v) { setEditingId(null); form.reset(); } }}>
                 <DialogTrigger asChild>

@@ -47,11 +47,6 @@ function SubjectImport({ departments, subjects, onImportComplete }) {
           if (name && code) {
             const exists = subjects?.some(s => s.code === String(code));
             if (exists) {
-              toast({ 
-                title: "Import Skip", 
-                description: `Subject ${name} (${code}) already exists.`,
-                variant: "destructive"
-              });
               errorCount++;
               continue;
             }
@@ -73,8 +68,8 @@ function SubjectImport({ departments, subjects, onImportComplete }) {
 
         toast({ 
           title: "Import Complete", 
-          description: `Successfully imported ${successCount} subjects.${errorCount > 0 ? ` Failed to import ${errorCount} records.` : ""}`,
-          variant: errorCount > 0 ? "destructive" : "default"
+          description: `Successfully imported ${successCount} subjects.${errorCount > 0 ? ` Skipped/Failed ${errorCount} records.` : ""}`,
+          variant: errorCount > 0 ? "default" : "default"
         });
         
         if (onImportComplete) onImportComplete();
