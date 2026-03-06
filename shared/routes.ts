@@ -237,10 +237,11 @@ export const api = {
       },
     },
     generatePython: {
-      method: 'GET' as const,
+      method: 'POST' as const,
       path: '/api/generate-timetable' as const,
+      input: generateTimetableSchema,
       responses: {
-        200: z.any(),
+        200: z.object({ message: z.string(), count: z.number() }),
         500: z.object({ message: z.string() }),
       },
     },

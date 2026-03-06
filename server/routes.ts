@@ -2,10 +2,8 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth } from "./auth";
-import { api } from "@shared/routes";
-import { generateTimetable } from "./scheduler";
-import { z } from "zod";
-import axios from "axios";
+import { api, generateTimetableSchema } from "@shared/routes";
+import { generateWithPython } from "./python-scheduler";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -13,14 +11,133 @@ export async function registerRoutes(
 ): Promise<Server> {
   setupAuth(app);
 
+  const generateAndPersistTimetable = async (departmentId: number, semester?: number) => {
+    const allSections = await storage.getSections();
+    const sections = allSections.filter(
+      (section) =>
+        section.departmentId === departmentId &&
+        (semester ? section.semester === semester : true),
+    );
+
+    if (sections.length === 0) {
+      throw new Error("No sections found for this department/semester");
+    }
+
+    const subjects = (await storage.getSubjectsByDepartment(departmentId)).filter(
+      (subject) => !subject.sectionId || sections.some((section) => section.id === subject.sectionId),
+    );
+    const classrooms = await storage.getClassrooms();
+    const timeSlots = await storage.getTimeSlots();
+    const faculty = (await storage.getFaculty()).filter((f) => f.departmentId === departmentId);
+
+    if (subjects.length === 0) throw new Error("No subjects found for selected department");
+    if (classrooms.length === 0) throw new Error("No classrooms found");
+    if (timeSlots.length === 0) throw new Error("No time slots found");
+    if (faculty.length === 0) throw new Error("No faculty found for selected department");
+
+    for (const section of sections) {
+      await storage.clearTimetable(section.id);
+    }
+
+    const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    const pythonResult = await generateWithPython({
+      classrooms: classrooms.map((classroom) => ({
+        roomNumber: classroom.roomNumber,
+      })),
+      subjects: subjects.map((subject) => ({
+        name: subject.name,
+        departmentId: subject.departmentId,
+        sectionId: subject.sectionId,
+        facultyId: subject.facultyId,
+        weeklyHours: subject.weeklyHours,
+      })),
+      faculty: faculty.map((f) => ({
+        id: f.id,
+        name: f.name,
+        departmentId: f.departmentId,
+      })),
+      sections: sections.map((section) => ({
+        id: section.id,
+        name: section.name,
+        departmentId: section.departmentId,
+      })),
+      timeslots: timeSlots.map((slot) => ({
+        id: slot.id,
+        dayOfWeek: slot.dayOfWeek,
+        label: slot.label,
+        startTime: slot.startTime,
+        endTime: slot.endTime,
+      })),
+      days,
+    });
+
+    const sectionByName = new Map(sections.map((s) => [s.name, s]));
+    const roomByNumber = new Map(classrooms.map((c) => [c.roomNumber, c]));
+    const facultyByName = new Map(faculty.map((f) => [f.name, f]));
+    const slotByKey = new Map(
+      timeSlots.map((slot) => [`${slot.dayOfWeek}__${slot.label}`, slot] as const),
+    );
+
+    const sectionSubjectByName = new Map<string, Map<string, (typeof subjects)[number]>>();
+    for (const section of sections) {
+      const candidates = subjects.filter(
+        (subject) => subject.sectionId === section.id || subject.sectionId === null,
+      );
+      const byName = new Map<string, (typeof subjects)[number]>();
+      for (const subject of candidates) {
+        if (!byName.has(subject.name)) byName.set(subject.name, subject);
+      }
+      sectionSubjectByName.set(section.name, byName);
+    }
+
+    let saved = 0;
+    for (const row of pythonResult.timetable) {
+      const section = sectionByName.get(row.section);
+      const subject = section ? sectionSubjectByName.get(section.name)?.get(row.subject) : undefined;
+      const facultyMember = facultyByName.get(row.faculty);
+      const room = roomByNumber.get(row.room);
+      const slot = slotByKey.get(`${row.day}__${row.period}`);
+
+      if (!section || !subject || !facultyMember || !room || !slot) {
+        continue;
+      }
+
+      await storage.createTimetableEntry({
+        sectionId: section.id,
+        subjectId: subject.id,
+        facultyId: facultyMember.id,
+        classroomId: room.id,
+        timeSlotId: slot.id,
+      });
+      saved += 1;
+    }
+
+    if (saved === 0) {
+      throw new Error("Python returned timetable rows, but none could be mapped to database IDs");
+    }
+
+    return saved;
+  };
+
   // Python Service Integration
-  app.get(api.timetable.generatePython.path, async (req, res) => {
+  app.post(api.timetable.generatePython.path, async (req, res) => {
     try {
-      const response = await axios.get("http://localhost:8000/generate");
-      res.json(response.data);
+      const parsed = generateTimetableSchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ message: "Invalid payload" });
+        return;
+      }
+
+      const { departmentId, semester } = parsed.data;
+      const count = await generateAndPersistTimetable(departmentId, semester);
+
+      res.json({
+        message: "Timetable generated successfully",
+        count,
+      });
     } catch (error: any) {
       console.error("Error calling Python service:", error.message);
-      res.status(500).json({ message: "Failed to connect to Python service" });
+      res.status(500).json({ message: "Failed to generate timetable with Python" });
     }
   });
 
@@ -186,9 +303,19 @@ export async function registerRoutes(
 
   app.post(api.timetable.generate.path, async (req, res) => {
     try {
-      const { departmentId, semester } = req.body;
-      const count = await generateTimetable(departmentId, semester);
-      res.json({ message: "Timetable generated successfully", count });
+      const parsed = generateTimetableSchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ message: "Invalid payload" });
+        return;
+      }
+
+      const { departmentId, semester } = parsed.data;
+      const count = await generateAndPersistTimetable(departmentId, semester);
+
+      res.json({
+        message: "Timetable generated successfully",
+        count,
+      });
     } catch (error: any) {
       res.status(400).json({ message: error.message });
     }

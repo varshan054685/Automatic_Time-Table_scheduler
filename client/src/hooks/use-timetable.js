@@ -7,8 +7,8 @@ export function useTimetable(filters) {
     queryKey,
     queryFn: async () => {
       const params = new URLSearchParams();
-      if (filters?.sectionId) params.append("sectionId", filters.sectionId);
-      if (filters?.facultyId) params.append("facultyId", filters.facultyId);
+      if (filters?.sectionId && filters.sectionId !== "none") params.append("sectionId", filters.sectionId);
+      if (filters?.facultyId && filters.facultyId !== "none") params.append("facultyId", filters.facultyId);
       
       const res = await fetch(`${api.timetable.list.path}?${params}`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch timetable");

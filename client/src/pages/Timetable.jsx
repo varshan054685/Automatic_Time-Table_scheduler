@@ -27,9 +27,14 @@ export default function TimetablePage() {
     !selectedDept || f.departmentId.toString() === selectedDept
   );
 
+  const normalizedSection = selectedSection && selectedSection !== "none" ? selectedSection : "";
+  const normalizedFaculty = selectedFaculty && selectedFaculty !== "none" ? selectedFaculty : "";
+  const isSectionView = Boolean(normalizedSection);
+  const isFacultyView = Boolean(normalizedFaculty);
+
   const { data: timetable, isLoading: isLoadingTimetable } = useTimetable({
-    sectionId: selectedSection,
-    facultyId: selectedFaculty
+    sectionId: normalizedSection,
+    facultyId: normalizedFaculty
   });
 
   const generateMutation = useGenerateTimetable();
@@ -190,7 +195,7 @@ export default function TimetablePage() {
           </Card>
 
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-            {(!selectedSection && !selectedFaculty) ? (
+            {(!isSectionView && !isFacultyView) ? (
               <div className="p-12 text-center text-slate-500">
                 <p>Select a Class or Faculty above to view the timetable</p>
               </div>
@@ -226,12 +231,12 @@ export default function TimetablePage() {
                               {entry ? (
                                 <div className="text-center">
                                   <div className="font-bold text-primary mb-1">{entry.subject.name}</div>
-                                  {selectedSection && (
+                                  {isSectionView && (
                                     <div className="text-xs text-slate-500 flex items-center justify-center gap-1">
                                       <User className="w-3 h-3" /> {entry.faculty.name}
                                     </div>
                                   )}
-                                  {selectedFaculty && (
+                                  {isFacultyView && (
                                     <div className="text-xs text-slate-500">
                                       Section: {entry.section.name}
                                     </div>
