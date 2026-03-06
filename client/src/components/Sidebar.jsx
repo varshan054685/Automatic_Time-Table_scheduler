@@ -20,10 +20,10 @@ import { useIsMobile } from "@/hooks/use-mobile";
 const navItems = [
   { label: "Dashboard", href: "/", icon: LayoutDashboard },
   { label: "Departments", href: "/departments", icon: Building2 },
-  { label: "Classrooms", href: "/classrooms", icon: Users }, 
-  { label: "Subjects", href: "/subjects", icon: BookOpen },
+  { label: "Classrooms", href: "/classrooms", icon: School },
   { label: "Faculty", href: "/faculty", icon: GraduationCap },
   { label: "Sections", href: "/sections", icon: Users },
+  { label: "Subjects", href: "/subjects", icon: BookOpen },
   { label: "Time Slots", href: "/timeslots", icon: Clock },
   { label: "Timetable", href: "/timetable", icon: CalendarDays },
 ];

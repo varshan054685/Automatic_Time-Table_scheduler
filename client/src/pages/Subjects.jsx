@@ -20,7 +20,7 @@ function SubjectImport({ departments, subjects, onImportComplete }) {
   const { toast } = useToast();
   const createMutation = useCreateSubject();
 
-  const handleImport = async (e) => {
+    const handleImport = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
@@ -39,11 +39,12 @@ function SubjectImport({ departments, subjects, onImportComplete }) {
         let errorCount = 0;
 
         for (const item of data) {
-          const name = item["Subject Name"] || item.name || item.Name || item["name"] || item["Subject"] || item["subject name"] || item["subject"];
-          const code = item["Subject Code"] || item.code || item.Code || item["code"] || item["subject code"];
+          const name = item["Name"] || item["Subject Name"] || item.name || item.Name || item["name"] || item["Subject"] || item["subject name"] || item["subject"];
+          const code = item["Code"] || item["Subject Code"] || item.code || item.Code || item["code"] || item["subject code"];
           const hours = item["Weekly Hours"] || item.weeklyHours || item.WeeklyHours || item["weeklyHours"] || item["Hours"] || item["hours"];
           const deptSearch = item["Department"] || item.department || item.departmentCode || item.DepartmentCode || item["department"] || item["Dept"] || item["dept"];
-          const facultySearch = item["Faculty"] || item.faculty || item.FacultyName || item["Faculty Name"] || item["Faculty Code"] || item.facultyCode || item["faculty"] || item["Staff"] || item["staff"] || item["Professor"];
+          const facultySearch = item["Default Faculty"] || item["Faculty"] || item.faculty || item.FacultyName || item["Faculty Name"] || item["Faculty Code"] || item.facultyCode || item["faculty"] || item["Staff"] || item["staff"] || item["Professor"];
+          const sectionSearch = item["Target Section"] || item["Section"] || item.section || item["section"];
 
           if (name && code) {
             const exists = subjects?.some(s => String(s.code).toLowerCase() === String(code).toLowerCase());
@@ -67,8 +68,11 @@ function SubjectImport({ departments, subjects, onImportComplete }) {
 
             const fac = faculty?.find(f => 
               String(f.name).toLowerCase().trim() === String(facultySearch).toLowerCase().trim() || 
-              String(f.code).toLowerCase().trim() === String(facultySearch).toLowerCase().trim() || 
-              String(f.email).toLowerCase().trim() === String(facultySearch).toLowerCase().trim()
+              String(f.code).toLowerCase().trim() === String(facultySearch).toLowerCase().trim()
+            );
+
+            const sec = sections?.find(s => 
+              String(s.name).toLowerCase().trim() === String(sectionSearch).toLowerCase().trim()
             );
             
             try {
@@ -78,6 +82,7 @@ function SubjectImport({ departments, subjects, onImportComplete }) {
                 weeklyHours: Number(hours || 0),
                 departmentId: deptId,
                 facultyId: fac ? fac.id : (item.facultyId ? Number(item.facultyId) : null),
+                sectionId: sec ? sec.id : (item.sectionId ? Number(item.sectionId) : null),
                 type: "theory"
               });
               successCount++;
@@ -382,20 +387,26 @@ export default function Subjects() {
                     <div className="flex items-center gap-2">Name <ArrowUpDown className="w-3 h-3" /></div>
                   </TableHead>
                   <TableHead>Weekly Hours</TableHead>
+                  <TableHead>Department</TableHead>
+                  <TableHead>Default Faculty</TableHead>
+                  <TableHead>Target Section</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading ? (
-                  <TableRow><TableCell colSpan={4} className="text-center py-8">Loading...</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={7} className="text-center py-8">Loading...</TableCell></TableRow>
                 ) : filteredAndSortedSubjects.length === 0 ? (
-                  <TableRow><TableCell colSpan={4} className="text-center py-8 text-muted-foreground">No subjects found</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">No subjects found</TableCell></TableRow>
                 ) : (
                   filteredAndSortedSubjects.map((subject) => (
                     <TableRow key={subject.id}>
                       <TableCell className="font-mono">{subject.code}</TableCell>
                       <TableCell className="font-medium">{subject.name}</TableCell>
                       <TableCell>{subject.weeklyHours}</TableCell>
+                      <TableCell>{departments?.find(d => d.id === subject.departmentId)?.name || "N/A"}</TableCell>
+                      <TableCell>{faculty?.find(f => f.id === subject.facultyId)?.name || "None"}</TableCell>
+                      <TableCell>{sections?.find(s => s.id === subject.sectionId)?.name || "None"}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
                           <Button 
