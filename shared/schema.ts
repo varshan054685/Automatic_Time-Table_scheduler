@@ -43,7 +43,7 @@ export const subjects = pgTable("subjects", {
 export const faculty = pgTable("faculty", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
-  code: text("code").notNull().unique(), // Added code field
+  code: text("code").notNull().unique(), 
   departmentId: integer("department_id").notNull(),
   email: text("email"),
   availability: jsonb("availability").$type<string[]>().default([]), 

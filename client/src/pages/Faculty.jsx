@@ -39,39 +39,47 @@ function FacultyImport({ departments, faculty, onImportComplete }) {
         let errorCount = 0;
 
         for (const item of data) {
-          const name = item["Name"] || item.name;
-          const email = item["Email"] || item.email;
-          const code = item["Code"] || item.code;
-          const deptSearch = item["Department"] || item.department || item.departmentCode;
+          const name = item["Faculty Name"] || item["Name"] || item.name || item.Name || item["Full Name"] || item["fullName"] || item["staff name"] || item["Staff Name"];
+          const email = item["Email"] || item.email || item.Email || item["email"] || item["Mail"] || item["mail"];
+          const code = item["Faculty Code"] || item["Code"] || item.code || item.Code || item["code"] || item["Staff Code"] || item["staff code"];
+          const deptSearch = item["Department"] || item.department || item.Department || item["department"] || item.departmentCode || item.DepartmentCode || item["Dept"] || item["dept"];
 
           if (name) {
-            // Check for duplicates by code or email
-            const isDuplicate = faculty?.some(f => 
-              (code && f.code === code) || 
-              (email && f.email === email)
+            const dept = departments?.find(d => 
+              String(d.name).toLowerCase().trim() === String(deptSearch).toLowerCase().trim() || 
+              String(d.code).toLowerCase().trim() === String(deptSearch).toLowerCase().trim()
             );
+            
+            const deptId = dept ? dept.id : (item.departmentId ? Number(item.departmentId) : (departments && departments.length > 0 ? departments[0].id : null));
 
-            if (isDuplicate) {
-              toast({
-                title: "Skipped Duplicate",
-                description: `Faculty with code/email "${code || email}" already exists.`,
-                variant: "destructive"
-              });
+            if (!deptId) {
+              console.warn(`Skipping faculty ${name}: No valid department ID found. Available depts:`, departments);
               errorCount++;
               continue;
             }
 
-            const dept = departments?.find(d => d.name === deptSearch || d.code === deptSearch);
+            // Check for duplicates by code or email
+            const isDuplicate = faculty?.some(f => 
+              (code && String(f.code).toLowerCase() === String(code).toLowerCase()) || 
+              (email && String(f.email).toLowerCase() === String(email).toLowerCase())
+            );
+
+            if (isDuplicate) {
+              errorCount++;
+              continue;
+            }
+
             try {
               await createMutation.mutateAsync({ 
-                name, 
-                code: code || `FAC${Date.now()}${successCount}`,
-                email: email || "", 
-                departmentId: dept ? dept.id : Number(item.departmentId || 0),
+                name: String(name), 
+                code: code ? String(code) : `FAC${Date.now()}${successCount}`,
+                email: email ? String(email) : "", 
+                departmentId: deptId,
                 availability: []
               });
               successCount++;
             } catch (err) {
+              console.error(`Failed to import faculty ${name}:`, err);
               errorCount++;
             }
           }
@@ -79,8 +87,8 @@ function FacultyImport({ departments, faculty, onImportComplete }) {
 
         toast({ 
           title: "Import Complete", 
-          description: `Successfully imported ${successCount} faculty.${errorCount > 0 ? ` Failed to import ${errorCount} records.` : ""}`,
-          variant: errorCount > 0 ? "destructive" : "default"
+          description: `Successfully imported ${successCount} faculty.${errorCount > 0 ? ` Skipped/Failed ${errorCount} records.` : ""}`,
+          variant: errorCount > 0 ? "default" : "default"
         });
         
         if (onImportComplete) onImportComplete();

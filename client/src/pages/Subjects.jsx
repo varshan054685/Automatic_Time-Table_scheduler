@@ -39,28 +39,50 @@ function SubjectImport({ departments, subjects, onImportComplete }) {
         let errorCount = 0;
 
         for (const item of data) {
-          const name = item["Subject Name"] || item.name || item.Name;
-          const code = item["Subject Code"] || item.code || item.Code;
-          const hours = item["Weekly Hours"] || item.weeklyHours || item.WeeklyHours;
-          const deptSearch = item["Department"] || item.department || item.departmentCode || item.DepartmentCode;
+          const name = item["Subject Name"] || item.name || item.Name || item["name"] || item["Subject"] || item["subject name"] || item["subject"];
+          const code = item["Subject Code"] || item.code || item.Code || item["code"] || item["subject code"];
+          const hours = item["Weekly Hours"] || item.weeklyHours || item.WeeklyHours || item["weeklyHours"] || item["Hours"] || item["hours"];
+          const deptSearch = item["Department"] || item.department || item.departmentCode || item.DepartmentCode || item["department"] || item["Dept"] || item["dept"];
+          const facultySearch = item["Faculty"] || item.faculty || item.FacultyName || item["Faculty Name"] || item["Faculty Code"] || item.facultyCode || item["faculty"] || item["Staff"] || item["staff"] || item["Professor"];
 
           if (name && code) {
-            const exists = subjects?.some(s => s.code === String(code));
+            const exists = subjects?.some(s => String(s.code).toLowerCase() === String(code).toLowerCase());
             if (exists) {
               errorCount++;
               continue;
             }
-            const dept = departments?.find(d => d.name === deptSearch || d.code === deptSearch);
+            
+            const dept = departments?.find(d => 
+              String(d.name).toLowerCase().trim() === String(deptSearch).toLowerCase().trim() || 
+              String(d.code).toLowerCase().trim() === String(deptSearch).toLowerCase().trim()
+            );
+
+            const deptId = dept ? dept.id : (item.departmentId ? Number(item.departmentId) : (departments && departments.length > 0 ? departments[0].id : null));
+
+            if (!deptId) {
+              console.warn(`Skipping subject ${name}: No valid department ID found.`);
+              errorCount++;
+              continue;
+            }
+
+            const fac = faculty?.find(f => 
+              String(f.name).toLowerCase().trim() === String(facultySearch).toLowerCase().trim() || 
+              String(f.code).toLowerCase().trim() === String(facultySearch).toLowerCase().trim() || 
+              String(f.email).toLowerCase().trim() === String(facultySearch).toLowerCase().trim()
+            );
+            
             try {
               await createMutation.mutateAsync({ 
-                name, 
+                name: String(name), 
                 code: String(code), 
                 weeklyHours: Number(hours || 0),
-                departmentId: dept ? dept.id : Number(item.departmentId || 0),
+                departmentId: deptId,
+                facultyId: fac ? fac.id : (item.facultyId ? Number(item.facultyId) : null),
                 type: "theory"
               });
               successCount++;
             } catch (err) {
+              console.error(`Failed to import subject ${name}:`, err);
               errorCount++;
             }
           }
