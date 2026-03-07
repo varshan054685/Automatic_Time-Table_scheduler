@@ -14,7 +14,7 @@ import { api } from "@shared/routes";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import * as XLSX from "xlsx";
 
-function SubjectImport({ departments, subjects, onImportComplete }) {
+function SubjectImport({ departments, subjects, faculty, sections, onImportComplete }) {
   const [isImporting, setIsImporting] = useState(false);
   const fileInputRef = useRef(null);
   const { toast } = useToast();
@@ -29,8 +29,8 @@ function SubjectImport({ departments, subjects, onImportComplete }) {
 
     reader.onload = async (evt) => {
       try {
-        const bstr = evt.target.result;
-        const wb = XLSX.read(bstr, { type: "binary" });
+        const buffer = new Uint8Array(evt.target.result);
+        const wb = XLSX.read(buffer, { type: "array" });
         const wsname = wb.SheetNames[0];
         const ws = wb.Sheets[wsname];
         const data = XLSX.utils.sheet_to_json(ws);
@@ -101,13 +101,14 @@ function SubjectImport({ departments, subjects, onImportComplete }) {
         
         if (onImportComplete) onImportComplete();
       } catch (error) {
-        toast({ title: "Import Failed", description: "Failed to read Excel file", variant: "destructive" });
+        console.error("Excel import error:", error);
+        toast({ title: "Import Failed", description: error?.message || "Failed to read Excel file", variant: "destructive" });
       } finally {
         setIsImporting(false);
         if (fileInputRef.current) fileInputRef.current.value = "";
       }
     };
-    reader.readAsBinaryString(file);
+    reader.readAsArrayBuffer(file);
   };
 
   return (
@@ -239,7 +240,7 @@ export default function Subjects() {
             </div>
             
             <div className="flex gap-2">
-              <SubjectImport departments={departments} subjects={subjects} onImportComplete={refetch} />
+              <SubjectImport departments={departments} subjects={subjects} faculty={faculty} sections={sections} onImportComplete={refetch} />
 
               <Dialog open={open} onOpenChange={(v) => { setOpen(v); if(!v) { setEditingId(null); form.reset(); } }}>
                 <DialogTrigger asChild>

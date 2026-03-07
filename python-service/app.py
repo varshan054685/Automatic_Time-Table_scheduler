@@ -1,31 +1,64 @@
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, Field
-
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from typing import List, Optional
 from scheduler import generate_timetable
 
+app = FastAPI(title="Timetable Scheduler")
 
-class GenerateTimetableRequest(BaseModel):
-    classrooms: list[dict] = Field(default_factory=list)
-    subjects: list[dict] = Field(default_factory=list)
-    faculty: list[dict] = Field(default_factory=list)
-    sections: list[dict] = Field(default_factory=list)
-    timeslots: list[dict] = Field(default_factory=list)
-    days: list[str] = Field(default_factory=list)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
+class ClassroomItem(BaseModel):
+    roomNumber: str
 
-app = FastAPI(title="Timetable Scheduler Service", version="1.0.0")
+class SubjectItem(BaseModel):
+    name: str
+    departmentId: int
+    sectionId: Optional[int] = None
+    facultyId: Optional[int] = None
+    weeklyHours: int
 
+class FacultyItem(BaseModel):
+    id: int
+    name: str
+    departmentId: int
 
-@app.get("/")
-def root():
-    return {"message": "Timetable FastAPI service is running"}
+class SectionItem(BaseModel):
+    id: int
+    name: str
+    departmentId: int
 
+class TimeslotItem(BaseModel):
+    id: int
+    dayOfWeek: str
+    label: str
+    startTime: str
+    endTime: str
+
+class GenerateRequest(BaseModel):
+    classrooms: List[ClassroomItem]
+    subjects: List[SubjectItem]
+    faculty: List[FacultyItem]
+    sections: List[SectionItem]
+    timeslots: List[TimeslotItem]
+    days: List[str]
 
 @app.post("/generate-timetable")
-def generate_timetable_endpoint(payload: GenerateTimetableRequest):
-    try:
-        return generate_timetable(payload.model_dump())
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail="Failed to generate timetable") from exc
+def generate(payload: GenerateRequest):
+    data = payload.model_dump() if hasattr(payload, 'model_dump') else payload.dict()
+    result = generate_timetable(data)
+    
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+        
+    return result
+
+@app.get("/health")
+def health_check():
+    return {"status": "healthy"}

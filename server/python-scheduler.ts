@@ -8,6 +8,7 @@ type SchedulerInput = {
     sectionId: number | null;
     facultyId: number | null;
     weeklyHours: number;
+    type: string | null;
   }>;
   faculty: Array<{ id: number; name: string; departmentId: number }>;
   sections: Array<{ id: number; name: string; departmentId: number }>;
@@ -33,8 +34,15 @@ type SchedulerOutput = {
 
 export async function generateWithPython(payload: SchedulerInput): Promise<SchedulerOutput> {
   const baseUrl = process.env.PYTHON_SERVICE_URL || "http://127.0.0.1:8000";
-  const response = await axios.post<SchedulerOutput>(`${baseUrl}/generate-timetable`, payload, {
-    timeout: 30000,
-  });
-  return response.data;
+  try {
+    const response = await axios.post<SchedulerOutput>(`${baseUrl}/generate-timetable`, payload, {
+      timeout: 30000,
+    });
+    return response.data;
+  } catch (error: any) {
+    if (error.response?.data?.detail) {
+       throw new Error(error.response.data.detail);
+    }
+    throw error;
+  }
 }

@@ -28,8 +28,8 @@ function DepartmentImport({ departments, onImportComplete }) {
 
     reader.onload = async (evt) => {
       try {
-        const bstr = evt.target.result;
-        const wb = XLSX.read(bstr, { type: "binary" });
+        const buffer = new Uint8Array(evt.target.result);
+        const wb = XLSX.read(buffer, { type: "array" });
         const wsname = wb.SheetNames[0];
         const ws = wb.Sheets[wsname];
         const data = XLSX.utils.sheet_to_json(ws);
@@ -64,13 +64,14 @@ function DepartmentImport({ departments, onImportComplete }) {
         
         if (onImportComplete) onImportComplete();
       } catch (error) {
-        toast({ title: "Import Failed", description: "Failed to read Excel file", variant: "destructive" });
+        console.error("Excel import error:", error);
+        toast({ title: "Import Failed", description: error?.message || "Failed to read Excel file", variant: "destructive" });
       } finally {
         setIsImporting(false);
         if (fileInputRef.current) fileInputRef.current.value = "";
       }
     };
-    reader.readAsBinaryString(file);
+    reader.readAsArrayBuffer(file);
   };
 
   return (

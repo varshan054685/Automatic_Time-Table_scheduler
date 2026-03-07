@@ -30,10 +30,19 @@ export async function registerRoutes(
     const timeSlots = await storage.getTimeSlots();
     const faculty = (await storage.getFaculty()).filter((f) => f.departmentId === departmentId);
 
-    if (subjects.length === 0) throw new Error("No subjects found for selected department");
+    // Remove aggressive throw errors; it should evaluate normally or schedule what it can.
     if (classrooms.length === 0) throw new Error("No classrooms found");
     if (timeSlots.length === 0) throw new Error("No time slots found");
-    if (faculty.length === 0) throw new Error("No faculty found for selected department");
+    
+    if (subjects.length === 0) {
+      console.warn("No subjects found for selected department, returning 0");
+      return 0;
+    }
+    
+    if (faculty.length === 0) {
+       console.warn("No faculty found for selected department, returning 0");
+       return 0;
+    }
 
     for (const section of sections) {
       await storage.clearTimetable(section.id);
@@ -50,6 +59,7 @@ export async function registerRoutes(
         sectionId: subject.sectionId,
         facultyId: subject.facultyId,
         weeklyHours: subject.weeklyHours,
+        type: subject.type,
       })),
       faculty: faculty.map((f) => ({
         id: f.id,
@@ -136,8 +146,11 @@ export async function registerRoutes(
         count,
       });
     } catch (error: any) {
-      console.error("Error calling Python service:", error.message);
-      res.status(500).json({ message: "Failed to generate timetable with Python" });
+      if (error.response?.data?.detail) {
+        res.status(400).json({ message: error.response.data.detail });
+      } else {
+        res.status(500).json({ message: "Failed to generate timetable with Python: " + error.message });
+      }
     }
   });
 

@@ -29,8 +29,8 @@ function SectionImport({ departments, sections, onImportComplete }) {
 
     reader.onload = async (evt) => {
       try {
-        const bstr = evt.target.result;
-        const wb = XLSX.read(bstr, { type: "binary" });
+        const buffer = new Uint8Array(evt.target.result);
+        const wb = XLSX.read(buffer, { type: "array" });
         const wsname = wb.SheetNames[0];
         const ws = wb.Sheets[wsname];
         const data = XLSX.utils.sheet_to_json(ws);
@@ -45,7 +45,10 @@ function SectionImport({ departments, sections, onImportComplete }) {
           const deptSearch = item["Department"] || item.department || item.departmentCode;
 
           if (name) {
-            const dept = departments?.find(d => d.name === deptSearch || d.code === deptSearch);
+            const dept = departments?.find(d => 
+              String(d.name).toLowerCase().trim() === String(deptSearch).toLowerCase().trim() || 
+              String(d.code).toLowerCase().trim() === String(deptSearch).toLowerCase().trim()
+            );
             const deptId = dept ? dept.id : Number(item.departmentId || 0);
 
             // Check for duplicate section in the same department
@@ -83,13 +86,14 @@ function SectionImport({ departments, sections, onImportComplete }) {
         
         if (onImportComplete) onImportComplete();
       } catch (error) {
-        toast({ title: "Import Failed", description: "Failed to read Excel file", variant: "destructive" });
+        console.error("Excel import error:", error);
+        toast({ title: "Import Failed", description: error?.message || "Failed to read Excel file", variant: "destructive" });
       } finally {
         setIsImporting(false);
         if (fileInputRef.current) fileInputRef.current.value = "";
       }
     };
-    reader.readAsBinaryString(file);
+    reader.readAsArrayBuffer(file);
   };
 
   return (
@@ -306,20 +310,22 @@ export default function Sections() {
                   <TableHead className="cursor-pointer hover:bg-slate-50" onClick={() => handleSort('semester')}>
                     <div className="flex items-center gap-2">Semester <ArrowUpDown className="w-3 h-3" /></div>
                   </TableHead>
+                  <TableHead>Department</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading ? (
-                  <TableRow><TableCell colSpan={4} className="text-center py-8">Loading...</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={5} className="text-center py-8">Loading...</TableCell></TableRow>
                 ) : filteredAndSortedSections.length === 0 ? (
-                  <TableRow><TableCell colSpan={4} className="text-center py-8 text-muted-foreground">No sections found</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">No sections found</TableCell></TableRow>
                 ) : (
                   filteredAndSortedSections.map((section) => (
                     <TableRow key={section.id}>
                       <TableCell className="font-medium">{section.name}</TableCell>
                       <TableCell>{section.year}</TableCell>
                       <TableCell>{section.semester}</TableCell>
+                      <TableCell>{departments?.find(d => d.id === section.departmentId)?.name || "Unknown"}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
                           <Button 
