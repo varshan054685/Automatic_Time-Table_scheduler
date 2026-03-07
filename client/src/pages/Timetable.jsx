@@ -403,14 +403,14 @@ export default function TimetablePage() {
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="w-full text-xs">
                   <thead className="bg-slate-50/50 border-b border-slate-200">
                     <tr>
-                      <th className="px-6 py-4 text-left font-bold text-slate-900 w-40 border-r border-slate-200 bg-slate-100/30">Day / Time</th>
+                      <th className="px-2 py-2 text-left font-bold text-slate-900 w-24 border-r border-slate-200 bg-slate-100/30 text-[10px]">Day / Time</th>
                       {uniqueSlots.map((slot, idx) => (
-                        <th key={idx} className="px-6 py-4 text-center font-bold text-slate-900 min-w-[180px] border-r border-slate-200 last:border-0">
-                          <div className="text-[10px] text-primary/70 uppercase tracking-[0.2em] font-black mb-1.5">{slot.label}</div>
-                          <div className="text-sm font-mono tracking-tight">{formatTime(slot.startTime).replace(' ', '')} - {formatTime(slot.endTime).replace(' ', '')}</div>
+                        <th key={idx} className="px-2 py-2 text-center font-bold text-slate-900 min-w-[100px] border-r border-slate-200 last:border-0">
+                          <div className="text-[8px] text-primary/70 uppercase tracking-[0.1em] font-black">{slot.label}</div>
+                          <div className="text-[9px] font-mono tracking-tight">{formatTime(slot.startTime).replace(' ', '')} - {formatTime(slot.endTime).replace(' ', '')}</div>
                         </th>
                       ))}
                     </tr>
@@ -418,7 +418,7 @@ export default function TimetablePage() {
                   <tbody>
                     {activeDays.map(day => (
                       <tr key={day} className="border-b border-slate-100 hover:bg-slate-50/30 transition-colors">
-                        <td className="px-6 py-6 font-bold text-slate-900 bg-slate-50/20 border-r border-slate-200">
+                        <td className="px-2 py-2 font-bold text-slate-900 bg-slate-50/20 border-r border-slate-200 text-[10px]">
                           {day}
                         </td>
                         {uniqueSlots.map((slot, idx) => {
@@ -427,30 +427,30 @@ export default function TimetablePage() {
                           const isBreak = slot.label.toLowerCase().includes('break') || slot.label.toLowerCase().includes('lunch');
                           
                           return (
-                            <td key={idx} className={`px-4 py-6 border-r border-slate-200 last:border-0 relative h-full transition-all ${isBreak ? 'bg-slate-100/30' : ''}`}>
+                            <td key={idx} className={`px-2 py-2 border-r border-slate-200 last:border-0 relative h-full transition-all ${isBreak ? 'bg-slate-100/30' : ''}`}>
                               {isBreak ? (
-                                <div className="flex flex-col items-center justify-center h-full gap-2 opacity-40">
-                                  <div className="w-1 h-8 bg-slate-300 rounded-full"></div>
-                                  <div className="text-[10px] text-slate-500 font-black tracking-[0.3em] uppercase rotate-0">{slot.label}</div>
-                                  <div className="w-1 h-8 bg-slate-300 rounded-full"></div>
+                                <div className="flex flex-col items-center justify-center h-full gap-1 opacity-40">
+                                  <div className="w-0.5 h-4 bg-slate-300 rounded-full"></div>
+                                  <div className="text-[7px] text-slate-500 font-black tracking-[0.2em] uppercase rotate-0">{slot.label}</div>
+                                  <div className="w-0.5 h-4 bg-slate-300 rounded-full"></div>
                                 </div>
                               ) : entry ? (
                                 <div className="text-center">
-                                  <div className="font-extrabold text-slate-900 text-base mb-2 tracking-tight">{entry.subject.name}</div>
-                                  <div className="space-y-1.5">
+                                  <div className="font-bold text-slate-900 text-[10px] tracking-tight">{entry.subject.name}</div>
+                                  <div className="space-y-0.5">
                                     {isSectionView && (
-                                      <div className="text-[11px] font-bold text-slate-600 bg-slate-100/50 py-1 px-2 rounded-lg flex items-center justify-center gap-1.5 border border-slate-200/50">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-primary/60"></div> {entry.faculty.name}
+                                      <div className="text-[8px] font-bold text-slate-600 bg-slate-100/50 py-0.5 px-1 rounded flex items-center justify-center gap-1 border border-slate-200/50">
+                                        <div className="w-1 h-1 rounded-full bg-primary/60"></div> {entry.faculty.name}
                                       </div>
                                     )}
                                     {isFacultyView && (
-                                      <div className="text-[11px] font-bold text-slate-600 bg-slate-100/50 py-1 px-2 rounded-lg flex items-center justify-center gap-1.5 border border-slate-200/50">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-indigo-500/60"></div> Section: {entry.section.name}
+                                      <div className="text-[8px] font-bold text-slate-600 bg-slate-100/50 py-0.5 px-1 rounded flex items-center justify-center gap-1 border border-slate-200/50">
+                                        <div className="w-1 h-1 rounded-full bg-indigo-500/60"></div> {entry.section.name}
                                       </div>
                                     )}
-                                    <div className="text-[10px] font-black text-slate-400 uppercase tracking-wider flex items-center justify-center gap-1 group">
-                                      <div className="w-1 h-1 bg-slate-200 group-hover:bg-primary/40 rounded-full transition-colors"></div>
-                                      Room {entry.classroom.roomNumber}
+                                    <div className="text-[7px] font-black text-slate-400 uppercase tracking-wide flex items-center justify-center gap-0.5 group">
+                                      <div className="w-0.5 h-0.5 bg-slate-200 group-hover:bg-primary/40 rounded-full transition-colors"></div>
+                                      R{entry.classroom.roomNumber}
                                     </div>
                                   </div>
                                 </div>
