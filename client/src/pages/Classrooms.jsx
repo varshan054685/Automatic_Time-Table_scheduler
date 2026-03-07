@@ -19,6 +19,7 @@ function ClassroomImport({ classrooms, onImportComplete }) {
   const fileInputRef = useRef(null);
   const { toast } = useToast();
   const createMutation = useCreateClassroom();
+  const updateMutation = useUpdateClassroom();
 
   const handleImport = async (e) => {
     const file = e.target.files[0];
@@ -36,6 +37,7 @@ function ClassroomImport({ classrooms, onImportComplete }) {
         const data = XLSX.utils.sheet_to_json(ws);
 
         let successCount = 0;
+        let updateCount = 0;
         let errorCount = 0;
 
         for (const item of data) {
@@ -44,19 +46,27 @@ function ClassroomImport({ classrooms, onImportComplete }) {
           const type = item["Type"] || item.type || item.Type;
 
           if (roomNumber) {
-            const exists = classrooms?.some(c => c.roomNumber === String(roomNumber));
-            if (exists) {
-              errorCount++;
-              continue;
-            }
+            const existing = classrooms?.find(c => c.roomNumber === String(roomNumber));
+            
             try {
-              await createMutation.mutateAsync({ 
-                roomNumber: String(roomNumber), 
-                capacity: Number(capacity || 0), 
-                type: String(type || "lecture").toLowerCase() === "lab" ? "lab" : "lecture" 
-              });
-              successCount++;
+              if (existing) {
+                await updateMutation.mutateAsync({
+                  id: existing.id,
+                  roomNumber: String(roomNumber),
+                  capacity: Number(capacity || existing.capacity),
+                  type: type ? (String(type).toLowerCase() === "lab" ? "lab" : "lecture") : existing.type
+                });
+                updateCount++;
+              } else {
+                await createMutation.mutateAsync({ 
+                  roomNumber: String(roomNumber), 
+                  capacity: Number(capacity || 0), 
+                  type: String(type || "lecture").toLowerCase() === "lab" ? "lab" : "lecture" 
+                });
+                successCount++;
+              }
             } catch (err) {
+              console.error(`Failed to import/update classroom ${roomNumber}:`, err);
               errorCount++;
             }
           }
@@ -64,8 +74,7 @@ function ClassroomImport({ classrooms, onImportComplete }) {
 
         toast({ 
           title: "Import Complete", 
-          description: `Successfully imported ${successCount} classrooms.${errorCount > 0 ? ` Skipped/Failed ${errorCount} records.` : ""}`,
-          variant: errorCount > 0 ? "default" : "default"
+          description: `Imported ${successCount} new, updated ${updateCount} classrooms.${errorCount > 0 ? ` Failed ${errorCount} records.` : ""}`,
         });
         
         if (onImportComplete) onImportComplete();

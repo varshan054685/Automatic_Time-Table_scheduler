@@ -8,17 +8,18 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Trash2, Search, ArrowUpDown, Pencil, Upload, Loader2 } from "lucide-react";
-import { useSections, useCreateSection, useUpdateSection, useDeleteSection, useDepartments } from "@/hooks/use-master-data";
+import { useSections, useCreateSection, useUpdateSection, useDeleteSection, useDepartments, useClassrooms } from "@/hooks/use-master-data";
 import { useToast } from "@/hooks/use-toast";
 import { api } from "@shared/routes";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import * as XLSX from "xlsx";
 
-function SectionImport({ departments, sections, onImportComplete }) {
+function SectionImport({ departments, classrooms, sections, onImportComplete }) {
   const [isImporting, setIsImporting] = useState(false);
   const fileInputRef = useRef(null);
   const { toast } = useToast();
   const createMutation = useCreateSection();
+  const updateMutation = useUpdateSection();
 
   const handleImport = async (e) => {
     const file = e.target.files[0];
@@ -36,52 +37,127 @@ function SectionImport({ departments, sections, onImportComplete }) {
         const data = XLSX.utils.sheet_to_json(ws);
 
         let successCount = 0;
+        let updateCount = 0;
         let errorCount = 0;
+        const errors = [];
 
-        for (const item of data) {
-          const name = item["Section Name"] || item["Name"] || item.name;
-          const year = item["Year"] || item.year;
-          const semester = item["Semester"] || item.semester;
-          const deptSearch = item["Department"] || item.department || item.departmentCode;
+        // Helper to find value from object with case-insensitive keys and space-tolerant search
+        const getVal = (obj, ...keys) => {
+          const objKeys = Object.keys(obj);
+          for (const k of keys) {
+            const foundKey = objKeys.find(ok => ok.toLowerCase().trim() === k.toLowerCase().trim());
+            if (foundKey) return obj[foundKey];
+          }
+          return null;
+        };
+
+        const clean = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]/g, "").trim();
+        
+        // Helper to extract first digit or Roman numeral (I-X)
+        const parseOrdinal = (val) => {
+          if (!val) return null;
+          const s = String(val).toUpperCase().trim();
+          const roman = { 'I': 1, 'II': 2, 'III': 3, 'IV': 4, 'V': 5, 'VI': 6, 'VII': 7, 'VIII': 8, 'IX': 9, 'X': 10 };
+          if (roman[s]) return roman[s];
+          const match = s.match(/\d+/);
+          return match ? parseInt(match[0]) : null;
+        };
+
+        for (let i = 0; i < data.length; i++) {
+          const item = data[i];
+          const rowNum = i + 2; // Assuming header is row 1
+          const name = getVal(item, "Section Name", "Name", "Section", "Class", "Class Name");
+          const yearRaw = getVal(item, "Year", "Study Year");
+          const semesterRaw = getVal(item, "Semester", "Sem");
+          const deptSearch = getVal(item, "Department", "Dept", "Department Code", "Dept Code");
+          const classroomSearch = getVal(item, "Classroom", "Room", "Class Room", "Room Number");
 
           if (name) {
-            const dept = departments?.find(d => 
-              String(d.name).toLowerCase().trim() === String(deptSearch).toLowerCase().trim() || 
-              String(d.code).toLowerCase().trim() === String(deptSearch).toLowerCase().trim()
-            );
-            const deptId = dept ? dept.id : Number(item.departmentId || 0);
-
-            // Check for duplicate section in the same department
-            const isDuplicate = sections?.some(s => 
-              s.name === name && 
-              Number(s.departmentId) === Number(deptId) &&
-              Number(s.year) === Number(year || 1) &&
-              Number(s.semester) === Number(semester || 1)
-            );
-
-            if (isDuplicate) {
-              errorCount++;
-              continue;
+            // Also try to extract year from name if missing
+            let yearNum = parseOrdinal(yearRaw);
+            if (!yearNum) {
+              const nameParts = String(name).split(/[\s-]+/);
+              for (const p of nameParts) {
+                const pNum = parseOrdinal(p);
+                if (pNum) { yearNum = pNum; break; }
+              }
             }
+            const semesterNum = parseOrdinal(semesterRaw);
+            const searchDeptClean = clean(deptSearch);
+            
+            const dept = departments?.find(d => {
+              const dNameClean = clean(d.name);
+              const dCodeClean = clean(d.code);
+              // Flexible matching: exact clean match OR code match OR prefix/suffix match
+              return (searchDeptClean && (
+                dNameClean === searchDeptClean || 
+                dCodeClean === searchDeptClean ||
+                dNameClean.includes(searchDeptClean) ||
+                searchDeptClean.includes(dNameClean)
+              ));
+            });
+            
+            const deptId = dept ? dept.id : (item.departmentId ? Number(item.departmentId) : 0);
+
+            const searchRoomClean = clean(classroomSearch);
+            const classroom = classrooms?.find(c => {
+              const rNumClean = clean(c.roomNumber);
+              return (searchRoomClean && (rNumClean === searchRoomClean || rNumClean.includes(searchRoomClean)));
+            });
+            const classroomId = classroom ? classroom.id : (item.classroomId ? Number(item.classroomId) : null);
+
+            // Check for existing section
+            const nameClean = clean(name);
+            const existing = sections?.find(s => 
+              clean(s.name) === nameClean && 
+              Number(s.year) === (yearNum || s.year) &&
+              Number(s.semester) === (semesterNum || s.semester)
+            );
+
+            const payload = {
+              name: String(name),
+              year: Number(yearNum || 1), 
+              semester: Number(semesterNum || 1),
+              departmentId: Number(deptId),
+              classroomId: classroomId
+            };
 
             try {
-              await createMutation.mutateAsync({ 
-                name, 
-                year: Number(year || 1), 
-                semester: Number(semester || 1),
-                departmentId: Number(deptId)
-              });
-              successCount++;
+              if (existing) {
+                await updateMutation.mutateAsync({
+                  id: existing.id,
+                  ...payload,
+                  departmentId: Number(deptId || existing.departmentId),
+                  classroomId: classroomId || existing.classroomId
+                });
+                updateCount++;
+              } else {
+                if (!deptId) {
+                  const msg = `Row ${rowNum}: No department found for "${deptSearch}"`;
+                  console.warn(msg);
+                  errors.push(msg);
+                  errorCount++;
+                  continue;
+                }
+                await createMutation.mutateAsync(payload);
+                successCount++;
+              }
             } catch (err) {
+              const msg = `Row ${rowNum} (${name}): ${err.message || 'Unknown error'}`;
+              console.error(`Import failed for row ${rowNum}:`, { payload, error: err });
+              errors.push(msg);
               errorCount++;
             }
           }
         }
 
+        const summary = `Imported ${successCount} new, updated ${updateCount} sections.`;
+        const errorSummary = errorCount > 0 ? ` Failed ${errorCount} records: ${errors.slice(0, 3).join("; ")}${errorCount > 3 ? "..." : ""}` : "";
+
         toast({ 
           title: "Import Complete", 
-          description: `Successfully imported ${successCount} sections.${errorCount > 0 ? ` Skipped/Failed ${errorCount} records.` : ""}`,
-          variant: errorCount > 0 ? "default" : "default"
+          description: summary + errorSummary,
+          variant: errorCount > 0 ? "destructive" : "default"
         });
         
         if (onImportComplete) onImportComplete();
@@ -117,18 +193,23 @@ export default function Sections() {
   const { toast } = useToast();
   const { data: sections, isLoading, refetch } = useSections();
   const { data: departments } = useDepartments();
+  const { data: classrooms } = useClassrooms();
   const createMutation = useCreateSection();
   const updateMutation = useUpdateSection();
   const deleteMutation = useDeleteSection();
 
   const form = useForm({
     resolver: zodResolver(api.sections.create.input),
-    defaultValues: { name: "", year: 1, semester: 1, departmentId: 0 },
+    defaultValues: { name: "", year: 1, semester: 1, departmentId: 0, classroomId: 0 },
   });
 
   const onSubmit = (values) => {
     if (editingId) {
-      updateMutation.mutate({ id: editingId, ...values }, {
+      updateMutation.mutate({ 
+        id: editingId, 
+        ...values,
+        classroomId: values.classroomId && values.classroomId !== "0" ? Number(values.classroomId) : null,
+      }, {
         onSuccess: () => {
           setOpen(false);
           setEditingId(null);
@@ -140,7 +221,10 @@ export default function Sections() {
         }
       });
     } else {
-      createMutation.mutate(values, {
+      createMutation.mutate({
+        ...values,
+        classroomId: values.classroomId && values.classroomId !== "0" ? Number(values.classroomId) : null,
+      }, {
         onSuccess: () => {
           setOpen(false);
           form.reset();
@@ -155,7 +239,13 @@ export default function Sections() {
 
   const handleEdit = (section) => {
     setEditingId(section.id);
-    form.reset({ name: section.name, year: section.year, semester: section.semester, departmentId: section.departmentId });
+    form.reset({ 
+      name: section.name, 
+      year: section.year, 
+      semester: section.semester, 
+      departmentId: section.departmentId,
+      classroomId: section.classroomId || 0 
+    });
     setOpen(true);
   };
 
@@ -206,7 +296,7 @@ export default function Sections() {
             </div>
             
             <div className="flex gap-2">
-              <SectionImport departments={departments} sections={sections} onImportComplete={refetch} />
+              <SectionImport departments={departments} classrooms={classrooms} sections={sections} onImportComplete={refetch} />
 
               <Dialog open={open} onOpenChange={(v) => { setOpen(v); if(!v) { setEditingId(null); form.reset(); } }}>
                 <DialogTrigger asChild>
@@ -275,6 +365,29 @@ export default function Sections() {
                           </FormItem>
                         )}
                       />
+                      <FormField
+                        control={form.control}
+                        name="classroomId"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Classroom</FormLabel>
+                            <Select onValueChange={(val) => field.onChange(parseInt(val))} value={field.value?.toString()}>
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select Classroom (Optional)" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="0">None</SelectItem>
+                                {classrooms?.map(room => (
+                                  <SelectItem key={room.id} value={room.id.toString()}>{room.roomNumber}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
                       <Button type="submit" className="w-full" disabled={createMutation.isPending || updateMutation.isPending}>
                         {editingId ? (updateMutation.isPending ? "Updating..." : "Update Section") : (createMutation.isPending ? "Creating..." : "Create Section")}
                       </Button>
@@ -310,7 +423,8 @@ export default function Sections() {
                   <TableHead className="cursor-pointer hover:bg-slate-50" onClick={() => handleSort('semester')}>
                     <div className="flex items-center gap-2">Semester <ArrowUpDown className="w-3 h-3" /></div>
                   </TableHead>
-                  <TableHead>Department</TableHead>
+                   <TableHead>Department</TableHead>
+                   <TableHead>Classroom</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -325,7 +439,8 @@ export default function Sections() {
                       <TableCell className="font-medium">{section.name}</TableCell>
                       <TableCell>{section.year}</TableCell>
                       <TableCell>{section.semester}</TableCell>
-                      <TableCell>{departments?.find(d => d.id === section.departmentId)?.name || "Unknown"}</TableCell>
+                       <TableCell>{departments?.find(d => d.id === section.departmentId)?.name || section.department?.name || "Unknown"}</TableCell>
+                       <TableCell>{classrooms?.find(c => c.id === section.classroomId)?.roomNumber || section.classroom?.roomNumber || "None"}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
                           <Button 

@@ -24,7 +24,16 @@ export default function TimetablePage() {
     !selectedDept || s.departmentId.toString() === selectedDept
   );
 
-  const filteredFaculty = faculty; // Show all faculty globally for personal view
+  const filteredFaculty = useMemo(() => {
+    if (!selectedDept) return faculty;
+    // Faculty belonging to this dept
+    const deptFacultyIds = new Set(faculty?.filter(f => f.departmentId.toString() === selectedDept).map(f => f.id));
+    // Also include faculty who teach any subject in this department
+    subjects?.filter(s => s.departmentId.toString() === selectedDept && s.facultyId).forEach(s => {
+      deptFacultyIds.add(s.facultyId);
+    });
+    return faculty?.filter(f => deptFacultyIds.has(f.id));
+  }, [faculty, subjects, selectedDept]);
 
   const normalizedSection = selectedSection && selectedSection !== "none" ? selectedSection : "";
   const normalizedFaculty = selectedFaculty && selectedFaculty !== "none" ? selectedFaculty : "";
@@ -125,14 +134,14 @@ export default function TimetablePage() {
     const seen = new Set();
     const list = [];
     timetable.forEach(entry => {
-      if (!seen.has(entry.subject.id)) {
+      if (entry.subject && !seen.has(entry.subject.id)) {
         seen.add(entry.subject.id);
         const subj = subjects?.find(s => s.id === entry.subject.id);
         const fac = faculty?.find(f => f.id === entry.facultyId);
         list.push({
           ...entry.subject,
-          facultyName: fac?.name || entry.faculty.name,
-          acronym: entry.subject.name.split(' ').map(w => w[0]).join('').toUpperCase()
+          facultyName: fac?.name || entry.faculty?.name || "Unknown Faculty",
+          acronym: entry.subject.name?.split(' ').map(w => w[0]).join('').toUpperCase() || "N/A"
         });
       }
     });
@@ -229,8 +238,8 @@ export default function TimetablePage() {
                         
                         return (
                           <td key={sIdx} className="border border-slate-900 p-1 text-center font-bold text-[11pt]">
-                            {entry?.subject.name.split(' ').map(w => w[0]).join('').toUpperCase() || ""}
-                            {entry?.subject.type === 'lab' ? ' LAB' : ''}
+                            {entry?.subject?.name.split(' ').map(w => w[0]).join('').toUpperCase() || ""}
+                            {entry?.subject?.type === 'lab' ? ' LAB' : ''}
                           </td>
                         );
                       })}
@@ -353,10 +362,9 @@ export default function TimetablePage() {
                   <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
                     <User className="w-4 h-4 text-primary" /> Faculty View
                   </label>
-                  <Select value={selectedFaculty} onValueChange={(val) => {
+                  <Select disabled={!selectedDept} value={selectedFaculty} onValueChange={(val) => {
                     setSelectedFaculty(val);
                     setSelectedSection("");
-                    setSelectedDept("");
                   }}>
                     <SelectTrigger className="bg-white border-slate-200 focus:ring-primary/20">
                       <SelectValue placeholder="Select Faculty" />
@@ -436,21 +444,21 @@ export default function TimetablePage() {
                                 </div>
                               ) : entry ? (
                                 <div className="text-center">
-                                  <div className="font-bold text-slate-900 text-[10px] tracking-tight">{entry.subject.name}</div>
+                                  <div className="font-bold text-slate-900 text-[10px] tracking-tight">{entry.subject?.name || "Unknown Subject"}</div>
                                   <div className="space-y-0.5">
                                     {isSectionView && (
                                       <div className="text-[8px] font-bold text-slate-600 bg-slate-100/50 py-0.5 px-1 rounded flex items-center justify-center gap-1 border border-slate-200/50">
-                                        <div className="w-1 h-1 rounded-full bg-primary/60"></div> {entry.faculty.name}
+                                        <div className="w-1 h-1 rounded-full bg-primary/60"></div> {entry.faculty?.name || "Unknown"}
                                       </div>
                                     )}
                                     {isFacultyView && (
                                       <div className="text-[8px] font-bold text-slate-600 bg-slate-100/50 py-0.5 px-1 rounded flex items-center justify-center gap-1 border border-slate-200/50">
-                                        <div className="w-1 h-1 rounded-full bg-indigo-500/60"></div> {entry.section.name}
+                                        <div className="w-1 h-1 rounded-full bg-indigo-500/60"></div> {entry.section?.name || "Unknown"}
                                       </div>
                                     )}
                                     <div className="text-[7px] font-black text-slate-400 uppercase tracking-wide flex items-center justify-center gap-0.5 group">
                                       <div className="w-0.5 h-0.5 bg-slate-200 group-hover:bg-primary/40 rounded-full transition-colors"></div>
-                                      R{entry.classroom.roomNumber}
+                                      R{entry.classroom?.roomNumber || "N/A"}
                                     </div>
                                   </div>
                                 </div>

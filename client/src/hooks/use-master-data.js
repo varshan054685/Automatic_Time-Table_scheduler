@@ -274,6 +274,7 @@ export function useCreateSection() {
       const validated = api.sections.create.input.parse({
         ...data,
         departmentId: Number(data.departmentId),
+        classroomId: data.classroomId ? Number(data.classroomId) : null,
         year: Number(data.year),
         semester: Number(data.semester)
       });
@@ -283,7 +284,11 @@ export function useCreateSection() {
         body: JSON.stringify(validated),
         credentials: "include",
       });
-      if (!res.ok) throw new Error("Failed to create section");
+      
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || "Failed to create section");
+      }
       return api.sections.create.responses[201].parse(await res.json());
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: [api.sections.list.path] }),
@@ -301,12 +306,17 @@ export function useUpdateSection() {
         body: JSON.stringify({
           ...data,
           departmentId: Number(data.departmentId),
+          classroomId: data.classroomId ? Number(data.classroomId) : null,
           year: Number(data.year),
           semester: Number(data.semester)
         }),
         credentials: "include",
       });
-      if (!res.ok) throw new Error("Failed to update section");
+      
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || "Failed to update section");
+      }
       return res.json();
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: [api.sections.list.path] }),

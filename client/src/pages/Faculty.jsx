@@ -19,6 +19,7 @@ function FacultyImport({ departments, faculty, onImportComplete }) {
   const fileInputRef = useRef(null);
   const { toast } = useToast();
   const createMutation = useCreateFaculty();
+  const updateMutation = useUpdateFaculty();
 
   const handleImport = async (e) => {
     const file = e.target.files[0];
@@ -36,6 +37,7 @@ function FacultyImport({ departments, faculty, onImportComplete }) {
         const data = XLSX.utils.sheet_to_json(ws);
 
         let successCount = 0;
+        let updateCount = 0;
         let errorCount = 0;
 
         for (const item of data) {
@@ -53,33 +55,40 @@ function FacultyImport({ departments, faculty, onImportComplete }) {
             const deptId = dept ? dept.id : (item.departmentId ? Number(item.departmentId) : (departments && departments.length > 0 ? departments[0].id : null));
 
             if (!deptId) {
-              console.warn(`Skipping faculty ${name}: No valid department ID found. Available depts:`, departments);
+              console.warn(`Skipping faculty ${name}: No valid department ID found.`);
               errorCount++;
               continue;
             }
 
-            // Check for duplicates by code or email
-            const isDuplicate = faculty?.some(f => 
+            // Check for existing by code or email
+            const existing = faculty?.find(f => 
               (code && String(f.code).toLowerCase() === String(code).toLowerCase()) || 
               (email && String(f.email).toLowerCase() === String(email).toLowerCase())
             );
 
-            if (isDuplicate) {
-              errorCount++;
-              continue;
-            }
-
             try {
-              await createMutation.mutateAsync({ 
-                name: String(name), 
-                code: code ? String(code) : `FAC${Date.now()}${successCount}`,
-                email: email ? String(email) : "", 
-                departmentId: deptId,
-                availability: []
-              });
-              successCount++;
+              if (existing) {
+                await updateMutation.mutateAsync({
+                  id: existing.id,
+                  name: String(name),
+                  code: code ? String(code) : existing.code,
+                  email: email ? String(email) : existing.email,
+                  departmentId: deptId || existing.departmentId,
+                  availability: existing.availability || []
+                });
+                updateCount++;
+              } else {
+                await createMutation.mutateAsync({ 
+                  name: String(name), 
+                  code: code ? String(code) : `FAC${Date.now()}${successCount}`,
+                  email: email ? String(email) : "", 
+                  departmentId: deptId,
+                  availability: []
+                });
+                successCount++;
+              }
             } catch (err) {
-              console.error(`Failed to import faculty ${name}:`, err);
+              console.error(`Failed to import/update faculty ${name}:`, err);
               errorCount++;
             }
           }
@@ -87,8 +96,7 @@ function FacultyImport({ departments, faculty, onImportComplete }) {
 
         toast({ 
           title: "Import Complete", 
-          description: `Successfully imported ${successCount} faculty.${errorCount > 0 ? ` Skipped/Failed ${errorCount} records.` : ""}`,
-          variant: errorCount > 0 ? "default" : "default"
+          description: `Imported ${successCount} new, updated ${updateCount} faculty.${errorCount > 0 ? ` Failed ${errorCount} records.` : ""}`,
         });
         
         if (onImportComplete) onImportComplete();

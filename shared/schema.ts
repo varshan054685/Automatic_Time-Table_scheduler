@@ -56,6 +56,7 @@ export const sections = pgTable("sections", {
   year: integer("year").notNull(),
   semester: integer("semester").notNull(),
   departmentId: integer("department_id").notNull(),
+  classroomId: integer("classroom_id"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -95,6 +96,10 @@ export const sectionsRelations = relations(sections, ({ one }) => ({
   department: one(departments, {
     fields: [sections.departmentId],
     references: [departments.id],
+  }),
+  classroom: one(classrooms, {
+    fields: [sections.classroomId],
+    references: [classrooms.id],
   }),
 }));
 

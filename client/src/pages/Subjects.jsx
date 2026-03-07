@@ -19,6 +19,7 @@ function SubjectImport({ departments, subjects, faculty, sections, onImportCompl
   const fileInputRef = useRef(null);
   const { toast } = useToast();
   const createMutation = useCreateSubject();
+  const updateMutation = useUpdateSubject();
 
     const handleImport = async (e) => {
     const file = e.target.files[0];
@@ -36,6 +37,7 @@ function SubjectImport({ departments, subjects, faculty, sections, onImportCompl
         const data = XLSX.utils.sheet_to_json(ws);
 
         let successCount = 0;
+        let updateCount = 0;
         let errorCount = 0;
 
         for (const item of data) {
@@ -47,11 +49,7 @@ function SubjectImport({ departments, subjects, faculty, sections, onImportCompl
           const sectionSearch = item["Target Section"] || item["Section"] || item.section || item["section"];
 
           if (name && code) {
-            const exists = subjects?.some(s => String(s.code).toLowerCase() === String(code).toLowerCase());
-            if (exists) {
-              errorCount++;
-              continue;
-            }
+            const existing = subjects?.find(s => String(s.code).toLowerCase() === String(code).toLowerCase());
             
             const dept = departments?.find(d => 
               String(d.name).toLowerCase().trim() === String(deptSearch).toLowerCase().trim() || 
@@ -60,7 +58,7 @@ function SubjectImport({ departments, subjects, faculty, sections, onImportCompl
 
             const deptId = dept ? dept.id : (item.departmentId ? Number(item.departmentId) : (departments && departments.length > 0 ? departments[0].id : null));
 
-            if (!deptId) {
+            if (!deptId && !existing) {
               console.warn(`Skipping subject ${name}: No valid department ID found.`);
               errorCount++;
               continue;
@@ -76,18 +74,32 @@ function SubjectImport({ departments, subjects, faculty, sections, onImportCompl
             );
             
             try {
-              await createMutation.mutateAsync({ 
-                name: String(name), 
-                code: String(code), 
-                weeklyHours: Number(hours || 0),
-                departmentId: deptId,
-                facultyId: fac ? fac.id : (item.facultyId ? Number(item.facultyId) : null),
-                sectionId: sec ? sec.id : (item.sectionId ? Number(item.sectionId) : null),
-                type: "theory"
-              });
-              successCount++;
+              if (existing) {
+                await updateMutation.mutateAsync({
+                  id: existing.id,
+                  name: String(name),
+                  code: String(code),
+                  weeklyHours: Number(hours || existing.weeklyHours),
+                  departmentId: deptId || existing.departmentId,
+                  facultyId: fac ? fac.id : (item.facultyId ? Number(item.facultyId) : existing.facultyId),
+                  sectionId: sec ? sec.id : (item.sectionId ? Number(item.sectionId) : existing.sectionId),
+                  type: existing.type || "theory"
+                });
+                updateCount++;
+              } else {
+                await createMutation.mutateAsync({ 
+                  name: String(name), 
+                  code: String(code), 
+                  weeklyHours: Number(hours || 0),
+                  departmentId: deptId,
+                  facultyId: fac ? fac.id : (item.facultyId ? Number(item.facultyId) : null),
+                  sectionId: sec ? sec.id : (item.sectionId ? Number(item.sectionId) : null),
+                  type: "theory"
+                });
+                successCount++;
+              }
             } catch (err) {
-              console.error(`Failed to import subject ${name}:`, err);
+              console.error(`Failed to import/update subject ${name}:`, err);
               errorCount++;
             }
           }
@@ -95,8 +107,7 @@ function SubjectImport({ departments, subjects, faculty, sections, onImportCompl
 
         toast({ 
           title: "Import Complete", 
-          description: `Successfully imported ${successCount} subjects.${errorCount > 0 ? ` Skipped/Failed ${errorCount} records.` : ""}`,
-          variant: errorCount > 0 ? "default" : "default"
+          description: `Imported ${successCount} new, updated ${updateCount} subjects.${errorCount > 0 ? ` Failed ${errorCount} records.` : ""}`,
         });
         
         if (onImportComplete) onImportComplete();

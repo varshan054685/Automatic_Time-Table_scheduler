@@ -18,6 +18,7 @@ function DepartmentImport({ departments, onImportComplete }) {
   const fileInputRef = useRef(null);
   const { toast } = useToast();
   const createMutation = useCreateDepartment();
+  const updateMutation = useUpdateDepartment();
 
   const handleImport = async (e) => {
     const file = e.target.files[0];
@@ -35,6 +36,7 @@ function DepartmentImport({ departments, onImportComplete }) {
         const data = XLSX.utils.sheet_to_json(ws);
 
         let successCount = 0;
+        let updateCount = 0;
         let errorCount = 0;
 
         for (const item of data) {
@@ -42,15 +44,22 @@ function DepartmentImport({ departments, onImportComplete }) {
           const code = item["Department Code"] || item.code || item.Code;
 
           if (name && code) {
-            const exists = departments?.some(d => d.name === name || d.code === String(code));
-            if (exists) {
-              errorCount++;
-              continue;
-            }
+            const existing = departments?.find(d => d.name === name || d.code === String(code));
+            
             try {
-              await createMutation.mutateAsync({ name, code: String(code) });
-              successCount++;
+              if (existing) {
+                await updateMutation.mutateAsync({
+                  id: existing.id,
+                  name: String(name),
+                  code: String(code)
+                });
+                updateCount++;
+              } else {
+                await createMutation.mutateAsync({ name, code: String(code) });
+                successCount++;
+              }
             } catch (err) {
+              console.error(`Failed to import/update department ${name}:`, err);
               errorCount++;
             }
           }
@@ -58,8 +67,7 @@ function DepartmentImport({ departments, onImportComplete }) {
 
         toast({ 
           title: "Import Complete", 
-          description: `Successfully imported ${successCount} departments.${errorCount > 0 ? ` Skipped/Failed ${errorCount} records.` : ""}`,
-          variant: errorCount > 0 ? "default" : "default"
+          description: `Imported ${successCount} new, updated ${updateCount} departments.${errorCount > 0 ? ` Failed ${errorCount} records.` : ""}`,
         });
         
         if (onImportComplete) onImportComplete();

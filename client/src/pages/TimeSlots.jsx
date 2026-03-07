@@ -212,6 +212,7 @@ function TimeSlotImport({ timeSlots, onImportComplete }) {
   const fileInputRef = useRef(null);
   const { toast } = useToast();
   const createMutation = useCreateTimeSlot();
+  const updateMutation = useUpdateTimeSlot();
 
   const handleImport = async (e) => {
     const file = e.target.files[0];
@@ -229,6 +230,7 @@ function TimeSlotImport({ timeSlots, onImportComplete }) {
         const data = XLSX.utils.sheet_to_json(ws);
 
         let successCount = 0;
+        let updateCount = 0;
         let errorCount = 0;
 
         for (const item of data) {
@@ -238,27 +240,34 @@ function TimeSlotImport({ timeSlots, onImportComplete }) {
           const endTime = item["End Time"] || item.endTime;
 
           if (dayOfWeek && label && startTime && endTime) {
-            // Check for duplicate time slot
-            const isDuplicate = timeSlots?.some(s => 
+            // Check for existing time slot
+            const existing = timeSlots?.find(s => 
               s.dayOfWeek === dayOfWeek && 
               s.startTime === startTime && 
               s.endTime === endTime
             );
 
-            if (isDuplicate) {
-              errorCount++;
-              continue;
-            }
-
             try {
-              await createMutation.mutateAsync({
-                dayOfWeek,
-                label,
-                startTime,
-                endTime
-              });
-              successCount++;
+              if (existing) {
+                await updateMutation.mutateAsync({
+                  id: existing.id,
+                  dayOfWeek,
+                  label,
+                  startTime,
+                  endTime
+                });
+                updateCount++;
+              } else {
+                await createMutation.mutateAsync({
+                  dayOfWeek,
+                  label,
+                  startTime,
+                  endTime
+                });
+                successCount++;
+              }
             } catch (err) {
+              console.error(`Failed to import/update time slot ${label}:`, err);
               errorCount++;
             }
           }
@@ -266,8 +275,7 @@ function TimeSlotImport({ timeSlots, onImportComplete }) {
 
         toast({ 
           title: "Import Complete", 
-          description: `Successfully imported ${successCount} time slots.${errorCount > 0 ? ` Skipped/Failed ${errorCount} records.` : ""}`,
-          variant: errorCount > 0 ? "default" : "default"
+          description: `Imported ${successCount} new, updated ${updateCount} time slots.${errorCount > 0 ? ` Failed ${errorCount} records.` : ""}`,
         });
         
         if (onImportComplete) onImportComplete();

@@ -181,7 +181,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getSections(): Promise<Section[]> {
-    return await db.select().from(sections);
+    return await db.query.sections.findMany({
+      with: {
+        department: true,
+        classroom: true,
+      },
+    }) as any;
   }
 
   async getSection(id: number): Promise<Section | undefined> {
