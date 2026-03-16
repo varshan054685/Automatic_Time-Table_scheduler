@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card } from "@/components/ui/card";
 import { Loader2, Download, RefreshCw, User, Calendar, BookOpen, Clock } from "lucide-react";
-import { useTimetable, useGenerateTimetable } from "@/hooks/use-timetable";
+import { useTimetable, useGenerateTimetable, useRegenerateAll } from "@/hooks/use-timetable";
 import { useDepartments, useSections, useTimeSlots, useFaculty, useSubjects } from "@/hooks/use-master-data";
 import { useToast } from "@/hooks/use-toast";
 
@@ -46,34 +46,12 @@ export default function TimetablePage() {
   });
 
   const generateMutation = useGenerateTimetable();
+  const regenerateAllMutation = useRegenerateAll();
 
   const handleGenerate = () => {
-    if (!selectedDept) {
-      toast({ title: "Error", description: "Please select a department first", variant: "destructive" });
-      return;
-    }
-
-    let defaultSem = "1";
-    if (selectedSection && selectedSection !== "none") {
-      const sec = sections?.find(s => s.id.toString() === selectedSection);
-      if (sec) defaultSem = sec.semester.toString();
-    } else {
-      const deptSections = sections?.filter(s => s.departmentId.toString() === selectedDept);
-      if (deptSections && deptSections.length > 0) {
-        defaultSem = deptSections[0].semester.toString();
-      }
-    }
-
-    const semesterStr = prompt("Enter semester number (e.g. 1, 2, 3) or leave empty for all:", defaultSem);
-    if (semesterStr === null) return;
+    if (!confirm("This will clear the current timetable and regenerate it for all departments. Continue?")) return;
     
-    const semNum = parseInt(semesterStr);
-    const payload = { departmentId: parseInt(selectedDept) };
-    if (!isNaN(semNum)) {
-       payload.semester = semNum;
-    }
-
-    generateMutation.mutate(payload, {
+    regenerateAllMutation.mutate(null, {
       onSuccess: (data) => {
         toast({ title: "Success", description: data.message });
       },
@@ -84,10 +62,11 @@ export default function TimetablePage() {
   };
 
   const getEntry = (day, slotId) => {
-    return timetable?.find(t => 
-      t.timeSlotId === slotId && 
-      t.timeSlot.dayOfWeek === day
-    );
+    if (!slotId) return null;
+    return timetable?.find(t =>
+      t.timeSlotId === slotId &&
+      (t.timeSlot ? t.timeSlot.dayOfWeek === day : true)
+    ) ?? null;
   };
 
   const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
@@ -308,11 +287,11 @@ export default function TimetablePage() {
                 <Calendar className="w-4 h-4" /> Generate and view weekly schedules.
               </p>
             </div>
-            <div className="flex gap-2">
-               <Button variant="outline" className="gap-2 border-slate-200 hover:bg-slate-50 transition-colors" onClick={() => window.print()}>
-                 <Download className="w-4 h-4" /> Export PDF
-               </Button>
-            </div>
+              <div className="flex gap-2">
+                <Button variant="outline" className="gap-2 border-slate-200 hover:bg-slate-50 transition-colors" onClick={() => window.print()}>
+                  <Download className="w-4 h-4" /> Export PDF
+                </Button>
+              </div>
           </div>
 
           <Card className="p-6 bg-white/80 backdrop-blur-sm shadow-xl shadow-slate-200/50 border-white/50 print:hidden">
@@ -382,10 +361,10 @@ export default function TimetablePage() {
               <div className="flex justify-end pt-2">
                 <Button 
                   onClick={handleGenerate} 
-                  disabled={!selectedDept || generateMutation.isPending}
+                  disabled={regenerateAllMutation.isPending}
                   className="bg-primary hover:bg-primary/90 text-white min-w-[160px] shadow-lg shadow-primary/20 transition-all active:scale-95"
                 >
-                  {generateMutation.isPending ? (
+                  {regenerateAllMutation.isPending ? (
                     <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Generating...</>
                   ) : (
                     <><RefreshCw className="w-4 h-4 mr-2" /> Generate New</>
@@ -444,7 +423,10 @@ export default function TimetablePage() {
                                 </div>
                               ) : entry ? (
                                 <div className="text-center">
-                                  <div className="font-bold text-slate-900 text-[10px] tracking-tight">{entry.subject?.name || "Unknown Subject"}</div>
+                                  <div className="font-bold text-slate-900 text-[10px] tracking-tight">
+                                    {entry.subject?.name || "Unknown Subject"}
+                                    {entry.subject?.type === 'lab' && <span className="ml-1 text-[8px] bg-amber-100 text-amber-700 px-1 rounded">LAB</span>}
+                                  </div>
                                   <div className="space-y-0.5">
                                     {isSectionView && (
                                       <div className="text-[8px] font-bold text-slate-600 bg-slate-100/50 py-0.5 px-1 rounded flex items-center justify-center gap-1 border border-slate-200/50">

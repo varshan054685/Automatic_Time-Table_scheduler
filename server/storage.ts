@@ -59,6 +59,7 @@ export interface IStorage {
   getTimetable(sectionId?: number, facultyId?: number): Promise<any[]>;
   createTimetableEntry(entry: any): Promise<TimetableEntry>;
   clearTimetable(sectionId: number): Promise<void>;
+  clearAllTimetable(): Promise<void>;
   
   // For scheduler
   getAllAllocatedSlots(departmentId: number): Promise<TimetableEntry[]>;
@@ -257,6 +258,10 @@ export class DatabaseStorage implements IStorage {
 
   async clearTimetable(sectionId: number): Promise<void> {
     await db.delete(timetable).where(eq(timetable.sectionId, sectionId));
+  }
+
+  async clearAllTimetable(): Promise<void> {
+    await db.delete(timetable);
   }
 
   async getAllAllocatedSlots(departmentId: number): Promise<TimetableEntry[]> {

@@ -1,6 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, buildUrl } from "@shared/routes";
 
+// Helper: invalidate both the entity list and the timetable
+const invalidateTimetable = (queryClient) =>
+  queryClient.invalidateQueries({ queryKey: [api.timetable.list.path] });
+
 // === DEPARTMENTS ===
 export function useDepartments() {
   return useQuery({
@@ -27,7 +31,10 @@ export function useCreateDepartment() {
       if (!res.ok) throw new Error("Failed to create department");
       return api.departments.create.responses[201].parse(await res.json());
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: [api.departments.list.path] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.departments.list.path] });
+      invalidateTimetable(queryClient);
+    },
   });
 }
 
@@ -45,7 +52,10 @@ export function useUpdateDepartment() {
       if (!res.ok) throw new Error("Failed to update department");
       return res.json();
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: [api.departments.list.path] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.departments.list.path] });
+      invalidateTimetable(queryClient);
+    },
   });
 }
 
@@ -57,7 +67,10 @@ export function useDeleteDepartment() {
       const res = await fetch(url, { method: "DELETE", credentials: "include" });
       if (!res.ok) throw new Error("Failed to delete department");
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: [api.departments.list.path] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.departments.list.path] });
+      invalidateTimetable(queryClient);
+    },
   });
 }
 
@@ -90,7 +103,10 @@ export function useCreateClassroom() {
       if (!res.ok) throw new Error("Failed to create classroom");
       return api.classrooms.create.responses[201].parse(await res.json());
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: [api.classrooms.list.path] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.classrooms.list.path] });
+      invalidateTimetable(queryClient);
+    },
   });
 }
 
@@ -108,7 +124,10 @@ export function useUpdateClassroom() {
       if (!res.ok) throw new Error("Failed to update classroom");
       return res.json();
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: [api.classrooms.list.path] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.classrooms.list.path] });
+      invalidateTimetable(queryClient);
+    },
   });
 }
 
@@ -120,7 +139,10 @@ export function useDeleteClassroom() {
       const res = await fetch(url, { method: "DELETE", credentials: "include" });
       if (!res.ok) throw new Error("Failed to delete classroom");
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: [api.classrooms.list.path] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.classrooms.list.path] });
+      invalidateTimetable(queryClient);
+    },
   });
 }
 
@@ -154,7 +176,10 @@ export function useCreateSubject() {
       if (!res.ok) throw new Error("Failed to create subject");
       return api.subjects.create.responses[201].parse(await res.json());
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: [api.subjects.list.path] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.subjects.list.path] });
+      invalidateTimetable(queryClient);
+    },
   });
 }
 
@@ -176,7 +201,10 @@ export function useUpdateSubject() {
       if (!res.ok) throw new Error("Failed to update subject");
       return res.json();
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: [api.subjects.list.path] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.subjects.list.path] });
+      invalidateTimetable(queryClient);
+    },
   });
 }
 
@@ -188,7 +216,10 @@ export function useDeleteSubject() {
       const res = await fetch(url, { method: "DELETE", credentials: "include" });
       if (!res.ok) throw new Error("Failed to delete subject");
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: [api.subjects.list.path] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.subjects.list.path] });
+      invalidateTimetable(queryClient);
+    },
   });
 }
 
@@ -221,7 +252,10 @@ export function useCreateFaculty() {
       if (!res.ok) throw new Error("Failed to create faculty");
       return api.faculty.create.responses[201].parse(await res.json());
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: [api.faculty.list.path] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.faculty.list.path] });
+      invalidateTimetable(queryClient);
+    },
   });
 }
 
@@ -239,7 +273,10 @@ export function useUpdateFaculty() {
       if (!res.ok) throw new Error("Failed to update faculty");
       return res.json();
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: [api.faculty.list.path] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.faculty.list.path] });
+      invalidateTimetable(queryClient);
+    },
   });
 }
 
@@ -251,7 +288,10 @@ export function useDeleteFaculty() {
       const res = await fetch(url, { method: "DELETE", credentials: "include" });
       if (!res.ok) throw new Error("Failed to delete faculty");
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: [api.faculty.list.path] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.faculty.list.path] });
+      invalidateTimetable(queryClient);
+    },
   });
 }
 
@@ -291,7 +331,10 @@ export function useCreateSection() {
       }
       return api.sections.create.responses[201].parse(await res.json());
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: [api.sections.list.path] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.sections.list.path] });
+      invalidateTimetable(queryClient);
+    },
   });
 }
 
@@ -319,7 +362,10 @@ export function useUpdateSection() {
       }
       return res.json();
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: [api.sections.list.path] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.sections.list.path] });
+      invalidateTimetable(queryClient);
+    },
   });
 }
 
@@ -331,7 +377,10 @@ export function useDeleteSection() {
       const res = await fetch(url, { method: "DELETE", credentials: "include" });
       if (!res.ok) throw new Error("Failed to delete section");
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: [api.sections.list.path] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.sections.list.path] });
+      invalidateTimetable(queryClient);
+    },
   });
 }
 
@@ -361,7 +410,10 @@ export function useCreateTimeSlot() {
       if (!res.ok) throw new Error("Failed to create time slot");
       return api.timeSlots.create.responses[201].parse(await res.json());
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: [api.timeSlots.list.path] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.timeSlots.list.path] });
+      invalidateTimetable(queryClient);
+    },
   });
 }
 
@@ -379,7 +431,10 @@ export function useUpdateTimeSlot() {
       if (!res.ok) throw new Error("Failed to update time slot");
       return res.json();
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: [api.timeSlots.list.path] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.timeSlots.list.path] });
+      invalidateTimetable(queryClient);
+    },
   });
 }
 
@@ -391,6 +446,9 @@ export function useDeleteTimeSlot() {
       const res = await fetch(url, { method: "DELETE", credentials: "include" });
       if (!res.ok) throw new Error("Failed to delete time slot");
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: [api.timeSlots.list.path] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.timeSlots.list.path] });
+      invalidateTimetable(queryClient);
+    },
   });
 }

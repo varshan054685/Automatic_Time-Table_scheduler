@@ -41,14 +41,31 @@ function SubjectImport({ departments, subjects, faculty, sections, onImportCompl
         let errorCount = 0;
 
         for (const item of data) {
-          const name = item["Name"] || item["Subject Name"] || item.name || item.Name || item["name"] || item["Subject"] || item["subject name"] || item["subject"];
-          const code = item["Code"] || item["Subject Code"] || item.code || item.Code || item["code"] || item["subject code"];
-          const hours = item["Weekly Hours"] || item.weeklyHours || item.WeeklyHours || item["weeklyHours"] || item["Hours"] || item["hours"];
-          const deptSearch = item["Department"] || item.department || item.departmentCode || item.DepartmentCode || item["department"] || item["Dept"] || item["dept"];
-          const facultySearch = item["Default Faculty"] || item["Faculty"] || item.faculty || item.FacultyName || item["Faculty Name"] || item["Faculty Code"] || item.facultyCode || item["faculty"] || item["Staff"] || item["staff"] || item["Professor"];
-          const sectionSearch = item["Target Section"] || item["Section"] || item.section || item["section"];
+          // Robust header matching helper
+          const getValue = (possibleKeys) => {
+            const keys = Object.keys(item);
+            for (const key of possibleKeys) {
+              const matchedKey = keys.find(k => k.toLowerCase().trim() === key.toLowerCase().trim());
+              if (matchedKey) return item[matchedKey];
+            }
+            return null;
+          };
+
+          const name = getValue(["Name", "Subject Name", "Subject", "subject"]);
+          const code = getValue(["Code", "Subject Code", "subject code"]);
+          const hours = getValue(["Weekly Hours", "weeklyHours", "Hours", "hours"]);
+          const deptSearch = getValue(["Department", "department", "departmentCode", "Dept", "dept"]);
+          const facultySearch = getValue(["Default Faculty", "Faculty", "Faculty Name", "Faculty Code", "Staff", "staff", "Professor"]);
+          const sectionSearch = getValue(["Target Section", "Section", "section"]);
+          const typeSearch = getValue(["Subject Type", "Type", "SubjectType", "type"]);
 
           if (name && code) {
+            let type = "lecture";
+            if (typeSearch) {
+              const lowerType = String(typeSearch).toLowerCase().trim();
+              if (lowerType.includes("lab")) type = "lab";
+              else if (lowerType.includes("lecture") || lowerType.includes("theory")) type = "lecture";
+            }
             const existing = subjects?.find(s => String(s.code).toLowerCase() === String(code).toLowerCase());
             
             const dept = departments?.find(d => 
@@ -81,9 +98,9 @@ function SubjectImport({ departments, subjects, faculty, sections, onImportCompl
                   code: String(code),
                   weeklyHours: Number(hours || existing.weeklyHours),
                   departmentId: deptId || existing.departmentId,
-                  facultyId: fac ? fac.id : (item.facultyId ? Number(item.facultyId) : existing.facultyId),
+                   facultyId: fac ? fac.id : (item.facultyId ? Number(item.facultyId) : existing.facultyId),
                   sectionId: sec ? sec.id : (item.sectionId ? Number(item.sectionId) : existing.sectionId),
-                  type: existing.type || "theory"
+                  type: type || existing.type || "lecture"
                 });
                 updateCount++;
               } else {
@@ -94,7 +111,7 @@ function SubjectImport({ departments, subjects, faculty, sections, onImportCompl
                   departmentId: deptId,
                   facultyId: fac ? fac.id : (item.facultyId ? Number(item.facultyId) : null),
                   sectionId: sec ? sec.id : (item.sectionId ? Number(item.sectionId) : null),
-                  type: "theory"
+                  type: type || "lecture"
                 });
                 successCount++;
               }
@@ -151,7 +168,7 @@ export default function Subjects() {
 
   const form = useForm({
     resolver: zodResolver(api.subjects.create.input),
-    defaultValues: { name: "", code: "", weeklyHours: 0, departmentId: 0, facultyId: 0, sectionId: 0, type: "theory" },
+    defaultValues: { name: "", code: "", weeklyHours: 0, departmentId: 0, facultyId: 0, sectionId: 0, type: "lecture" },
   });
 
   const onSubmit = (values) => {
@@ -196,7 +213,7 @@ export default function Subjects() {
       departmentId: subject.departmentId, 
       facultyId: subject.facultyId || 0,
       sectionId: subject.sectionId || 0,
-      type: subject.type || "theory" 
+      type: subject.type || "lecture" 
     });
     setOpen(true);
   };
@@ -366,6 +383,27 @@ export default function Subjects() {
                           </FormItem>
                         )}
                       />
+                      <FormField
+                        control={form.control}
+                        name="type"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Subject Type</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value}>
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select Type" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="lecture">Lecture</SelectItem>
+                                <SelectItem value="lab">Lab</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
                       <Button type="submit" className="w-full" disabled={createMutation.isPending || updateMutation.isPending}>
                         {editingId ? (updateMutation.isPending ? "Updating..." : "Update Subject") : (createMutation.isPending ? "Creating..." : "Create Subject")}
                       </Button>
@@ -402,6 +440,7 @@ export default function Subjects() {
                   <TableHead>Department</TableHead>
                   <TableHead>Default Faculty</TableHead>
                   <TableHead>Target Section</TableHead>
+                  <TableHead>Subject Type</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -419,6 +458,7 @@ export default function Subjects() {
                       <TableCell>{departments?.find(d => d.id === subject.departmentId)?.name || "N/A"}</TableCell>
                       <TableCell>{faculty?.find(f => f.id === subject.facultyId)?.name || "None"}</TableCell>
                       <TableCell>{sections?.find(s => s.id === subject.sectionId)?.name || "None"}</TableCell>
+                      <TableCell className="capitalize">{subject.type || "lecture"}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
                           <Button 

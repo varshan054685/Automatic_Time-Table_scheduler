@@ -25,9 +25,9 @@ type SchedulerOutput = {
   timetable: Array<{
     day: string;
     period: string;
-    section: string;
-    subject: string;
-    faculty: string;
+    sectionId: number;
+    subjectId: number;
+    facultyId: number;
     room: string;
   }>;
 };
@@ -36,7 +36,7 @@ export async function generateWithPython(payload: SchedulerInput): Promise<Sched
   const baseUrl = process.env.PYTHON_SERVICE_URL || "http://127.0.0.1:8000";
   try {
     const response = await axios.post<SchedulerOutput>(`${baseUrl}/generate-timetable`, payload, {
-      timeout: 30000,
+      timeout: 90000,
     });
     return response.data;
   } catch (error: any) {

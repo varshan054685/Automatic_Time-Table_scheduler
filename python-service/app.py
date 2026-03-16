@@ -18,11 +18,13 @@ class ClassroomItem(BaseModel):
     roomNumber: str
 
 class SubjectItem(BaseModel):
+    id: int
     name: str
     departmentId: int
     sectionId: Optional[int] = None
     facultyId: Optional[int] = None
     weeklyHours: int
+    type: Optional[str] = "lecture"
 
 class FacultyItem(BaseModel):
     id: int

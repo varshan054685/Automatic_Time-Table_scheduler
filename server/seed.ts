@@ -40,8 +40,8 @@ async function seed() {
     console.log("Created classrooms");
 
     // 4. Subjects
-    await storage.createSubject({ name: "Data Structures", code: "CS201", weeklyHours: 4, departmentId: cs.id, type: "theory" });
-    await storage.createSubject({ name: "Database Systems", code: "CS301", weeklyHours: 3, departmentId: cs.id, type: "theory" });
+    await storage.createSubject({ name: "Data Structures", code: "CS201", weeklyHours: 4, departmentId: cs.id, type: "lecture" });
+    await storage.createSubject({ name: "Database Systems", code: "CS301", weeklyHours: 3, departmentId: cs.id, type: "lecture" });
     console.log("Created subjects");
 
     // 5. Faculty

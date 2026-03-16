@@ -42,3 +42,20 @@ export function useGenerateTimetable() {
     },
   });
 }
+
+export function useRegenerateAll() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/timetable/regenerate-all", {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to regenerate all");
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.timetable.list.path] });
+    },
+  });
+}
