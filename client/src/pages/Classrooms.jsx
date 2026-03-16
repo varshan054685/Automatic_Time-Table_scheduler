@@ -41,9 +41,18 @@ function ClassroomImport({ classrooms, onImportComplete }) {
         let errorCount = 0;
 
         for (const item of data) {
-          const roomNumber = item["Room Number"] || item.roomNumber || item.RoomNumber;
-          const capacity = item["Capacity"] || item.capacity || item.Capacity;
-          const type = item["Type"] || item.type || item.Type;
+          const keys = Object.keys(item);
+          const getVal = (...possibleKeys) => {
+            for (const k of possibleKeys) {
+              const found = keys.find(ck => ck.toLowerCase().trim() === k.toLowerCase().trim());
+              if (found !== undefined && item[found] !== undefined && item[found] !== "") return item[found];
+            }
+            return null;
+          };
+
+          const roomNumber = getVal("Room Number", "Room No", "Room No.", "Room", "Classroom", "room number", "room", "RoomNumber", "roomNumber");
+          const capacity = getVal("Capacity", "capacity", "Seats", "seats", "Size", "size");
+          const typeRaw = getVal("Type", "type", "Room Type", "room type", "Classroom Type");
 
           if (roomNumber) {
             const existing = classrooms?.find(c => c.roomNumber === String(roomNumber));
@@ -54,14 +63,14 @@ function ClassroomImport({ classrooms, onImportComplete }) {
                   id: existing.id,
                   roomNumber: String(roomNumber),
                   capacity: Number(capacity || existing.capacity),
-                  type: type ? (String(type).toLowerCase() === "lab" ? "lab" : "lecture") : existing.type
+                  type: typeRaw ? (String(typeRaw).toLowerCase().includes("lab") ? "lab" : "lecture") : existing.type
                 });
                 updateCount++;
               } else {
                 await createMutation.mutateAsync({ 
                   roomNumber: String(roomNumber), 
                   capacity: Number(capacity || 0), 
-                  type: String(type || "lecture").toLowerCase() === "lab" ? "lab" : "lecture" 
+                  type: typeRaw ? (String(typeRaw).toLowerCase().includes("lab") ? "lab" : "lecture") : "lecture"
                 });
                 successCount++;
               }

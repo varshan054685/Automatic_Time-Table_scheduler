@@ -1,10 +1,12 @@
 import { Sidebar } from "@/components/Sidebar";
 import { StatCard } from "@/components/StatCard";
 import { useDepartments, useFaculty, useSections, useClassrooms } from "@/hooks/use-master-data";
-import { Building2, GraduationCap, Users, BookOpen } from "lucide-react";
+import { Building2, GraduationCap, Users, BookOpen, CalendarDays, UserCog, LayoutGrid, Settings } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { useLocation } from "wouter";
 
 export default function Dashboard() {
+  const [, navigate] = useLocation();
   const { data: departments } = useDepartments();
   const { data: faculty } = useFaculty();
   const { data: sections } = useSections();
@@ -77,22 +79,24 @@ export default function Dashboard() {
             <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
               <h3 className="text-lg font-semibold mb-4">Quick Actions</h3>
               <div className="grid grid-cols-2 gap-4">
-                <div className="p-4 bg-slate-50 rounded-lg border border-slate-100 hover:border-primary/50 cursor-pointer transition-colors">
-                  <h4 className="font-medium text-slate-900">Generate Timetable</h4>
-                  <p className="text-sm text-slate-500 mt-1">Create a new schedule for a semester</p>
-                </div>
-                <div className="p-4 bg-slate-50 rounded-lg border border-slate-100 hover:border-primary/50 cursor-pointer transition-colors">
-                  <h4 className="font-medium text-slate-900">Manage Faculty</h4>
-                  <p className="text-sm text-slate-500 mt-1">Add or update faculty details</p>
-                </div>
-                <div className="p-4 bg-slate-50 rounded-lg border border-slate-100 hover:border-primary/50 cursor-pointer transition-colors">
-                  <h4 className="font-medium text-slate-900">View Schedule</h4>
-                  <p className="text-sm text-slate-500 mt-1">Check current academic timetable</p>
-                </div>
-                <div className="p-4 bg-slate-50 rounded-lg border border-slate-100 hover:border-primary/50 cursor-pointer transition-colors">
-                  <h4 className="font-medium text-slate-900">System Settings</h4>
-                  <p className="text-sm text-slate-500 mt-1">Configure academic year</p>
-                </div>
+                {[
+                  { icon: CalendarDays, label: "Generate Timetable", desc: "Create a new schedule for a semester", path: "/timetable", color: "text-blue-500 bg-blue-50" },
+                  { icon: UserCog, label: "Manage Faculty", desc: "Add or update faculty details", path: "/faculty", color: "text-purple-500 bg-purple-50" },
+                  { icon: LayoutGrid, label: "View Schedule", desc: "Check current academic timetable", path: "/timetable", color: "text-green-500 bg-green-50" },
+                  { icon: Settings, label: "System Settings", desc: "Configure departments & classrooms", path: "/departments", color: "text-orange-500 bg-orange-50" },
+                ].map(({ icon: Icon, label, desc, path, color }) => (
+                  <button
+                    key={label}
+                    onClick={() => navigate(path)}
+                    className="p-4 bg-slate-50 rounded-lg border border-slate-100 hover:border-primary/50 hover:bg-primary/5 cursor-pointer transition-all text-left group"
+                  >
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center mb-2 ${color} group-hover:scale-110 transition-transform`}>
+                      <Icon className="w-4 h-4" />
+                    </div>
+                    <h4 className="font-medium text-slate-900">{label}</h4>
+                    <p className="text-sm text-slate-500 mt-0.5">{desc}</p>
+                  </button>
+                ))}
               </div>
             </div>
           </div>

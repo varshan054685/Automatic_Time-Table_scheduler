@@ -81,14 +81,20 @@ function SubjectImport({ departments, subjects, faculty, sections, onImportCompl
               continue;
             }
 
+            // Normalize helper: strip punctuation, collapse spaces, lowercase
+            const normalize = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9\s]/g, "").replace(/\s+/g, " ").trim();
+            const looseMatch = (a, b) => {
+              if (!a || !b) return false;
+              const na = normalize(a), nb = normalize(b);
+              return na === nb || na.includes(nb) || nb.includes(na);
+            };
+
             const fac = faculty?.find(f => 
-              String(f.name).toLowerCase().trim() === String(facultySearch).toLowerCase().trim() || 
-              String(f.code).toLowerCase().trim() === String(facultySearch).toLowerCase().trim()
+              looseMatch(f.name, facultySearch) || 
+              looseMatch(f.code, facultySearch)
             );
 
-            const sec = sections?.find(s => 
-              String(s.name).toLowerCase().trim() === String(sectionSearch).toLowerCase().trim()
-            );
+            const sec = sectionSearch ? sections?.find(s => looseMatch(s.name, sectionSearch)) : null;
             
             try {
               if (existing) {

@@ -40,22 +40,35 @@ function DepartmentImport({ departments, onImportComplete }) {
         let errorCount = 0;
 
         for (const item of data) {
-          const name = item["Department Name"] || item.name || item.Name;
-          const code = item["Department Code"] || item.code || item.Code;
+          const keys = Object.keys(item);
+          const getVal = (...possibleKeys) => {
+            for (const k of possibleKeys) {
+              const found = keys.find(ck => ck.toLowerCase().trim() === k.toLowerCase().trim());
+              if (found !== undefined && item[found] !== undefined && item[found] !== "") return item[found];
+            }
+            return null;
+          };
 
-          if (name && code) {
-            const existing = departments?.find(d => d.name === name || d.code === String(code));
+          const name = getVal("Department Name", "Department", "Name", "name", "dept name", "Dept Name");
+          const code = getVal("Department Code", "Code", "code", "Dept Code", "dept code");
+
+          if (name) {
+            const finalCode = code ? String(code) : String(name).toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6);
+            const existing = departments?.find(d =>
+              String(d.name).toLowerCase().trim() === String(name).toLowerCase().trim() ||
+              String(d.code).toLowerCase().trim() === finalCode.toLowerCase().trim()
+            );
             
             try {
               if (existing) {
                 await updateMutation.mutateAsync({
                   id: existing.id,
                   name: String(name),
-                  code: String(code)
+                  code: finalCode
                 });
                 updateCount++;
               } else {
-                await createMutation.mutateAsync({ name, code: String(code) });
+                await createMutation.mutateAsync({ name: String(name), code: finalCode });
                 successCount++;
               }
             } catch (err) {
