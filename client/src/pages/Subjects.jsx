@@ -81,8 +81,8 @@ function SubjectImport({ departments, subjects, faculty, sections, onImportCompl
               continue;
             }
 
-            // Normalize helper: strip punctuation, collapse spaces, lowercase
-            const normalize = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9\s]/g, "").replace(/\s+/g, " ").trim();
+            // Normalize helper: replace punctuation with spaces so "B.com.(IT)" and "B.Com IT" both become "b com it"
+            const normalize = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]/g, " ").replace(/\s+/g, " ").trim();
             const looseMatch = (a, b) => {
               if (!a || !b) return false;
               const na = normalize(a), nb = normalize(b);
