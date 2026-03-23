@@ -36,7 +36,7 @@ export async function generateWithPython(payload: SchedulerInput): Promise<Sched
   const baseUrl = process.env.PYTHON_SERVICE_URL || "http://127.0.0.1:8000";
   try {
     const response = await axios.post<SchedulerOutput>(`${baseUrl}/generate-timetable`, payload, {
-      timeout: 90000,
+      timeout: 190000,
     });
     return response.data;
   } catch (error: any) {

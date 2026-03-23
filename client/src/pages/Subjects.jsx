@@ -73,7 +73,7 @@ function SubjectImport({ departments, subjects, faculty, sections, onImportCompl
               String(d.code).toLowerCase().trim() === String(deptSearch).toLowerCase().trim()
             );
 
-            const deptId = dept ? dept.id : (item.departmentId ? Number(item.departmentId) : (departments && departments.length > 0 ? departments[0].id : null));
+            const deptId = dept ? dept.id : (item.departmentId ? Number(item.departmentId) : null);
 
             if (!deptId && !existing) {
               console.warn(`Skipping subject ${name}: No valid department ID found.`);
@@ -86,7 +86,9 @@ function SubjectImport({ departments, subjects, faculty, sections, onImportCompl
             const looseMatch = (a, b) => {
               if (!a || !b) return false;
               const na = normalize(a), nb = normalize(b);
-              return na === nb || na.includes(nb) || nb.includes(na);
+              // Exact match after normalization is much safer for Roman numerals (I, II, III)
+              // This prevents "II B.Com IT" from matching "I B.Com IT"
+              return na === nb;
             };
 
             const fac = faculty?.find(f => 
@@ -94,7 +96,9 @@ function SubjectImport({ departments, subjects, faculty, sections, onImportCompl
               looseMatch(f.code, facultySearch)
             );
 
-            const sec = sectionSearch ? sections?.find(s => looseMatch(s.name, sectionSearch)) : null;
+            const sec = (sectionSearch && deptId) ? sections?.find(s => 
+              Number(s.departmentId) === deptId && looseMatch(s.name, sectionSearch)
+            ) : null;
             
             try {
               if (existing) {

@@ -102,6 +102,7 @@ def generate_timetable(data: dict):
     v_by_slot_sec = defaultdict(list)
     v_by_block = defaultdict(list)
     v_by_block_day = defaultdict(list)
+    subj_slot_active = {}
 
     for b_idx, block in enumerate(all_blocks):
         size, f_id, s_id = block['size'], block['faculty_id'], block['section_id']
@@ -127,6 +128,8 @@ def generate_timetable(data: dict):
                             v_by_slot_room[(d_idx, p_idx, r_idx)].append(v)
                             v_by_slot_fac[(d_idx, p_idx, f_id)].append(v)
                             v_by_slot_sec[(d_idx, p_idx, s_id)].append(v)
+                            # Pre-cache for B2B penalty calculation
+                            subj_slot_active.setdefault((d_idx, p_idx, s_id, sub.get('id')), []).append(v)
 
     print(f"DEBUG: Variables: {len(x)}")
     for b_idx in range(len(all_blocks)):
@@ -181,28 +184,14 @@ def generate_timetable(data: dict):
 
     # Optimized B2B Penalty: Target same SUBJECT in same SECTION
     b2b_penalty = []
-    subj_slot_active = {} # (d, p, sub, s) -> BoolVar or None
-    fac_slot_active = {} # (d, p, f) -> BoolVar or None
+    fac_slot_active_cache = {} # (d, p, f) -> BoolVar or None
+    sub_slot_active_cache = {} # (d, p, s, sub) -> BoolVar or None
 
-    def get_slot_active(d, p, entity_id, cache, var_map, prefix):
-        key = (d, p, entity_id)
+    def get_entity_active(key, cache, var_map, prefix):
         if key not in cache:
             vs = var_map.get(key, [])
             if vs:
-                active = model.NewBoolVar(f'{prefix}_{d}_{p}_{entity_id}')
-                model.AddMaxEquality(active, vs)
-                cache[key] = active
-            else: cache[key] = None
-        return cache[key]
-
-    def get_slot_active_multi(d, p, sub_id, sec_id, cache, var_map, prefix):
-        # We need to find variables where this specific subject is taught to this section
-        key = (d, p, sub_id, sec_id)
-        if key not in cache:
-            # Re-collect variables for this specific subject/section/slot
-            vs = [v for (b_idx, dd, pp, rr), v in x.items() if dd == d and pp <= p < pp + all_blocks[b_idx]['size'] and all_blocks[b_idx]['subject_id'] == sub_id and all_blocks[b_idx]['section_id'] == sec_id]
-            if vs:
-                active = model.NewBoolVar(f'{prefix}_{d}_{p}_{sub_id}_{sec_id}')
+                active = model.NewBoolVar(f'{prefix}_{"_".join(map(str, key))}')
                 model.AddMaxEquality(active, vs)
                 cache[key] = active
             else: cache[key] = None
@@ -213,20 +202,20 @@ def generate_timetable(data: dict):
             p1, p2 = p_indices[i], p_indices[i+1]
             if p2 != p1 + 1: continue
             
-            # Faculty B2B (Keep this, as faculty shouldn't teach too many in a row)
+            # Faculty B2B
             for f_id in set(b['faculty_id'] for b in all_blocks):
-                a1 = get_slot_active(d_idx, p1, f_id, fac_slot_active, v_by_slot_fac, 'f_act')
-                a2 = get_slot_active(d_idx, p2, f_id, fac_slot_active, v_by_slot_fac, 'f_act')
+                a1 = get_entity_active((d_idx, p1, f_id), fac_slot_active_cache, v_by_slot_fac, 'f_act')
+                a2 = get_entity_active((d_idx, p2, f_id), fac_slot_active_cache, v_by_slot_fac, 'f_act')
                 if a1 is not None and a2 is not None:
                     b = model.NewBoolVar('')
                     model.Add(b >= a1 + a2 - 1)
                     b2b_penalty.append(b)
 
-            # Subject B2B (Students shouldn't have same subject twice in a row)
+            # Subject B2B
             for sub_id in set(b['subject_id'] for b in all_blocks):
                 for s_id in set(b['section_id'] for b in all_blocks):
-                    a1 = get_slot_active_multi(d_idx, p1, sub_id, s_id, subj_slot_active, {}, 'sub_act')
-                    a2 = get_slot_active_multi(d_idx, p2, sub_id, s_id, subj_slot_active, {}, 'sub_act')
+                    a1 = get_entity_active((d_idx, p1, s_id, sub_id), sub_slot_active_cache, subj_slot_active, 'sub_act')
+                    a2 = get_entity_active((d_idx, p2, s_id, sub_id), sub_slot_active_cache, subj_slot_active, 'sub_act')
                     if a1 is not None and a2 is not None:
                         b = model.NewBoolVar('')
                         model.Add(b >= a1 + a2 - 1)
