@@ -93,7 +93,8 @@ def generate_timetable(data: dict):
         for p_idx, period in enumerate(periods):
             if (day, period) in slot_lookup: day_period_indices[d_idx].append(p_idx)
     for d_idx in day_period_indices: day_period_indices[d_idx].sort()
-
+    print("DEBUG day_period_indices:", dict(day_period_indices))
+    
     num_rooms = len(rooms)
     
     x = {} # (b, d, p, r) -> v
@@ -137,6 +138,61 @@ def generate_timetable(data: dict):
     for cov in v_by_slot_room.values(): model.AddAtMostOne(cov)
     for cov in v_by_slot_fac.values(): model.AddAtMostOne(cov)
     for cov in v_by_slot_sec.values(): model.AddAtMostOne(cov)
+
+    fac_slot_active_cache = {} # (d, p, f) -> BoolVar or None
+    sub_slot_active_cache = {} # (d, p, s, sub) -> BoolVar or None
+
+    def get_entity_active(key, cache, var_map, prefix):
+        if key not in cache:
+            vs = var_map.get(key, [])
+            if vs:
+                active = model.NewBoolVar(f'{prefix}_{"_".join(map(str, key))}')
+                model.AddMaxEquality(active, vs)
+                cache[key] = active
+            else: cache[key] = None
+        return cache[key]
+
+    # Section Contiguous Daily Schedule: Prevent holes/gaps in a student's day
+    # If a section has classes at period i and period k (i < k), it MUST have classes at all periods j (i < j < k)
+    for s_id in set(b['section_id'] for b in all_blocks):
+        for d_idx, p_indices in day_period_indices.items():
+            # Get variables for each period on this day
+            day_sec_vars = []
+            for p_idx in p_indices:
+                a = get_entity_active((d_idx, p_idx, s_id), sub_slot_active_cache, v_by_slot_sec, 'sec_act_gap')
+                day_sec_vars.append(a if a is not None else 0)
+            
+            # Enforce triplet implication
+            n_p = len(day_sec_vars)
+            for i in range(n_p):
+                for k in range(i + 2, n_p):
+                    for j in range(i + 1, k):
+                        v_i = day_sec_vars[i]
+                        v_j = day_sec_vars[j]
+                        v_k = day_sec_vars[k]
+                        if isinstance(v_i, int) and isinstance(v_k, int):
+                            if v_i == 1 and v_k == 1 and isinstance(v_j, int) and v_j == 0:
+                                model.AddBoolOr([]) # Infeasible
+                            elif v_i == 1 and v_k == 1 and not isinstance(v_j, int):
+                                model.Add(v_j == 1)
+                        elif isinstance(v_i, int) and v_i == 1 and not isinstance(v_k, int):
+                            if isinstance(v_j, int):
+                                if v_j == 0: model.Add(v_k == 0)
+                            else:
+                                model.Add(v_j >= v_k)
+                        elif isinstance(v_k, int) and v_k == 1 and not isinstance(v_i, int):
+                            if isinstance(v_j, int):
+                                if v_j == 0: model.Add(v_i == 0)
+                            else:
+                                model.Add(v_j >= v_i)
+                        elif not isinstance(v_i, int) and not isinstance(v_k, int):
+                            if isinstance(v_j, int):
+                                if v_j == 0:
+                                    model.Add(v_i + v_k <= 1)
+                            else:
+                                model.Add(v_j >= v_i + v_k - 1)
+                                if s_id == 1 and d_idx == 0:
+                                    print(f"DEBUG ADDED: {v_j} >= {v_i} + {v_k} - 1")
 
     for f_id in set(b['faculty_id'] for b in all_blocks):
         for d_idx in day_period_indices:
@@ -184,18 +240,6 @@ def generate_timetable(data: dict):
 
     # Optimized B2B Penalty: Target same SUBJECT in same SECTION
     b2b_penalty = []
-    fac_slot_active_cache = {} # (d, p, f) -> BoolVar or None
-    sub_slot_active_cache = {} # (d, p, s, sub) -> BoolVar or None
-
-    def get_entity_active(key, cache, var_map, prefix):
-        if key not in cache:
-            vs = var_map.get(key, [])
-            if vs:
-                active = model.NewBoolVar(f'{prefix}_{"_".join(map(str, key))}')
-                model.AddMaxEquality(active, vs)
-                cache[key] = active
-            else: cache[key] = None
-        return cache[key]
 
     for d_idx, p_indices in day_period_indices.items():
         for i in range(len(p_indices)-1):
@@ -221,26 +265,34 @@ def generate_timetable(data: dict):
                         model.Add(b >= a1 + a2 - 1)
                         b2b_penalty.append(b)
 
-    # Day Distribution Incentive: Small bonus for using all days
-    day_active_vars = []
-    for d_idx in day_period_indices:
-        day_active = model.NewBoolVar(f'day_active_{d_idx}')
-        # Find all variables belonging to this day
-        d_vars = []
-        for (b_idx, dd_idx), vs in v_by_block_day.items():
-            if dd_idx == d_idx:
-                d_vars.extend(vs)
-        if d_vars:
-            model.AddMaxEquality(day_active, d_vars)
-            day_active_vars.append(day_active)
+    # Section Active Days: Minimize to pack classes into fewer days
+    sec_day_active_vars = []
+    for s_id in set(b['section_id'] for b in all_blocks):
+        for d_idx in day_period_indices:
+            sda = model.NewBoolVar(f'sda_{s_id}_{d_idx}')
+            d_vars = []
+            for (b_idx, dd_idx), vs in v_by_block_day.items():
+                if dd_idx == d_idx and all_blocks[b_idx]['section_id'] == s_id:
+                    d_vars.extend(vs)
+            if d_vars:
+                model.AddMaxEquality(sda, d_vars)
+                sec_day_active_vars.append(sda)
+            else:
+                model.Add(sda == 0)
+
+    # Late Period Penalty: Push free periods to the end of the day
+    late_period_vars = []
+    for (b_idx, d_idx, p_start, r_idx), v in x.items():
+        # Penalize scheduling later in the day to prevent gaps
+        late_period_vars.append(v * p_start)
 
     total_sch = sum(v * all_blocks[k[0]]['size'] for k, v in x.items())
     
     # Strong penalty for NOT scheduling a block to eliminate "Free" periods
     scheduling_penalty = sum((1 - sum(v_by_block[b_idx])) * 10000 for b_idx in range(len(all_blocks)) if v_by_block[b_idx])
 
-    # Objective: Maximize total scheduled hours, minimize back-to-back, minimize penalties, and slight incentive for day spreading
-    model.Maximize(total_sch * 1000 - scheduling_penalty - sum(b2b_penalty) * 10 + sum(day_active_vars))
+    # Objective: Maximize total scheduled, minimize B2B, minimize active days per section, and minimize late periods
+    model.Maximize(total_sch * 10000 - scheduling_penalty - sum(b2b_penalty) * 10 - sum(sec_day_active_vars) * 50 - sum(late_period_vars))
 
     solver = cp_model.CpSolver()
     solver.parameters.max_time_in_seconds = 180.0 # Increase to 3 mins for hard packing
