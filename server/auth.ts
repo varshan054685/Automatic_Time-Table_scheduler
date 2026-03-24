@@ -84,10 +84,11 @@ export function setupAuth(app: Express) {
         role: "staff",
       });
 
-      req.login(user, (err) => {
+      req.login(user, async (err) => {
         if (err) return next(err);
+        const membership = await storage.getUserWorkspaceMembership(user.id);
         const { password: _, ...safeUser } = user;
-        res.status(201).json(safeUser);
+        res.status(201).json({ ...safeUser, workspace: membership || null });
       });
     } catch (err) {
       next(err);
@@ -99,10 +100,11 @@ export function setupAuth(app: Express) {
     passport.authenticate("local", (err: any, user: any) => {
       if (err) return next(err);
       if (!user) return res.status(401).json({ message: "Invalid email or password" });
-      req.login(user, (err) => {
+      req.login(user, async (err) => {
         if (err) return next(err);
+        const membership = await storage.getUserWorkspaceMembership(user.id);
         const { password: _, ...safeUser } = user;
-        res.status(200).json(safeUser);
+        res.status(200).json({ ...safeUser, workspace: membership || null });
       });
     })(req, res, next);
   });

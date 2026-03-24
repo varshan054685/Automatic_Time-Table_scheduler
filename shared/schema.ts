@@ -229,17 +229,18 @@ export const timeSlotsRelations = relations(timeSlots, ({ one }) => ({
 }));
 
 // === INSERTS ===
+// workspaceId is injected server-side, so omit it from client-facing insert schemas
 export const insertUserSchema = createInsertSchema(users);
 export const insertWorkspaceSchema = createInsertSchema(workspaces);
 export const insertWorkspaceMemberSchema = createInsertSchema(workspaceMembers);
 export const insertChangeRequestSchema = createInsertSchema(changeRequests);
-export const insertDepartmentSchema = createInsertSchema(departments);
-export const insertClassroomSchema = createInsertSchema(classrooms);
-export const insertSubjectSchema = createInsertSchema(subjects);
-export const insertFacultySchema = createInsertSchema(faculty);
-export const insertSectionSchema = createInsertSchema(sections);
-export const insertTimeSlotSchema = createInsertSchema(timeSlots);
-export const insertTimetableSchema = createInsertSchema(timetable);
+export const insertDepartmentSchema = createInsertSchema(departments).omit({ workspaceId: true });
+export const insertClassroomSchema = createInsertSchema(classrooms).omit({ workspaceId: true });
+export const insertSubjectSchema = createInsertSchema(subjects).omit({ workspaceId: true });
+export const insertFacultySchema = createInsertSchema(faculty).omit({ workspaceId: true });
+export const insertSectionSchema = createInsertSchema(sections).omit({ workspaceId: true });
+export const insertTimeSlotSchema = createInsertSchema(timeSlots).omit({ workspaceId: true });
+export const insertTimetableSchema = createInsertSchema(timetable).omit({ workspaceId: true });
 
 // === TYPES ===
 export type User = typeof users.$inferSelect;

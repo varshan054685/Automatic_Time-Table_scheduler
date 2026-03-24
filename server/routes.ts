@@ -5,22 +5,20 @@ import { setupAuth } from "./auth";
 import { api, generateTimetableSchema } from "@shared/routes";
 import { generateWithPython } from "./python-scheduler";
 
-// Helper: get workspace info from session user
-function getWorkspaceInfo(req: Request): { userId: number; workspaceId: number; role: string } | null {
-  const user = req.user as any;
-  if (!user || !user.workspace) return null;
-  return { userId: user.id, workspaceId: user.workspace.workspaceId, role: user.workspace.role };
-}
-
 // Middleware: require authenticated user with workspace
-function requireWorkspace(req: Request, res: Response, next: NextFunction) {
+async function requireWorkspace(req: Request, res: Response, next: NextFunction) {
   if (!req.isAuthenticated()) return res.sendStatus(401);
-  const info = getWorkspaceInfo(req);
-  if (!info) return res.status(403).json({ message: "No workspace found. Create or join a workspace first." });
-  (req as any).workspaceId = info.workspaceId;
-  (req as any).workspaceRole = info.role;
-  (req as any).wsUserId = info.userId;
-  next();
+  const user = req.user as any;
+  try {
+    const membership = await storage.getUserWorkspaceMembership(user.id);
+    if (!membership) return res.status(403).json({ message: "No workspace found. Create or join a workspace first." });
+    (req as any).workspaceId = membership.workspaceId;
+    (req as any).workspaceRole = membership.role;
+    (req as any).wsUserId = user.id;
+    next();
+  } catch (err) {
+    next(err);
+  }
 }
 
 // Middleware: require owner role
@@ -31,6 +29,11 @@ function requireOwner(req: Request, res: Response, next: NextFunction) {
   next();
 }
 
+// Helper to safely parse param id
+function paramId(req: Request): number {
+  return parseInt(String(req.params.id), 10);
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -38,14 +41,13 @@ export async function registerRoutes(
   setupAuth(app);
 
   // ─── Workspace Routes ───
-  app.post(api.workspaces.create.path, async (req, res) => {
+  app.post(api.workspaces.create.path, async (req: Request, res: Response) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     const user = req.user as any;
     try {
       const { name } = req.body;
       if (!name) return res.status(400).json({ message: "Workspace name is required" });
       
-      // Check if user already has a workspace
       const existing = await storage.getUserWorkspaceMembership(user.id);
       if (existing) return res.status(400).json({ message: "You already belong to a workspace" });
 
@@ -56,7 +58,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post(api.workspaces.join.path, async (req, res) => {
+  app.post(api.workspaces.join.path, async (req: Request, res: Response) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     const user = req.user as any;
     try {
@@ -76,56 +78,55 @@ export async function registerRoutes(
     }
   });
 
-  app.get(api.workspaces.current.path, requireWorkspace, async (req, res) => {
+  app.get(api.workspaces.current.path, requireWorkspace, async (req: Request, res: Response) => {
     const wsId = (req as any).workspaceId;
     const ws = await storage.getWorkspace(wsId);
     const members = await storage.getWorkspaceMembers(wsId);
     res.json({ ...ws, members });
   });
 
-  app.post(api.workspaces.regenerateCode.path, requireWorkspace, requireOwner, async (req, res) => {
+  app.post(api.workspaces.regenerateCode.path, requireWorkspace, requireOwner, async (req: Request, res: Response) => {
     const wsId = (req as any).workspaceId;
     const newCode = await storage.regenerateReferralCode(wsId);
     res.json({ referralCode: newCode });
   });
 
   // ─── Change Request Routes ───
-  app.get(api.changeRequests.list.path, requireWorkspace, async (req, res) => {
+  app.get(api.changeRequests.list.path, requireWorkspace, async (req: Request, res: Response) => {
     const wsId = (req as any).workspaceId;
     const requests = await storage.getChangeRequests(wsId);
     res.json(requests);
   });
 
-  app.post(api.changeRequests.approve.path, requireWorkspace, requireOwner, async (req, res) => {
+  app.post(api.changeRequests.approve.path, requireWorkspace, requireOwner, async (req: Request, res: Response) => {
     try {
-      const id = parseInt(req.params.id);
+      const id = paramId(req);
       const cr = await storage.getChangeRequest(id);
       if (!cr) return res.status(404).json({ message: "Change request not found" });
       if (cr.workspaceId !== (req as any).workspaceId) return res.status(403).json({ message: "Not your workspace" });
       if (cr.status !== "pending") return res.status(400).json({ message: "Request already processed" });
 
-      // Apply the change
       const data = cr.data as any;
       if (cr.type === "edit" && data.table && data.id && data.changes) {
-        const tableMap: Record<string, (id: number, changes: any) => Promise<any>> = {
-          departments: (id, c) => storage.updateDepartment(id, c),
-          classrooms: (id, c) => storage.updateClassroom(id, c),
-          subjects: (id, c) => storage.updateSubject(id, c),
-          faculty: (id, c) => storage.updateFaculty(id, c),
-          sections: (id, c) => storage.updateSection(id, c),
-          timeSlots: (id, c) => storage.updateTimeSlot(id, c),
+        const tableMap: Record<string, (rid: number, changes: any) => Promise<any>> = {
+          departments: (rid, c) => storage.updateDepartment(rid, c),
+          classrooms: (rid, c) => storage.updateClassroom(rid, c),
+          subjects: (rid, c) => storage.updateSubject(rid, c),
+          faculty: (rid, c) => storage.updateFaculty(rid, c),
+          sections: (rid, c) => storage.updateSection(rid, c),
+          timeSlots: (rid, c) => storage.updateTimeSlot(rid, c),
         };
         if (tableMap[data.table]) {
           await tableMap[data.table](data.id, data.changes);
         }
       } else if (cr.type === "delete" && data.table && data.id) {
-        const deleteMap: Record<string, (id: number) => Promise<void>> = {
-          departments: (id) => storage.deleteDepartment(id),
-          classrooms: (id) => storage.deleteClassroom(id),
-          subjects: (id) => storage.deleteSubject(id),
-          faculty: (id) => storage.deleteFaculty(id),
-          sections: (id) => storage.deleteSection(id),
-          timeSlots: (id) => storage.deleteTimeSlot(id),
+        const deleteMap: Record<string, (rid: number) => Promise<void>> = {
+          departments: (rid) => storage.deleteDepartment(rid),
+          classrooms: (rid) => storage.deleteClassroom(rid),
+          subjects: (rid) => storage.deleteSubject(rid),
+          faculty: (rid) => storage.deleteFaculty(rid),
+          sections: (rid) => storage.deleteSection(rid),
+          timeSlots: (rid) => storage.deleteTimeSlot(rid),
         };
         if (deleteMap[data.table]) {
           await deleteMap[data.table](data.id);
@@ -139,9 +140,9 @@ export async function registerRoutes(
     }
   });
 
-  app.post(api.changeRequests.reject.path, requireWorkspace, requireOwner, async (req, res) => {
+  app.post(api.changeRequests.reject.path, requireWorkspace, requireOwner, async (req: Request, res: Response) => {
     try {
-      const id = parseInt(req.params.id);
+      const id = paramId(req);
       const cr = await storage.getChangeRequest(id);
       if (!cr) return res.status(404).json({ message: "Change request not found" });
       if (cr.workspaceId !== (req as any).workspaceId) return res.status(403).json({ message: "Not your workspace" });
@@ -191,9 +192,10 @@ export async function registerRoutes(
     }
 
     // Determine days from timeslots
-    const uniqueDays = [...new Set(allTimeSlots.map(s => s.dayOfWeek))];
+    const daySet: Set<string> = new Set();
+    allTimeSlots.forEach(s => daySet.add(s.dayOfWeek));
     const dayOrder = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-    const days = dayOrder.filter(d => uniqueDays.includes(d));
+    const days = dayOrder.filter(d => daySet.has(d));
 
     const pythonResult = await generateWithPython({
       classrooms: allClassrooms.map((classroom) => ({ roomNumber: classroom.roomNumber })),
@@ -263,13 +265,11 @@ export async function registerRoutes(
   };
 
   // ─── CRUD Routes (workspace-scoped) ───
-  // Helper to create a viewer-intercepted edit/delete
   const viewerCheck = (tableName: string) => {
     return async (req: Request, res: Response, next: NextFunction) => {
       if ((req as any).workspaceRole !== "owner") {
-        // Viewer: create change request instead
         const type = req.method === "DELETE" ? "delete" : "edit";
-        const data: any = { table: tableName, id: parseInt(req.params.id) };
+        const data: any = { table: tableName, id: paramId(req) };
         if (type === "edit") data.changes = req.body;
 
         await storage.createChangeRequest({
@@ -285,7 +285,7 @@ export async function registerRoutes(
   };
 
   // Timetable generation
-  app.post(api.timetable.generatePython.path, requireWorkspace, requireOwner, async (req, res) => {
+  app.post(api.timetable.generatePython.path, requireWorkspace, requireOwner, async (req: Request, res: Response) => {
     try {
       const parsed = generateTimetableSchema.safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ message: "Invalid payload" });
@@ -296,7 +296,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/timetable/regenerate-all", requireWorkspace, requireOwner, async (req, res) => {
+  app.post("/api/timetable/regenerate-all", requireWorkspace, requireOwner, async (req: Request, res: Response) => {
     try {
       const wsId = (req as any).workspaceId;
       await storage.clearAllTimetable(wsId);
@@ -317,126 +317,126 @@ export async function registerRoutes(
   });
 
   // Departments
-  app.get(api.departments.list.path, requireWorkspace, async (req, res) => {
+  app.get(api.departments.list.path, requireWorkspace, async (req: Request, res: Response) => {
     const depts = await storage.getDepartments((req as any).workspaceId);
     res.json(depts);
   });
-  app.post(api.departments.create.path, requireWorkspace, requireOwner, async (req, res) => {
+  app.post(api.departments.create.path, requireWorkspace, requireOwner, async (req: Request, res: Response) => {
     const dept = await storage.createDepartment({ ...req.body, workspaceId: (req as any).workspaceId });
     res.status(201).json(dept);
     triggerRegenForDepartments([dept.id], (req as any).workspaceId);
   });
-  app.patch(api.departments.update.path, requireWorkspace, viewerCheck("departments"), async (req, res) => {
-    const dept = await storage.updateDepartment(parseInt(req.params.id), req.body);
+  app.patch(api.departments.update.path, requireWorkspace, viewerCheck("departments"), async (req: Request, res: Response) => {
+    const dept = await storage.updateDepartment(paramId(req), req.body);
     res.json(dept);
     triggerRegenForDepartments([dept.id], (req as any).workspaceId);
   });
-  app.delete(api.departments.delete.path, requireWorkspace, viewerCheck("departments"), async (req, res) => {
-    await storage.deleteDepartment(parseInt(req.params.id));
+  app.delete(api.departments.delete.path, requireWorkspace, viewerCheck("departments"), async (req: Request, res: Response) => {
+    await storage.deleteDepartment(paramId(req));
     res.status(204).send();
   });
 
   // Classrooms
-  app.get(api.classrooms.list.path, requireWorkspace, async (req, res) => {
+  app.get(api.classrooms.list.path, requireWorkspace, async (req: Request, res: Response) => {
     const rooms = await storage.getClassrooms((req as any).workspaceId);
     res.json(rooms);
   });
-  app.post(api.classrooms.create.path, requireWorkspace, requireOwner, async (req, res) => {
+  app.post(api.classrooms.create.path, requireWorkspace, requireOwner, async (req: Request, res: Response) => {
     const room = await storage.createClassroom({ ...req.body, workspaceId: (req as any).workspaceId });
     res.status(201).json(room);
   });
-  app.patch(api.classrooms.update.path, requireWorkspace, viewerCheck("classrooms"), async (req, res) => {
-    const room = await storage.updateClassroom(parseInt(req.params.id), req.body);
+  app.patch(api.classrooms.update.path, requireWorkspace, viewerCheck("classrooms"), async (req: Request, res: Response) => {
+    const room = await storage.updateClassroom(paramId(req), req.body);
     res.json(room);
   });
-  app.delete(api.classrooms.delete.path, requireWorkspace, viewerCheck("classrooms"), async (req, res) => {
-    await storage.deleteClassroom(parseInt(req.params.id));
+  app.delete(api.classrooms.delete.path, requireWorkspace, viewerCheck("classrooms"), async (req: Request, res: Response) => {
+    await storage.deleteClassroom(paramId(req));
     res.status(204).send();
   });
 
   // Subjects
-  app.get(api.subjects.list.path, requireWorkspace, async (req, res) => {
+  app.get(api.subjects.list.path, requireWorkspace, async (req: Request, res: Response) => {
     const subjs = await storage.getSubjects((req as any).workspaceId);
     res.json(subjs);
   });
-  app.post(api.subjects.create.path, requireWorkspace, requireOwner, async (req, res) => {
+  app.post(api.subjects.create.path, requireWorkspace, requireOwner, async (req: Request, res: Response) => {
     const subj = await storage.createSubject({ ...req.body, workspaceId: (req as any).workspaceId });
     res.status(201).json(subj);
   });
-  app.patch(api.subjects.update.path, requireWorkspace, viewerCheck("subjects"), async (req, res) => {
-    const subj = await storage.updateSubject(parseInt(req.params.id), req.body);
+  app.patch(api.subjects.update.path, requireWorkspace, viewerCheck("subjects"), async (req: Request, res: Response) => {
+    const subj = await storage.updateSubject(paramId(req), req.body);
     res.json(subj);
   });
-  app.delete(api.subjects.delete.path, requireWorkspace, viewerCheck("subjects"), async (req, res) => {
-    await storage.deleteSubject(parseInt(req.params.id));
+  app.delete(api.subjects.delete.path, requireWorkspace, viewerCheck("subjects"), async (req: Request, res: Response) => {
+    await storage.deleteSubject(paramId(req));
     res.status(204).send();
   });
 
   // Faculty
-  app.get(api.faculty.list.path, requireWorkspace, async (req, res) => {
+  app.get(api.faculty.list.path, requireWorkspace, async (req: Request, res: Response) => {
     const facs = await storage.getFaculty((req as any).workspaceId);
     res.json(facs);
   });
-  app.post(api.faculty.create.path, requireWorkspace, requireOwner, async (req, res) => {
+  app.post(api.faculty.create.path, requireWorkspace, requireOwner, async (req: Request, res: Response) => {
     const data = req.body;
     if (!data.code) data.code = `FAC${Date.now()}`;
     const fac = await storage.createFaculty({ ...data, workspaceId: (req as any).workspaceId });
     res.status(201).json(fac);
   });
-  app.patch(api.faculty.update.path, requireWorkspace, viewerCheck("faculty"), async (req, res) => {
-    const fac = await storage.updateFaculty(parseInt(req.params.id), req.body);
+  app.patch(api.faculty.update.path, requireWorkspace, viewerCheck("faculty"), async (req: Request, res: Response) => {
+    const fac = await storage.updateFaculty(paramId(req), req.body);
     res.json(fac);
   });
-  app.delete(api.faculty.delete.path, requireWorkspace, viewerCheck("faculty"), async (req, res) => {
-    await storage.deleteFaculty(parseInt(req.params.id));
+  app.delete(api.faculty.delete.path, requireWorkspace, viewerCheck("faculty"), async (req: Request, res: Response) => {
+    await storage.deleteFaculty(paramId(req));
     res.status(204).send();
   });
 
   // Sections
-  app.get(api.sections.list.path, requireWorkspace, async (req, res) => {
+  app.get(api.sections.list.path, requireWorkspace, async (req: Request, res: Response) => {
     const secs = await storage.getSections((req as any).workspaceId);
     res.json(secs);
   });
-  app.post(api.sections.create.path, requireWorkspace, requireOwner, async (req, res) => {
+  app.post(api.sections.create.path, requireWorkspace, requireOwner, async (req: Request, res: Response) => {
     const sec = await storage.createSection({ ...req.body, workspaceId: (req as any).workspaceId });
     res.status(201).json(sec);
   });
-  app.patch(api.sections.update.path, requireWorkspace, viewerCheck("sections"), async (req, res) => {
-    const sec = await storage.updateSection(parseInt(req.params.id), req.body);
+  app.patch(api.sections.update.path, requireWorkspace, viewerCheck("sections"), async (req: Request, res: Response) => {
+    const sec = await storage.updateSection(paramId(req), req.body);
     res.json(sec);
   });
-  app.delete(api.sections.delete.path, requireWorkspace, viewerCheck("sections"), async (req, res) => {
-    await storage.deleteSection(parseInt(req.params.id));
+  app.delete(api.sections.delete.path, requireWorkspace, viewerCheck("sections"), async (req: Request, res: Response) => {
+    await storage.deleteSection(paramId(req));
     res.status(204).send();
   });
 
   // TimeSlots
-  app.get(api.timeSlots.list.path, requireWorkspace, async (req, res) => {
+  app.get(api.timeSlots.list.path, requireWorkspace, async (req: Request, res: Response) => {
     const slots = await storage.getTimeSlots((req as any).workspaceId);
     res.json(slots);
   });
-  app.post(api.timeSlots.create.path, requireWorkspace, requireOwner, async (req, res) => {
+  app.post(api.timeSlots.create.path, requireWorkspace, requireOwner, async (req: Request, res: Response) => {
     const slot = await storage.createTimeSlot({ ...req.body, workspaceId: (req as any).workspaceId });
     res.status(201).json(slot);
   });
-  app.patch(api.timeSlots.update.path, requireWorkspace, viewerCheck("timeSlots"), async (req, res) => {
-    const slot = await storage.updateTimeSlot(parseInt(req.params.id), req.body);
+  app.patch(api.timeSlots.update.path, requireWorkspace, viewerCheck("timeSlots"), async (req: Request, res: Response) => {
+    const slot = await storage.updateTimeSlot(paramId(req), req.body);
     res.json(slot);
   });
-  app.delete(api.timeSlots.delete.path, requireWorkspace, viewerCheck("timeSlots"), async (req, res) => {
-    await storage.deleteTimeSlot(parseInt(req.params.id));
+  app.delete(api.timeSlots.delete.path, requireWorkspace, viewerCheck("timeSlots"), async (req: Request, res: Response) => {
+    await storage.deleteTimeSlot(paramId(req));
     res.status(204).send();
   });
 
   // Timetable
-  app.get(api.timetable.list.path, requireWorkspace, async (req, res) => {
-    const sectionId = req.query.sectionId ? parseInt(req.query.sectionId as string) : undefined;
-    const facultyId = req.query.facultyId ? parseInt(req.query.facultyId as string) : undefined;
+  app.get(api.timetable.list.path, requireWorkspace, async (req: Request, res: Response) => {
+    const sectionId = req.query.sectionId ? parseInt(String(req.query.sectionId), 10) : undefined;
+    const facultyId = req.query.facultyId ? parseInt(String(req.query.facultyId), 10) : undefined;
     const entries = await storage.getTimetable(sectionId, facultyId, (req as any).workspaceId);
     res.json(entries);
   });
 
-  app.post(api.timetable.generate.path, requireWorkspace, requireOwner, async (req, res) => {
+  app.post(api.timetable.generate.path, requireWorkspace, requireOwner, async (req: Request, res: Response) => {
     try {
       const parsed = generateTimetableSchema.safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ message: "Invalid payload" });
