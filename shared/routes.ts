@@ -7,13 +7,6 @@ import {
   insertFacultySchema, 
   insertSectionSchema, 
   insertTimeSlotSchema,
-  departments,
-  classrooms,
-  subjects,
-  faculty,
-  sections,
-  timeSlots,
-  timetable
 } from './schema';
 
 export const errorSchemas = {
@@ -39,8 +32,8 @@ export const api = {
   auth: {
     register: {
       method: 'POST' as const,
-      path: '/api/register' as const,
-      input: insertUserSchema,
+      path: '/api/auth/register' as const,
+      input: z.object({ email: z.string().email(), password: z.string().min(6), name: z.string().optional() }),
       responses: {
         201: z.any(),
         400: errorSchemas.validation,
@@ -48,8 +41,8 @@ export const api = {
     },
     login: {
       method: 'POST' as const,
-      path: '/api/login' as const,
-      input: z.object({ username: z.string(), password: z.string() }),
+      path: '/api/auth/login' as const,
+      input: z.object({ email: z.string(), password: z.string() }),
       responses: {
         200: z.any(),
         401: z.object({ message: z.string() }),
@@ -69,6 +62,47 @@ export const api = {
         200: z.any(),
         401: z.void(),
       },
+    },
+  },
+  workspaces: {
+    create: {
+      method: 'POST' as const,
+      path: '/api/workspaces' as const,
+      input: z.object({ name: z.string().min(1) }),
+      responses: { 201: z.any() },
+    },
+    join: {
+      method: 'POST' as const,
+      path: '/api/workspaces/join' as const,
+      input: z.object({ referralCode: z.string().min(1) }),
+      responses: { 200: z.any() },
+    },
+    current: {
+      method: 'GET' as const,
+      path: '/api/workspaces/current' as const,
+      responses: { 200: z.any() },
+    },
+    regenerateCode: {
+      method: 'POST' as const,
+      path: '/api/workspaces/regenerate-code' as const,
+      responses: { 200: z.any() },
+    },
+  },
+  changeRequests: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/change-requests' as const,
+      responses: { 200: z.array(z.any()) },
+    },
+    approve: {
+      method: 'POST' as const,
+      path: '/api/change-requests/:id/approve' as const,
+      responses: { 200: z.any() },
+    },
+    reject: {
+      method: 'POST' as const,
+      path: '/api/change-requests/:id/reject' as const,
+      responses: { 200: z.any() },
     },
   },
   departments: {

@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useUser } from "@/hooks/use-auth";
 import { Loader2 } from "lucide-react";
+import { WorkspaceSetupDialog } from "@/components/WorkspaceSetupDialog";
 
 import Login from "@/pages/Login";
 import Dashboard from "@/pages/Dashboard";
@@ -15,6 +16,8 @@ import Timetable from "@/pages/Timetable";
 import Subjects from "@/pages/Subjects";
 import Sections from "@/pages/Sections";
 import TimeSlots from "@/pages/TimeSlots";
+import ReferralPage from "@/pages/ReferralPage";
+import RequestsPage from "@/pages/RequestsPage";
 
 function ProtectedRoute({ component: Component }) {
   const { user, isLoading } = useUser();
@@ -27,6 +30,11 @@ function ProtectedRoute({ component: Component }) {
   if (!user) {
     setLocation("/login");
     return null;
+  }
+
+  // Show workspace setup if user has no workspace
+  if (!user.workspace) {
+    return <WorkspaceSetupDialog />;
   }
 
   return <Component />;
@@ -60,6 +68,12 @@ function Router() {
       </Route>
       <Route path="/timeslots">
         <ProtectedRoute component={TimeSlots} />
+      </Route>
+      <Route path="/referral">
+        <ProtectedRoute component={ReferralPage} />
+      </Route>
+      <Route path="/requests">
+        <ProtectedRoute component={RequestsPage} />
       </Route>
 
       <Route>404 Not Found</Route>

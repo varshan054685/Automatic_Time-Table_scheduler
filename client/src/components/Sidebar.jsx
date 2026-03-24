@@ -12,9 +12,11 @@ import {
   Calendar,
   Menu,
   X,
-  School
+  School,
+  Link2,
+  ClipboardList
 } from "lucide-react";
-import { useLogout } from "@/hooks/use-auth";
+import { useLogout, useUser } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { useIsMobile } from "@/hooks/use-mobile";
 
@@ -27,15 +29,25 @@ const navItems = [
   { label: "Subjects", href: "/subjects", icon: BookOpen },
   { label: "Time Slots", href: "/timeslots", icon: Clock },
   { label: "Timetable", href: "/timetable", icon: CalendarDays },
+  { label: "Referral Code", href: "/referral", icon: Link2 },
+  { label: "Requests", href: "/requests", icon: ClipboardList, ownerOnly: true },
 ];
 
 export function Sidebar() {
   const [location] = useLocation();
   const logoutMutation = useLogout();
+  const { user } = useUser();
   const isMobile = useIsMobile();
   const [isOpen, setIsOpen] = useState(false);
 
   const toggleSidebar = () => setIsOpen(!isOpen);
+  const isOwner = user?.workspace?.role === "owner";
+  const workspaceName = user?.workspace?.workspaceName || "Workspace";
+
+  const filteredNavItems = navItems.filter((item) => {
+    if (item.ownerOnly && !isOwner) return false;
+    return true;
+  });
 
   const sidebarContent = (
     <div className={`h-screen w-64 bg-slate-900 text-white flex flex-col fixed left-0 top-0 border-r border-slate-800 z-50 transition-transform duration-300 ${isMobile && !isOpen ? '-translate-x-full' : 'translate-x-0'}`}>
@@ -43,8 +55,10 @@ export function Sidebar() {
         <div className="flex items-center gap-3">
           <Calendar className="w-8 h-8 text-primary" />
           <div>
-            <h1 className="font-display font-bold text-lg">College</h1>
-            <p className="text-xs text-slate-400">Scheduler Admin</p>
+            <h1 className="font-display font-bold text-lg">{workspaceName}</h1>
+            <p className="text-xs text-slate-400">
+              {isOwner ? "Owner" : "Viewer"} • {user?.name}
+            </p>
           </div>
         </div>
         {isMobile && (
@@ -55,7 +69,7 @@ export function Sidebar() {
       </div>
 
       <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-        {navItems.map((item) => {
+        {filteredNavItems.map((item) => {
           const isActive = location === item.href;
           return (
             <Link key={item.href} href={item.href} onClick={() => isMobile && setIsOpen(false)}>
