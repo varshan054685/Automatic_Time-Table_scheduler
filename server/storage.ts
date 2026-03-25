@@ -103,6 +103,23 @@ export class DatabaseStorage {
       .where(eq(workspaceMembers.workspaceId, workspaceId));
   }
 
+  async deleteWorkspace(workspaceId: number): Promise<void> {
+    await db.delete(timetable).where(eq(timetable.workspaceId, workspaceId));
+    await db.delete(timeSlots).where(eq(timeSlots.workspaceId, workspaceId));
+    await db.delete(sections).where(eq(sections.workspaceId, workspaceId));
+    await db.delete(subjects).where(eq(subjects.workspaceId, workspaceId));
+    await db.delete(classrooms).where(eq(classrooms.workspaceId, workspaceId));
+    await db.delete(faculty).where(eq(faculty.workspaceId, workspaceId));
+    await db.delete(departments).where(eq(departments.workspaceId, workspaceId));
+    await db.delete(changeRequests).where(eq(changeRequests.workspaceId, workspaceId));
+    await db.delete(workspaceMembers).where(eq(workspaceMembers.workspaceId, workspaceId));
+    await db.delete(workspaces).where(eq(workspaces.id, workspaceId));
+  }
+
+  async leaveWorkspace(userId: number, workspaceId: number): Promise<void> {
+    await db.delete(workspaceMembers).where(and(eq(workspaceMembers.userId, userId), eq(workspaceMembers.workspaceId, workspaceId)));
+  }
+
   // ─── Change Requests ───
   async createChangeRequest(data: { workspaceId: number; requestedBy: number; type: string; data: any }): Promise<ChangeRequest> {
     const [cr] = await db.insert(changeRequests).values(data).returning();

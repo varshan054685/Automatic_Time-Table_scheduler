@@ -1,9 +1,12 @@
 import { Sidebar } from "@/components/Sidebar";
 import { StatCard } from "@/components/StatCard";
 import { useDepartments, useFaculty, useSections, useClassrooms } from "@/hooks/use-master-data";
-import { Building2, GraduationCap, Users, BookOpen, CalendarDays, UserCog, LayoutGrid, Settings } from "lucide-react";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { Building2, GraduationCap, Users, BookOpen, CalendarDays, UserCog, LayoutGrid, Settings, Clock, FileEdit, Trash2 } from "lucide-react";
 import { useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
+import { api } from "@shared/routes";
+import { useUser } from "@/hooks/use-auth";
+import { Link } from "wouter";
 
 export default function Dashboard() {
   const [, navigate] = useLocation();
@@ -11,14 +14,20 @@ export default function Dashboard() {
   const { data: faculty } = useFaculty();
   const { data: sections } = useSections();
   const { data: classrooms } = useClassrooms();
+  const { user } = useUser();
+  const isOwner = user?.workspace?.role === "owner";
 
-  // Simple data transformation for chart
-  const chartData = [
-    { name: 'Depts', count: departments?.length || 0 },
-    { name: 'Faculty', count: faculty?.length || 0 },
-    { name: 'Sections', count: sections?.length || 0 },
-    { name: 'Rooms', count: classrooms?.length || 0 },
-  ];
+  // Fetch pending requests
+  const { data: requests = [] } = useQuery({
+    queryKey: [api.changeRequests.list.path],
+    queryFn: async () => {
+      const res = await fetch(api.changeRequests.list.path, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch");
+      return await res.json();
+    },
+  });
+
+  const pendingRequests = requests.filter((r) => r.status === "pending").slice(0, 5);
 
   return (
     <div className="flex min-h-screen bg-slate-50/50">
@@ -58,23 +67,57 @@ export default function Dashboard() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
-              <h3 className="text-lg font-semibold mb-6">Resource Distribution</h3>
-              <div className="h-[300px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={chartData}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                    <XAxis dataKey="name" tickLine={false} axisLine={false} />
-                    <YAxis tickLine={false} axisLine={false} />
-                    <Tooltip 
-                      cursor={{fill: 'transparent'}}
-                      contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                    />
-                    <Bar dataKey="count" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} barSize={50} />
-                  </BarChart>
-                </ResponsiveContainer>
+            {/* Pending Requests Panel */}
+            <Link href="/requests">
+              <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 cursor-pointer hover:border-primary/50 hover:shadow-md transition-all">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold flex items-center gap-2">
+                    <Clock className="w-5 h-5 text-amber-500" />
+                    Pending Requests
+                  </h3>
+                  {pendingRequests.length > 0 && (
+                    <span className="bg-amber-100 text-amber-700 text-xs px-2 py-0.5 rounded-full font-medium">
+                      {pendingRequests.length}
+                    </span>
+                  )}
+                </div>
+                
+                {pendingRequests.length === 0 ? (
+                  <div className="text-center py-8 text-slate-400">
+                    <p>No pending requests</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {pendingRequests.map((req) => {
+                      const data = req.data || {};
+                      return (
+                        <div key={req.id} className="flex items-center justify-between p-3 bg-slate-50 border border-slate-200 rounded-lg hover:bg-slate-100 transition-colors">
+                          <div className="flex items-center gap-3">
+                            {req.type === "edit" ? (
+                              <FileEdit className="w-4 h-4 text-blue-500" />
+                            ) : (
+                              <Trash2 className="w-4 h-4 text-red-500" />
+                            )}
+                            <div>
+                              <p className="font-medium text-slate-900 text-sm">
+                                {req.type === "edit" ? "Edit" : "Delete"} → {data.table}
+                              </p>
+                              <p className="text-xs text-slate-500">
+                                by {req.requesterName || req.requesterEmail} • {new Date(req.createdAt).toLocaleDateString()}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+                
+                <div className="mt-4 pt-3 border-t border-slate-100 text-center">
+                  <span className="text-sm text-primary hover:underline">View all requests →</span>
+                </div>
               </div>
-            </div>
+            </Link>
 
             <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
               <h3 className="text-lg font-semibold mb-4">Quick Actions</h3>
@@ -83,7 +126,7 @@ export default function Dashboard() {
                   { icon: CalendarDays, label: "Generate Timetable", desc: "Create a new schedule for a semester", path: "/timetable", color: "text-blue-500 bg-blue-50" },
                   { icon: UserCog, label: "Manage Faculty", desc: "Add or update faculty details", path: "/faculty", color: "text-purple-500 bg-purple-50" },
                   { icon: LayoutGrid, label: "View Schedule", desc: "Check current academic timetable", path: "/timetable", color: "text-green-500 bg-green-50" },
-                  { icon: Settings, label: "System Settings", desc: "Configure departments & classrooms", path: "/departments", color: "text-orange-500 bg-orange-50" },
+                  { icon: Settings, label: "System Settings", desc: "Configure settings", path: "/settings", color: "text-orange-500 bg-orange-50" },
                 ].map(({ icon: Icon, label, desc, path, color }) => (
                   <button
                     key={label}

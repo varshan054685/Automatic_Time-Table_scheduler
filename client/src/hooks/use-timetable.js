@@ -14,6 +14,7 @@ export function useTimetable(filters) {
       if (!res.ok) throw new Error("Failed to fetch timetable");
       return api.timetable.list.responses[200].parse(await res.json());
     },
+    refetchInterval: 5000,
   });
 }
 

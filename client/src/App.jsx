@@ -16,8 +16,7 @@ import Timetable from "@/pages/Timetable";
 import Subjects from "@/pages/Subjects";
 import Sections from "@/pages/Sections";
 import TimeSlots from "@/pages/TimeSlots";
-import ReferralPage from "@/pages/ReferralPage";
-import RequestsPage from "@/pages/RequestsPage";
+import Settings from "@/pages/Settings";
 
 function ProtectedRoute({ component: Component }) {
   const { user, isLoading } = useUser();
@@ -69,11 +68,8 @@ function Router() {
       <Route path="/timeslots">
         <ProtectedRoute component={TimeSlots} />
       </Route>
-      <Route path="/referral">
-        <ProtectedRoute component={ReferralPage} />
-      </Route>
-      <Route path="/requests">
-        <ProtectedRoute component={RequestsPage} />
+      <Route path="/settings">
+        <ProtectedRoute component={Settings} />
       </Route>
 
       <Route>404 Not Found</Route>

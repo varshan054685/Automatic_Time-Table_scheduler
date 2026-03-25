@@ -572,6 +572,12 @@ export default function TimeSlots() {
               </div>
               
               <div className="flex gap-2">
+                <TimeSlotImport timeSlots={timeSlots} onImportComplete={refetch} />
+
+                <Button variant="outline" className="gap-2" onClick={handleExport}>
+                  <Download className="w-4 h-4" /> Export Excel
+                </Button>
+
                 <Dialog open={bulkOpen} onOpenChange={setBulkOpen}>
                   <DialogTrigger asChild>
                     <Button className="gap-2 shadow-lg shadow-primary/20 bg-indigo-600 hover:bg-indigo-700 text-white">
@@ -585,12 +591,6 @@ export default function TimeSlots() {
                     <BulkTimeSlotDialog onSuccess={refetch} onClose={() => setBulkOpen(false)} />
                   </DialogContent>
                 </Dialog>
-
-                <Button variant="outline" className="gap-2" onClick={handleExport}>
-                  <Download className="w-4 h-4" /> Export Excel
-                </Button>
-
-                <TimeSlotImport timeSlots={timeSlots} onImportComplete={refetch} />
               </div>
             </div>
 
@@ -638,24 +638,19 @@ export default function TimeSlots() {
                         </TableCell>
                         <TableCell>
                           <div className="flex flex-wrap gap-1">
-                            {activeDays.slice(0, 3).map(d => (
-                              <span key={d} className="px-2 py-1 bg-indigo-50 text-indigo-700 text-xs rounded-md font-medium">
+                            {activeDays.map(d => (
+                              <span key={d} className="px-2 py-1 bg-indigo-50 text-indigo-700 text-xs rounded-md font-medium shadow-sm border border-indigo-100">
                                 {d.slice(0, 3)}
                               </span>
                             ))}
-                            {activeDays.length > 3 && (
-                              <span className="px-2 py-1 bg-slate-100 text-slate-600 text-xs rounded-md font-medium">
-                                +{activeDays.length - 3}
-                              </span>
-                            )}
                           </div>
                         </TableCell>
                         <TableCell className="text-right">
-                          <div className="flex justify-end gap-1 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
+                          <div className="flex justify-end gap-2">
                             <Button 
                               variant="ghost" 
                               size="icon" 
-                              className="text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                              className="text-blue-500 hover:text-blue-600 hover:bg-blue-50 transition-colors h-8 w-8"
                               onClick={() => handleEdit(slot)}
                             >
                               <Pencil className="w-4 h-4" />
@@ -663,7 +658,7 @@ export default function TimeSlots() {
                             <Button 
                               variant="ghost" 
                               size="icon" 
-                              className="text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                              className="text-red-500 hover:text-red-600 hover:bg-red-50 transition-colors h-8 w-8"
                               onClick={() => {
                                 if(confirm(`Remove all ${activeDays.length} instances of ${slot.label} for all days?`)) {
                                   timeSlots

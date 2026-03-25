@@ -13,12 +13,13 @@ import {
   Menu,
   X,
   School,
-  Link2,
-  ClipboardList
+  Settings as SettingsIcon
 } from "lucide-react";
 import { useLogout, useUser } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useQuery } from "@tanstack/react-query";
+import { api } from "@shared/routes";
 
 const navItems = [
   { label: "Dashboard", href: "/", icon: LayoutDashboard },
@@ -29,8 +30,6 @@ const navItems = [
   { label: "Subjects", href: "/subjects", icon: BookOpen },
   { label: "Time Slots", href: "/timeslots", icon: Clock },
   { label: "Timetable", href: "/timetable", icon: CalendarDays },
-  { label: "Referral Code", href: "/referral", icon: Link2 },
-  { label: "Requests", href: "/requests", icon: ClipboardList, ownerOnly: true },
 ];
 
 export function Sidebar() {
@@ -44,10 +43,18 @@ export function Sidebar() {
   const isOwner = user?.workspace?.role === "owner";
   const workspaceName = user?.workspace?.workspaceName || "Workspace";
 
-  const filteredNavItems = navItems.filter((item) => {
-    if (item.ownerOnly && !isOwner) return false;
-    return true;
+  const { data: requests = [] } = useQuery({
+    queryKey: [api.changeRequests.list.path],
+    queryFn: async () => {
+      const res = await fetch(api.changeRequests.list.path, { credentials: "include" });
+      if (!res.ok) return [];
+      return await res.json();
+    },
+    enabled: isOwner,
+    refetchInterval: 5000,
   });
+  
+  const pendingCount = requests.filter((r) => r.status === "pending").length;
 
   const sidebarContent = (
     <div className={`h-screen w-64 bg-slate-900 text-white flex flex-col fixed left-0 top-0 border-r border-slate-800 z-50 transition-transform duration-300 ${isMobile && !isOpen ? '-translate-x-full' : 'translate-x-0'}`}>
@@ -69,7 +76,7 @@ export function Sidebar() {
       </div>
 
       <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-        {filteredNavItems.map((item) => {
+        {navItems.map((item) => {
           const isActive = location === item.href;
           return (
             <Link key={item.href} href={item.href} onClick={() => isMobile && setIsOpen(false)}>
@@ -88,6 +95,45 @@ export function Sidebar() {
             </Link>
           );
         })}
+
+        <Link href="/requests" onClick={() => isMobile && setIsOpen(false)}>
+          <div 
+            className={`
+              flex items-center justify-between px-4 py-3 rounded-lg cursor-pointer transition-all duration-200
+              ${location === '/requests' 
+                ? 'bg-primary text-white shadow-lg shadow-primary/20 font-medium translate-x-1' 
+                : 'text-slate-400 hover:text-white hover:bg-slate-800'
+              }
+            `}
+          >
+            <div className="flex items-center gap-3">
+              <SettingsIcon className="w-5 h-5" />
+              <span>Requests</span>
+            </div>
+            {isOwner && pendingCount > 0 && (
+              <span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full shadow-md shadow-red-500/50">
+                {pendingCount > 9 ? '9+' : pendingCount}
+              </span>
+            )}
+          </div>
+        </Link>
+
+        <div className="my-4 border-t border-slate-800"></div>
+
+        <Link href="/settings" onClick={() => isMobile && setIsOpen(false)}>
+          <div 
+            className={`
+              flex items-center gap-3 px-4 py-3 rounded-lg cursor-pointer transition-all duration-200
+              ${location === '/settings' 
+                ? 'bg-primary text-white shadow-lg shadow-primary/20 font-medium translate-x-1' 
+                : 'text-slate-400 hover:text-white hover:bg-slate-800'
+              }
+            `}
+          >
+            <SettingsIcon className="w-5 h-5" />
+            <span>Settings</span>
+          </div>
+        </Link>
       </nav>
 
       <div className="p-4 border-t border-slate-800">

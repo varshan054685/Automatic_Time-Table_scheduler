@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Trash2, Search, ArrowUpDown, Pencil, Upload, Loader2 } from "lucide-react";
+import { Plus, Trash2, Search, ArrowUpDown, Pencil, Upload, Loader2, Download } from "lucide-react";
 import { useDepartments, useCreateDepartment, useUpdateDepartment, useDeleteDepartment } from "@/hooks/use-master-data";
 import { useToast } from "@/hooks/use-toast";
 import { api } from "@shared/routes";
@@ -132,6 +132,23 @@ export default function Departments() {
     defaultValues: { name: "", code: "" },
   });
 
+  const handleExport = () => {
+    const data = departments?.length > 0 
+      ? departments.map(d => ({
+          "Department Name": d.name,
+          "Department Code": d.code
+        }))
+      : [{
+          "Department Name": "Example Dept",
+          "Department Code": "EXM"
+        }];
+        
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Departments");
+    XLSX.writeFile(wb, "departments_template.xlsx");
+  };
+
   const onSubmit = (values) => {
     if (editingId) {
       updateMutation.mutate({ id: editingId, ...values }, {
@@ -213,6 +230,9 @@ export default function Departments() {
             </div>
             
             <div className="flex gap-2">
+              <Button variant="outline" className="gap-2" onClick={handleExport}>
+                <Download className="w-4 h-4" /> Export Excel
+              </Button>
               <DepartmentImport departments={departments} onImportComplete={refetch} />
 
               <Dialog open={open} onOpenChange={(v) => { setOpen(v); if(!v) { setEditingId(null); form.reset(); } }}>

@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Trash2, Search, ArrowUpDown, Pencil, Upload, Loader2 } from "lucide-react";
+import { Plus, Trash2, Search, ArrowUpDown, Pencil, Upload, Loader2, Download } from "lucide-react";
 import { useSubjects, useCreateSubject, useUpdateSubject, useDeleteSubject, useDepartments, useFaculty, useSections } from "@/hooks/use-master-data";
 import { useToast } from "@/hooks/use-toast";
 import { api } from "@shared/routes";
@@ -181,6 +181,33 @@ export default function Subjects() {
     defaultValues: { name: "", code: "", weeklyHours: 0, departmentId: 0, facultyId: 0, sectionId: 0, type: "lecture" },
   });
 
+  const handleExport = () => {
+    const data = subjects?.length > 0 
+      ? subjects.map(s => ({
+          "Subject Name": s.name,
+          "Subject Code": s.code,
+          "Weekly Hours": s.weeklyHours,
+          "Department": departments?.find(d => d.id === s.departmentId)?.name || "",
+          "Default Faculty": faculty?.find(f => f.id === s.facultyId)?.name || "",
+          "Target Section": sections?.find(sec => sec.id === s.sectionId)?.name || "",
+          "Subject Type": s.type || "lecture"
+        }))
+      : [{
+          "Subject Name": "Data Structures",
+          "Subject Code": "CS201",
+          "Weekly Hours": 4,
+          "Department": "Computer Science",
+          "Default Faculty": "Dr. Alice",
+          "Target Section": "CS-A",
+          "Subject Type": "lecture"
+        }];
+        
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Subjects");
+    XLSX.writeFile(wb, "subjects_template.xlsx");
+  };
+
   const onSubmit = (values) => {
     const submissionData = {
       ...values,
@@ -278,6 +305,9 @@ export default function Subjects() {
             </div>
             
             <div className="flex gap-2">
+              <Button variant="outline" className="gap-2" onClick={handleExport}>
+                <Download className="w-4 h-4" /> Export Excel
+              </Button>
               <SubjectImport departments={departments} subjects={subjects} faculty={faculty} sections={sections} onImportComplete={refetch} />
 
               <Dialog open={open} onOpenChange={(v) => { setOpen(v); if(!v) { setEditingId(null); form.reset(); } }}>

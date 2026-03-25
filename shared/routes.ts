@@ -87,6 +87,16 @@ export const api = {
       path: '/api/workspaces/regenerate-code' as const,
       responses: { 200: z.any() },
     },
+    delete: {
+      method: 'DELETE' as const,
+      path: '/api/workspaces/current' as const,
+      responses: { 200: z.any() },
+    },
+    leave: {
+      method: 'POST' as const,
+      path: '/api/workspaces/leave' as const,
+      responses: { 200: z.any() },
+    },
   },
   changeRequests: {
     list: {

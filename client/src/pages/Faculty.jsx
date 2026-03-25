@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Trash2, Search, ArrowUpDown, Pencil, Upload, Loader2 } from "lucide-react";
+import { Plus, Trash2, Search, ArrowUpDown, Pencil, Upload, Loader2, Download } from "lucide-react";
 import { useFaculty, useCreateFaculty, useUpdateFaculty, useDeleteFaculty, useDepartments } from "@/hooks/use-master-data";
 import { useToast } from "@/hooks/use-toast";
 import { api } from "@shared/routes";
@@ -141,6 +141,27 @@ export default function Faculty() {
     defaultValues: { name: "", code: "", departmentId: 0, email: "", availability: [] },
   });
 
+  const handleExport = () => {
+    const data = faculty?.length > 0 
+      ? faculty.map(f => ({
+          "Faculty Code": f.code,
+          "Faculty Name": f.name,
+          "Email": f.email,
+          "Department": departments?.find(d => d.id === f.departmentId)?.name || ""
+        }))
+      : [{
+          "Faculty Code": "FAC001",
+          "Faculty Name": "Dr. Alice",
+          "Email": "alice@college.edu",
+          "Department": "Computer Science"
+        }];
+        
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Faculty");
+    XLSX.writeFile(wb, "faculty_template.xlsx");
+  };
+
   const onSubmit = (values) => {
     const data = {
       ...values,
@@ -227,6 +248,9 @@ export default function Faculty() {
             </div>
             
             <div className="flex gap-2">
+              <Button variant="outline" className="gap-2" onClick={handleExport}>
+                <Download className="w-4 h-4" /> Export Excel
+              </Button>
               <FacultyImport departments={departments} faculty={faculty} onImportComplete={refetch} />
 
               <Dialog open={open} onOpenChange={(v) => { setOpen(v); if(!v) { setEditingId(null); form.reset(); } }}>

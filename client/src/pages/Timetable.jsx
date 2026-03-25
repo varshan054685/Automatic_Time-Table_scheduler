@@ -9,9 +9,32 @@ import { useDepartments, useSections, useTimeSlots, useFaculty, useSubjects } fr
 import { useToast } from "@/hooks/use-toast";
 
 export default function TimetablePage() {
-  const [selectedDept, setSelectedDept] = useState("");
-  const [selectedSection, setSelectedSection] = useState("");
-  const [selectedFaculty, setSelectedFaculty] = useState("");
+  const [selectedDept, setSelectedDept] = useState(() => localStorage.getItem("tt_selectedDept") || "");
+  const [selectedSection, setSelectedSection] = useState(() => localStorage.getItem("tt_selectedSection") || "");
+  const [selectedFaculty, setSelectedFaculty] = useState(() => localStorage.getItem("tt_selectedFaculty") || "");
+
+  const updateDept = (val) => {
+    setSelectedDept(val);
+    localStorage.setItem("tt_selectedDept", val);
+    setSelectedSection("");
+    localStorage.removeItem("tt_selectedSection");
+    setSelectedFaculty("");
+    localStorage.removeItem("tt_selectedFaculty");
+  };
+
+  const updateSection = (val) => {
+    setSelectedSection(val);
+    localStorage.setItem("tt_selectedSection", val);
+    setSelectedFaculty("");
+    localStorage.removeItem("tt_selectedFaculty");
+  };
+
+  const updateFaculty = (val) => {
+    setSelectedFaculty(val);
+    localStorage.setItem("tt_selectedFaculty", val);
+    setSelectedSection("");
+    localStorage.removeItem("tt_selectedSection");
+  };
   const { toast } = useToast();
   
   const { data: departments } = useDepartments();
@@ -129,6 +152,16 @@ export default function TimetablePage() {
 
   return (
     <div className="flex min-h-screen bg-slate-50/50">
+      {regenerateAllMutation.isPending && (
+        <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-sm flex flex-col items-center justify-center text-white">
+          <Loader2 className="w-16 h-16 animate-spin mb-6 text-white" />
+          <h2 className="text-3xl font-bold font-display tracking-tight text-white shadow-sm">Generating Timetable...</h2>
+          <p className="mt-3 text-slate-200 text-lg">Please do not navigate away or close this page.</p>
+          <div className="mt-8 bg-slate-800/80 px-4 py-2 rounded-lg border border-slate-700 shadow-xl max-w-sm text-center">
+            <p className="text-sm text-slate-300">This process simulates thousands of combinations and may take up to a minute depending on complex constraints.</p>
+          </div>
+        </div>
+      )}
       <div className="print:hidden">
         <Sidebar />
       </div>
@@ -301,11 +334,7 @@ export default function TimetablePage() {
                   <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
                     <BookOpen className="w-4 h-4 text-primary" /> Department
                   </label>
-                  <Select value={selectedDept} onValueChange={(val) => {
-                    setSelectedDept(val);
-                    setSelectedSection("");
-                    setSelectedFaculty("");
-                  }}>
+                  <Select value={selectedDept} onValueChange={updateDept}>
                     <SelectTrigger className="bg-white border-slate-200 focus:ring-primary/20">
                       <SelectValue placeholder="Select Department" />
                     </SelectTrigger>
@@ -321,10 +350,7 @@ export default function TimetablePage() {
                   <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
                     <Calendar className="w-4 h-4 text-primary" /> Section/Class View
                   </label>
-                  <Select disabled={!selectedDept} value={selectedSection} onValueChange={(val) => {
-                    setSelectedSection(val);
-                    setSelectedFaculty("");
-                  }}>
+                  <Select disabled={!selectedDept} value={selectedSection} onValueChange={updateSection}>
                     <SelectTrigger className="bg-white border-slate-200 focus:ring-primary/20">
                       <SelectValue placeholder="Select Class" />
                     </SelectTrigger>
@@ -341,10 +367,7 @@ export default function TimetablePage() {
                   <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
                     <User className="w-4 h-4 text-primary" /> Faculty View
                   </label>
-                  <Select disabled={!selectedDept} value={selectedFaculty} onValueChange={(val) => {
-                    setSelectedFaculty(val);
-                    setSelectedSection("");
-                  }}>
+                  <Select disabled={!selectedDept} value={selectedFaculty} onValueChange={updateFaculty}>
                     <SelectTrigger className="bg-white border-slate-200 focus:ring-primary/20">
                       <SelectValue placeholder="Select Faculty" />
                     </SelectTrigger>

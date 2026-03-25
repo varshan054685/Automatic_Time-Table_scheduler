@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Copy, RefreshCw, Users, Shield, Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
-export default function ReferralPage() {
+export function ReferralContent() {
   const { user } = useUser();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -54,81 +54,74 @@ export default function ReferralPage() {
   }
 
   return (
-    <div className="flex min-h-screen bg-slate-50">
-      <Sidebar />
-      <main className="flex-1 ml-64 p-8">
-        <div className="max-w-2xl mx-auto space-y-6">
-          <div>
-            <h1 className="text-3xl font-bold text-slate-900">Referral Code</h1>
-            <p className="text-slate-500 mt-1">Share your workspace with others</p>
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold text-slate-900">Referral Code</h1>
+        <p className="text-slate-500 mt-1">Share your workspace with others</p>
+      </div>
+
+      <Card className="border-0 shadow-sm border border-slate-200">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Shield className="w-5 h-5 text-indigo-500" />
+            Your Workspace Code
+          </CardTitle>
+          <CardDescription>Anyone with this code can join your workspace as a viewer</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center gap-3">
+            <div className="flex-1 bg-slate-100 rounded-xl px-6 py-4 text-center">
+              <span className="text-2xl font-mono font-bold tracking-[0.3em] text-indigo-600">
+                {referralCode}
+              </span>
+            </div>
+            <Button variant="outline" size="icon" className="h-14 w-14 shadow-sm border-slate-200" onClick={copyCode}>
+              {copied ? <Check className="w-5 h-5 text-green-500" /> : <Copy className="w-5 h-5" />}
+            </Button>
           </div>
 
-          {/* Referral Code Card */}
-          <Card className="border-0 shadow-lg">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Shield className="w-5 h-5 text-indigo-500" />
-                Your Workspace Code
-              </CardTitle>
-              <CardDescription>Anyone with this code can join your workspace as a viewer</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-3">
-                <div className="flex-1 bg-slate-100 rounded-xl px-6 py-4 text-center">
-                  <span className="text-2xl font-mono font-bold tracking-[0.3em] text-indigo-600">
-                    {referralCode}
-                  </span>
+          {isOwner && (
+            <Button
+              variant="outline"
+              className="mt-4 w-full border-slate-200 shadow-sm hover:bg-slate-50"
+              onClick={() => regenerateMutation.mutate()}
+              disabled={regenerateMutation.isPending}
+            >
+              <RefreshCw className={`w-4 h-4 mr-2 ${regenerateMutation.isPending ? "animate-spin" : ""}`} />
+              {regenerateMutation.isPending ? "Generating..." : "Generate New Code"}
+            </Button>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className="border-0 shadow-sm border border-slate-200">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Users className="w-5 h-5 text-indigo-500" />
+            Workspace Members
+          </CardTitle>
+          <CardDescription>{members.length} member(s)</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            {members.map((member) => (
+              <div key={member.id} className="flex items-center justify-between p-3 bg-white border border-slate-100 shadow-sm rounded-lg">
+                <div>
+                  <p className="font-medium text-slate-900">{member.name}</p>
+                  <p className="text-sm text-slate-500">{member.email}</p>
                 </div>
-                <Button variant="outline" size="icon" className="h-14 w-14" onClick={copyCode}>
-                  {copied ? <Check className="w-5 h-5 text-green-500" /> : <Copy className="w-5 h-5" />}
-                </Button>
+                <span className={`px-2.5 py-1 rounded-full text-xs font-semibold shadow-sm border ${
+                  member.role === "owner" 
+                    ? "bg-indigo-50 text-indigo-700 border-indigo-200" 
+                    : "bg-slate-50 text-slate-600 border-slate-200"
+                }`}>
+                  {member.role === "owner" ? "Owner" : "Viewer"}
+                </span>
               </div>
-
-              {isOwner && (
-                <Button
-                  variant="outline"
-                  className="mt-4 w-full"
-                  onClick={() => regenerateMutation.mutate()}
-                  disabled={regenerateMutation.isPending}
-                >
-                  <RefreshCw className={`w-4 h-4 mr-2 ${regenerateMutation.isPending ? "animate-spin" : ""}`} />
-                  {regenerateMutation.isPending ? "Generating..." : "Generate New Code"}
-                </Button>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Members List */}
-          <Card className="border-0 shadow-lg">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Users className="w-5 h-5 text-indigo-500" />
-                Workspace Members
-              </CardTitle>
-              <CardDescription>{members.length} member(s)</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {members.map((member) => (
-                  <div key={member.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                    <div>
-                      <p className="font-medium text-slate-900">{member.name}</p>
-                      <p className="text-sm text-slate-500">{member.email}</p>
-                    </div>
-                    <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${
-                      member.role === "owner" 
-                        ? "bg-indigo-100 text-indigo-700" 
-                        : "bg-slate-200 text-slate-600"
-                    }`}>
-                      {member.role}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </main>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

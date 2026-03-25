@@ -14,6 +14,7 @@ export function useDepartments() {
       if (!res.ok) throw new Error("Failed to fetch departments");
       return api.departments.list.responses[200].parse(await res.json());
     },
+    refetchInterval: 5000,
   });
 }
 
@@ -83,6 +84,7 @@ export function useClassrooms() {
       if (!res.ok) throw new Error("Failed to fetch classrooms");
       return api.classrooms.list.responses[200].parse(await res.json());
     },
+    refetchInterval: 5000,
   });
 }
 
@@ -155,6 +157,7 @@ export function useSubjects() {
       if (!res.ok) throw new Error("Failed to fetch subjects");
       return api.subjects.list.responses[200].parse(await res.json());
     },
+    refetchInterval: 5000,
   });
 }
 
@@ -232,6 +235,7 @@ export function useFaculty() {
       if (!res.ok) throw new Error("Failed to fetch faculty");
       return api.faculty.list.responses[200].parse(await res.json());
     },
+    refetchInterval: 5000,
   });
 }
 
@@ -304,6 +308,7 @@ export function useSections() {
       if (!res.ok) throw new Error("Failed to fetch sections");
       return api.sections.list.responses[200].parse(await res.json());
     },
+    refetchInterval: 5000,
   });
 }
 
@@ -393,6 +398,7 @@ export function useTimeSlots() {
       if (!res.ok) throw new Error("Failed to fetch time slots");
       return api.timeSlots.list.responses[200].parse(await res.json());
     },
+    refetchInterval: 5000,
   });
 }
 

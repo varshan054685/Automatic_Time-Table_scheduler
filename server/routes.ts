@@ -91,6 +91,30 @@ export async function registerRoutes(
     res.json({ referralCode: newCode });
   });
 
+  app.delete(api.workspaces.delete.path, requireWorkspace, requireOwner, async (req: Request, res: Response) => {
+    try {
+      const wsId = (req as any).workspaceId;
+      await storage.deleteWorkspace(wsId);
+      res.json({ message: "Workspace deleted" });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.post(api.workspaces.leave.path, requireWorkspace, async (req: Request, res: Response) => {
+    try {
+      if ((req as any).workspaceRole === "owner") {
+        return res.status(400).json({ message: "Owners cannot leave the workspace, they must delete it." });
+      }
+      const wsId = (req as any).workspaceId;
+      const userId = (req as any).wsUserId;
+      await storage.leaveWorkspace(userId, wsId);
+      res.json({ message: "Left workspace" });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   // ─── Change Request Routes ───
   app.get(api.changeRequests.list.path, requireWorkspace, async (req: Request, res: Response) => {
     const wsId = (req as any).workspaceId;
@@ -278,7 +302,7 @@ export async function registerRoutes(
           type,
           data,
         });
-        return res.status(202).json({ message: "Your change request has been submitted for approval." });
+        return res.status(202).json({ message: "Request sent to admin" });
       }
       next();
     };
