@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useUser } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@shared/routes";
 import { ReferralContent } from "./ReferralPage";
 import { RequestsContent } from "./RequestsPage";
@@ -22,6 +22,11 @@ export default function Settings() {
     name: user?.name || "",
     email: user?.email || "",
     phone: user?.phone || ""
+  });
+  const [isEditingWorkspace, setIsEditingWorkspace] = useState(false);
+  const [workspaceData, setWorkspaceData] = useState({
+    name: user?.workspace?.workspaceName || "",
+    academicYear: user?.workspace?.academicYear || "2024-2025"
   });
 
   const updateProfileMutation = useMutation({
@@ -42,6 +47,40 @@ export default function Settings() {
     },
     onError: () => {
       toast({ title: "Failed to update profile", variant: "destructive" });
+    }
+  });
+
+  const { data: requests = [] } = useQuery({
+    queryKey: [api.changeRequests.list.path],
+    queryFn: async () => {
+      const res = await fetch(api.changeRequests.list.path, { credentials: "include" });
+      if (!res.ok) return [];
+      return await res.json();
+    },
+    enabled: isOwner,
+    refetchInterval: 5000,
+  });
+  
+  const pendingCount = requests.filter((r) => r.status === "pending").length;
+
+  const updateWsMutation = useMutation({
+    mutationFn: async (data) => {
+      const res = await fetch(api.workspaces.current.path, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(data)
+      });
+      if (!res.ok) throw new Error("Failed to update workspace");
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.auth.me.path] });
+      toast({ title: "Workspace updated successfully" });
+      setIsEditingWorkspace(false);
+    },
+    onError: () => {
+      toast({ title: "Failed to update workspace", variant: "destructive" });
     }
   });
 
@@ -84,7 +123,7 @@ export default function Settings() {
   return (
     <div className="flex min-h-screen bg-slate-50/50">
       <Sidebar />
-      <main className="flex-1 lg:ml-64 p-4 lg:p-8">
+      <main className="flex-1  p-4 lg:p-8">
         <div className="max-w-4xl mx-auto space-y-6 mt-12 lg:mt-0">
           <div>
             <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Settings</h1>
@@ -96,7 +135,15 @@ export default function Settings() {
               <TabsTrigger value="profile" className="flex items-center gap-2"><User className="w-4 h-4" /> <span className="hidden sm:inline">Profile</span></TabsTrigger>
               <TabsTrigger value="workspace" className="flex items-center gap-2"><Building2 className="w-4 h-4" /> <span className="hidden sm:inline">Workspace</span></TabsTrigger>
               <TabsTrigger value="referral" className="flex items-center gap-2"><Link2 className="w-4 h-4" /> <span className="hidden sm:inline">Referral</span></TabsTrigger>
-              <TabsTrigger value="requests" className="flex items-center gap-2"><ClipboardList className="w-4 h-4" /> <span className="hidden sm:inline">Requests</span></TabsTrigger>
+              <TabsTrigger value="requests" className="flex items-center gap-2">
+                <ClipboardList className="w-4 h-4" /> 
+                <span className="hidden sm:inline">Requests</span>
+                {isOwner && pendingCount > 0 && (
+                  <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow-sm ml-1">
+                    {pendingCount > 9 ? '9+' : pendingCount}
+                  </span>
+                )}
+              </TabsTrigger>
             </TabsList>
             
             <TabsContent value="profile" className="mt-6">
@@ -181,28 +228,74 @@ export default function Settings() {
 
             <TabsContent value="workspace" className="mt-6">
               <Card className="border-0 shadow-sm border border-slate-200">
-                <CardHeader>
-                  <CardTitle>Workspace</CardTitle>
-                  <CardDescription>View and manage your current workspace.</CardDescription>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <div>
+                    <CardTitle>Workspace</CardTitle>
+                    <CardDescription>View and manage your current workspace.</CardDescription>
+                  </div>
+                  {isOwner && (
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => setIsEditingWorkspace(!isEditingWorkspace)}
+                      className="gap-2"
+                    >
+                      <Pencil className="w-4 h-4" />
+                      {isEditingWorkspace ? "Cancel" : "Edit"}
+                    </Button>
+                  )}
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  <div className="grid gap-2">
-                    <label className="text-sm font-medium text-slate-500">Workspace Name</label>
-                    <div className="p-3 bg-slate-50 rounded-lg border border-slate-100 font-medium text-slate-900 flex items-center justify-between">
-                      {user?.workspace?.workspaceName}
-                      <span className="text-xs font-semibold bg-indigo-100 text-indigo-700 px-2.5 py-1 rounded-full">{isOwner ? "Owner" : "Viewer"}</span>
-                    </div>
-                  </div>
-                  
-                  <div className="grid gap-2">
-                    <label className="text-sm font-medium text-slate-500 flex items-center gap-2">
-                      <Calendar className="w-4 h-4" />
-                      Academic Year
-                    </label>
-                    <div className="p-3 bg-slate-50 rounded-lg border border-slate-100 font-medium text-slate-900">
-                      {user?.workspace?.academicYear || "2024-2025"}
-                    </div>
-                  </div>
+                  {isEditingWorkspace ? (
+                    <>
+                      <div className="grid gap-2">
+                        <label className="text-sm font-medium text-slate-500">Workspace Name</label>
+                        <Input 
+                          value={workspaceData.name}
+                          onChange={(e) => setWorkspaceData({...workspaceData, name: e.target.value})}
+                          placeholder="Enter workspace name"
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <label className="text-sm font-medium text-slate-500 flex items-center gap-2">
+                          <Calendar className="w-4 h-4" />
+                          Academic Year
+                        </label>
+                        <Input 
+                          value={workspaceData.academicYear}
+                          onChange={(e) => setWorkspaceData({...workspaceData, academicYear: e.target.value})}
+                          placeholder="e.g. 2024-2025"
+                        />
+                      </div>
+                      <Button 
+                        onClick={() => updateWsMutation.mutate(workspaceData)}
+                        disabled={updateWsMutation.isPending}
+                        className="w-full"
+                      >
+                        {updateWsMutation.isPending ? "Saving..." : "Save Workspace"}
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <div className="grid gap-2">
+                        <label className="text-sm font-medium text-slate-500">Workspace Name</label>
+                        <div className="p-3 bg-slate-50 rounded-lg border border-slate-100 font-medium text-slate-900 flex items-center justify-between">
+                          {user?.workspace?.workspaceName}
+                          <span className="text-xs font-semibold bg-indigo-100 text-indigo-700 px-2.5 py-1 rounded-full">{isOwner ? "Admin" : "Viewer"}</span>
+                        </div>
+                      </div>
+                      
+                      <div className="grid gap-2">
+                        <label className="text-sm font-medium text-slate-500 flex items-center gap-2">
+                          <Calendar className="w-4 h-4" />
+                          Academic Year
+                        </label>
+                        <div className="p-3 bg-slate-50 rounded-lg border border-slate-100 font-medium text-slate-900">
+                          {user?.workspace?.academicYear || "Not specified"}
+                        </div>
+                      </div>
+                    </>
+                  )}
 
                   <div className="border border-red-200 bg-red-50/50 rounded-xl p-5 border-dashed mt-4">
                     <h3 className="text-red-800 font-semibold flex items-center gap-2 mb-2">

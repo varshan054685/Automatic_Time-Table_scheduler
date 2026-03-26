@@ -10,6 +10,7 @@ export const users = pgTable("users", {
   password: text("password").notNull(),
   role: text("role").notNull().default("staff"), // 'admin' or 'staff'
   name: text("name"),
+  phone: text("phone"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -19,6 +20,8 @@ export const workspaces = pgTable("workspaces", {
   name: text("name").notNull(),
   ownerId: integer("owner_id").notNull(),
   referralCode: text("referral_code").notNull().unique(),
+  adminReferralCode: text("admin_referral_code").notNull().default('ADMIN_TEMPORARY_CODE'),
+  academicYear: text("academic_year").default("2024-2025"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

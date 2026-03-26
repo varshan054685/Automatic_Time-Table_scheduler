@@ -4,10 +4,11 @@ import { useUser } from "@/hooks/use-auth";
 import { Sidebar } from "@/components/Sidebar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Check, X, Clock, FileEdit, Trash2, AlertCircle, Building2, LayoutDashboard, ArrowLeft } from "lucide-react";
+import { Copy, RefreshCw, Users, Shield, Check, LayoutDashboard, Building2, AlertCircle, Clock, FileEdit, Trash2, ArrowLeft, Search, X } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 
 export function RequestsContent() {
   const { user } = useUser();
@@ -15,6 +16,7 @@ export function RequestsContent() {
   const queryClient = useQueryClient();
   const isOwner = user?.workspace?.role === "owner";
   const [selectedDept, setSelectedDept] = useState(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const { data: requests = [], isLoading } = useQuery({
     queryKey: [api.changeRequests.list.path],
@@ -65,6 +67,15 @@ export function RequestsContent() {
     },
   });
 
+  const filteredDepartments = useMemo(() => {
+    if (!searchQuery) return departments;
+    const q = searchQuery.toLowerCase();
+    return departments.filter(d => 
+      d.name.toLowerCase().includes(q) || 
+      (d.code && d.code.toLowerCase().includes(q))
+    );
+  }, [departments, searchQuery]);
+
   // Filter requests by selected department or show all
   const filteredPending = selectedDept
     ? requests.filter((r) => r.status === "pending" && r.departmentId === selectedDept.id)
@@ -93,7 +104,7 @@ export function RequestsContent() {
         <CardContent>
           <div className="p-3 bg-slate-50 rounded-lg border border-slate-100 font-medium text-slate-900 flex items-center justify-between">
             <span>{user?.workspace?.workspaceName || "My Workspace"}</span>
-            <span className="text-xs font-semibold bg-indigo-100 text-indigo-700 px-2.5 py-1 rounded-full">{isOwner ? "Owner" : "Viewer"}</span>
+            <span className="text-xs font-semibold bg-indigo-100 text-indigo-700 px-2.5 py-1 rounded-full">{isOwner ? "Admin" : "Viewer"}</span>
           </div>
         </CardContent>
       </Card>
@@ -112,14 +123,23 @@ export function RequestsContent() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {departments.length === 0 ? (
+          <div className="mb-4 relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <Input 
+              placeholder="Search departments..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9 border-slate-200 bg-slate-50 focus-visible:ring-primary/20"
+            />
+          </div>
+          {filteredDepartments.length === 0 ? (
             <div className="text-center py-8 text-slate-400">
               <AlertCircle className="w-10 h-10 mx-auto mb-2 opacity-50 text-slate-300" />
               <p>No departments found</p>
             </div>
           ) : (
-            <div className="space-y-2">
-              {departments.map((dept) => {
+            <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+              {filteredDepartments.map((dept) => {
                 const deptRequestCount = requests.filter(
                   (r) => r.status === "pending" && r.departmentId === dept.id
                 ).length;

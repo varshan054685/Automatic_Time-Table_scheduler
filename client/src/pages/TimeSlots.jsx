@@ -557,7 +557,7 @@ export default function TimeSlots() {
   return (
     <div className="flex min-h-screen bg-slate-50/50">
       <Sidebar />
-      <main className="flex-1 lg:ml-64 p-4 lg:p-8">
+      <main className="flex-1  p-4 lg:p-8">
         
         {timeSlots.length === 0 ? (
           <div className="pt-12 lg:pt-8 min-h-[calc(100vh-4rem)] flex flex-col justify-center">

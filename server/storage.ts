@@ -29,13 +29,20 @@ export class DatabaseStorage {
     return user;
   }
 
+  async updateUser(id: number, data: Partial<User>): Promise<User> {
+    const [u] = await db.update(users).set(data).where(eq(users.id, id)).returning();
+    return u;
+  }
+
   // ─── Workspaces ───
   async createWorkspace(name: string, ownerId: number): Promise<Workspace> {
     const referralCode = generateReferralCode();
+    const adminReferralCode = generateReferralCode();
     const [ws] = await db.insert(workspaces).values({
       name,
       ownerId,
       referralCode,
+      adminReferralCode,
     }).returning();
 
     // Add owner as member
@@ -48,9 +55,12 @@ export class DatabaseStorage {
     return ws;
   }
 
-  async getWorkspaceByReferralCode(code: string): Promise<Workspace | undefined> {
-    const [ws] = await db.select().from(workspaces).where(eq(workspaces.referralCode, code));
-    return ws;
+  async getWorkspaceByReferralCode(code: string): Promise<{ ws: Workspace; type: 'viewer' | 'owner' } | undefined> {
+    let [ws] = await db.select().from(workspaces).where(eq(workspaces.referralCode, code));
+    if (ws) return { ws, type: 'viewer' };
+    [ws] = await db.select().from(workspaces).where(eq(workspaces.adminReferralCode, code));
+    if (ws) return { ws, type: 'owner' };
+    return undefined;
   }
 
   async getWorkspace(id: number): Promise<Workspace | undefined> {
@@ -58,7 +68,7 @@ export class DatabaseStorage {
     return ws;
   }
 
-  async joinWorkspace(workspaceId: number, userId: number): Promise<WorkspaceMember> {
+  async joinWorkspace(workspaceId: number, userId: number, role: 'viewer' | 'owner'): Promise<WorkspaceMember> {
     // Check if already a member
     const existing = await db.select().from(workspaceMembers)
       .where(and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.userId, userId)));
@@ -67,17 +77,19 @@ export class DatabaseStorage {
     const [member] = await db.insert(workspaceMembers).values({
       workspaceId,
       userId,
-      role: "viewer",
+      role,
     }).returning();
     return member;
   }
 
-  async getUserWorkspaceMembership(userId: number): Promise<{workspaceId: number, role: string, workspaceName: string, referralCode: string} | null> {
+  async getUserWorkspaceMembership(userId: number): Promise<{workspaceId: number, role: string, workspaceName: string, referralCode: string, adminReferralCode: string, academicYear: string | null} | null> {
     const rows = await db.select({
       workspaceId: workspaceMembers.workspaceId,
       role: workspaceMembers.role,
       workspaceName: workspaces.name,
       referralCode: workspaces.referralCode,
+      adminReferralCode: workspaces.adminReferralCode,
+      academicYear: workspaces.academicYear,
     }).from(workspaceMembers)
       .innerJoin(workspaces, eq(workspaceMembers.workspaceId, workspaces.id))
       .where(eq(workspaceMembers.userId, userId))
@@ -85,9 +97,13 @@ export class DatabaseStorage {
     return rows[0] || null;
   }
 
-  async regenerateReferralCode(workspaceId: number): Promise<string> {
+  async regenerateReferralCode(workspaceId: number, type: 'viewer' | 'owner'): Promise<string> {
     const newCode = generateReferralCode();
-    await db.update(workspaces).set({ referralCode: newCode }).where(eq(workspaces.id, workspaceId));
+    if (type === 'owner') {
+      await db.update(workspaces).set({ adminReferralCode: newCode }).where(eq(workspaces.id, workspaceId));
+    } else {
+      await db.update(workspaces).set({ referralCode: newCode }).where(eq(workspaces.id, workspaceId));
+    }
     return newCode;
   }
 
@@ -119,6 +135,12 @@ export class DatabaseStorage {
   async leaveWorkspace(userId: number, workspaceId: number): Promise<void> {
     await db.delete(workspaceMembers).where(and(eq(workspaceMembers.userId, userId), eq(workspaceMembers.workspaceId, workspaceId)));
   }
+
+  async updateWorkspace(id: number, data: Partial<Workspace>): Promise<Workspace> {
+    const [ws] = await db.update(workspaces).set(data).where(eq(workspaces.id, id)).returning();
+    return ws;
+  }
+
 
   // ─── Change Requests ───
   async createChangeRequest(data: { workspaceId: number; requestedBy: number; type: string; data: any }): Promise<ChangeRequest> {

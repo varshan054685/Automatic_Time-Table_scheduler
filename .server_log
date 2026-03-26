@@ -1,0 +1,5 @@
+
+> rest-express@1.0.0 dev:node
+> NODE_ENV=development tsx watch server/index.ts
+
+9:15:14 PM [express] serving on port 5000

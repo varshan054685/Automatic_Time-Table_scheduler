@@ -68,11 +68,11 @@ export async function registerRoutes(
       const existing = await storage.getUserWorkspaceMembership(user.id);
       if (existing) return res.status(400).json({ message: "You already belong to a workspace" });
 
-      const ws = await storage.getWorkspaceByReferralCode(referralCode);
-      if (!ws) return res.status(404).json({ message: "Invalid referral code" });
+      const wsData = await storage.getWorkspaceByReferralCode(referralCode);
+      if (!wsData) return res.status(404).json({ message: "Invalid referral code" });
 
-      const member = await storage.joinWorkspace(ws.id, user.id);
-      res.json({ workspace: ws, member });
+      const member = await storage.joinWorkspace(wsData.ws.id, user.id, wsData.type);
+      res.json({ workspace: wsData.ws, member });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }
@@ -87,8 +87,21 @@ export async function registerRoutes(
 
   app.post(api.workspaces.regenerateCode.path, requireWorkspace, requireOwner, async (req: Request, res: Response) => {
     const wsId = (req as any).workspaceId;
-    const newCode = await storage.regenerateReferralCode(wsId);
-    res.json({ referralCode: newCode });
+    const { type } = req.body;
+    const codeType = type === 'admin' ? 'owner' : 'viewer';
+    const newCode = await storage.regenerateReferralCode(wsId, codeType);
+    res.json({ referralCode: newCode, type: codeType === 'owner' ? 'admin' : 'viewer' });
+  });
+
+  app.patch("/api/workspaces/current", requireWorkspace, requireOwner, async (req: Request, res: Response) => {
+    const wsId = (req as any).workspaceId;
+    const { name, academicYear } = req.body;
+    try {
+      const updated = await storage.updateWorkspace(wsId, { name, academicYear });
+      res.json(updated);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
   });
 
   app.delete(api.workspaces.delete.path, requireWorkspace, requireOwner, async (req: Request, res: Response) => {

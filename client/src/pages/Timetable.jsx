@@ -7,11 +7,15 @@ import { Loader2, Download, RefreshCw, User, Calendar, BookOpen, Clock } from "l
 import { useTimetable, useGenerateTimetable, useRegenerateAll } from "@/hooks/use-timetable";
 import { useDepartments, useSections, useTimeSlots, useFaculty, useSubjects } from "@/hooks/use-master-data";
 import { useToast } from "@/hooks/use-toast";
+import { useUser } from "@/hooks/use-auth";
 
 export default function TimetablePage() {
   const [selectedDept, setSelectedDept] = useState(() => localStorage.getItem("tt_selectedDept") || "");
   const [selectedSection, setSelectedSection] = useState(() => localStorage.getItem("tt_selectedSection") || "");
   const [selectedFaculty, setSelectedFaculty] = useState(() => localStorage.getItem("tt_selectedFaculty") || "");
+
+  const { user } = useUser();
+  const isOwner = user?.workspace?.role === "owner";
 
   const updateDept = (val) => {
     setSelectedDept(val);
@@ -165,7 +169,7 @@ export default function TimetablePage() {
       <div className="print:hidden">
         <Sidebar />
       </div>
-      <main className="flex-1 lg:ml-64 p-4 lg:p-8 print:m-0 print:p-0">
+      <main className="flex-1  p-4 lg:p-8 print:m-0 print:p-0">
         {/* Print Layout */}
         <div className="hidden print:block w-full text-[10pt] font-sans leading-tight">
           {/* Institution Header */}
@@ -381,11 +385,11 @@ export default function TimetablePage() {
                 </div>
               </div>
 
-              <div className="flex justify-end pt-2">
+              <div className="flex flex-col items-end pt-2">
                 <Button 
                   onClick={handleGenerate} 
-                  disabled={regenerateAllMutation.isPending}
-                  className="bg-primary hover:bg-primary/90 text-white min-w-[160px] shadow-lg shadow-primary/20 transition-all active:scale-95"
+                  disabled={regenerateAllMutation.isPending || !isOwner}
+                  className="bg-primary hover:bg-primary/90 text-white min-w-[160px] shadow-lg shadow-primary/20 transition-all active:scale-95 disabled:opacity-50"
                 >
                   {regenerateAllMutation.isPending ? (
                     <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Generating...</>
@@ -393,6 +397,11 @@ export default function TimetablePage() {
                     <><RefreshCw className="w-4 h-4 mr-2" /> Generate New</>
                   )}
                 </Button>
+                {!isOwner && (
+                  <p className="text-xs text-rose-500 mt-2 font-medium">
+                    Only admins can generate new timetables
+                  </p>
+                )}
               </div>
             </div>
           </Card>

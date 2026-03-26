@@ -32,7 +32,7 @@ export default function Dashboard() {
   return (
     <div className="flex min-h-screen bg-slate-50/50">
       <Sidebar />
-      <main className="flex-1 lg:ml-64 p-4 lg:p-8">
+      <main className="flex-1  p-4 lg:p-8">
         <div className="max-w-7xl mx-auto space-y-8 animate-in pt-12 lg:pt-0">
           <div>
             <h1 className="text-3xl font-display font-bold text-slate-900">Dashboard</h1>
@@ -68,8 +68,7 @@ export default function Dashboard() {
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {/* Pending Requests Panel */}
-            <Link href="/requests">
-              <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 cursor-pointer hover:border-primary/50 hover:shadow-md transition-all">
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 cursor-pointer hover:border-primary/50 hover:shadow-md transition-all">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-semibold flex items-center gap-2">
                     <Clock className="w-5 h-5 text-amber-500" />
@@ -91,7 +90,7 @@ export default function Dashboard() {
                     {pendingRequests.map((req) => {
                       const data = req.data || {};
                       return (
-                        <div key={req.id} className="flex items-center justify-between p-3 bg-slate-50 border border-slate-200 rounded-lg hover:bg-slate-100 transition-colors">
+                        <div key={req.id} onClick={() => navigate("/settings?tab=requests")} className="flex items-center justify-between p-3 bg-slate-50 border border-slate-200 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer">
                           <div className="flex items-center gap-3">
                             {req.type === "edit" ? (
                               <FileEdit className="w-4 h-4 text-blue-500" />
@@ -113,11 +112,10 @@ export default function Dashboard() {
                   </div>
                 )}
                 
-                <div className="mt-4 pt-3 border-t border-slate-100 text-center">
-                  <span className="text-sm text-primary hover:underline">View all requests →</span>
+                <div className="mt-auto pt-4 border-t border-slate-100 text-center">
+                  <span onClick={() => navigate("/settings?tab=requests")} className="text-sm text-primary hover:underline cursor-pointer py-2 px-4 inline-block tracking-wide font-medium">View all requests →</span>
                 </div>
               </div>
-            </Link>
 
             <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
               <h3 className="text-lg font-semibold mb-4">Quick Actions</h3>

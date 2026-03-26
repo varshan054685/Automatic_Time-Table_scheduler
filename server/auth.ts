@@ -59,6 +59,17 @@ export function setupAuth(app: Express) {
   });
 
   // Register
+  app.patch("/api/auth/profile", async (req, res, next) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const { name, email, phone } = req.body;
+      const user = await storage.updateUser((req.user as any).id, { name, email, phone });
+      res.json(user);
+    } catch (err: any) {
+      next(err);
+    }
+  });
+
   app.post("/api/auth/register", async (req, res, next) => {
     try {
       const schema = z.object({

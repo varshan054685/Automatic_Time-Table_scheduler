@@ -28,29 +28,32 @@ export function ReferralContent() {
   });
 
   const regenerateMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (type) => {
       const res = await fetch(api.workspaces.regenerateCode.path, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type }),
         credentials: "include",
       });
-      if (!res.ok) throw new Error("Failed to regenerate");
+      if (!res.ok) throw new Error(`Failed to regenerate ${type} code`);
       return await res.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: [api.workspaces.current.path] });
       queryClient.invalidateQueries({ queryKey: [api.auth.me.path] });
-      toast({ title: "New referral code generated!" });
+      toast({ title: `New ${data.type} referral code generated!` });
     },
   });
 
   const referralCode = wsData?.referralCode || workspace?.referralCode || "--------";
+  const adminReferralCode = wsData?.adminReferralCode || workspace?.adminReferralCode || "--------";
   const members = wsData?.members || [];
 
-  function copyCode() {
-    navigator.clipboard.writeText(referralCode);
-    setCopied(true);
-    toast({ title: "Referral code copied to clipboard!" });
-    setTimeout(() => setCopied(false), 2000);
+  function copyCode(code, type) {
+    navigator.clipboard.writeText(code);
+    setCopied({ ...copied, [type]: true });
+    toast({ title: `${type === 'admin' ? 'Admin' : 'Viewer'} referral code copied!` });
+    setTimeout(() => setCopied({ ...copied, [type]: false }), 2000);
   }
 
   return (
@@ -60,39 +63,85 @@ export function ReferralContent() {
         <p className="text-slate-500 mt-1">Share your workspace with others</p>
       </div>
 
-      <Card className="border-0 shadow-sm border border-slate-200">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Shield className="w-5 h-5 text-indigo-500" />
-            Your Workspace Code
-          </CardTitle>
-          <CardDescription>Anyone with this code can join your workspace as a viewer</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center gap-3">
-            <div className="flex-1 bg-slate-100 rounded-xl px-6 py-4 text-center">
-              <span className="text-2xl font-mono font-bold tracking-[0.3em] text-indigo-600">
-                {referralCode}
-              </span>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <Card className="border-0 shadow-sm border border-slate-200">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Users className="w-5 h-5 text-indigo-500" />
+              Viewer Code
+            </CardTitle>
+            <CardDescription>Share this code to invite Viewers</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-3">
+              <div className="flex-1 bg-slate-100 rounded-xl px-4 py-3 text-center">
+                <span className="text-xl font-mono font-bold tracking-[0.2em] text-indigo-600">
+                  {referralCode}
+                </span>
+              </div>
+              <Button variant="outline" size="icon" className="h-12 w-12 shadow-sm border-slate-200" onClick={() => copyCode(referralCode, 'viewer')}>
+                {copied['viewer'] ? <Check className="w-5 h-5 text-green-500" /> : <Copy className="w-5 h-5" />}
+              </Button>
             </div>
-            <Button variant="outline" size="icon" className="h-14 w-14 shadow-sm border-slate-200" onClick={copyCode}>
-              {copied ? <Check className="w-5 h-5 text-green-500" /> : <Copy className="w-5 h-5" />}
-            </Button>
-          </div>
 
-          {isOwner && (
-            <Button
-              variant="outline"
-              className="mt-4 w-full border-slate-200 shadow-sm hover:bg-slate-50"
-              onClick={() => regenerateMutation.mutate()}
-              disabled={regenerateMutation.isPending}
-            >
-              <RefreshCw className={`w-4 h-4 mr-2 ${regenerateMutation.isPending ? "animate-spin" : ""}`} />
-              {regenerateMutation.isPending ? "Generating..." : "Generate New Code"}
-            </Button>
-          )}
-        </CardContent>
-      </Card>
+            <div className="mt-4">
+              <Button
+                variant="outline"
+                className="w-full border-slate-200 shadow-sm disabled:opacity-50"
+                onClick={() => isOwner && regenerateMutation.mutate('viewer')}
+                disabled={!isOwner || regenerateMutation.isPending}
+              >
+                <RefreshCw className={`w-4 h-4 mr-2 ${(regenerateMutation.isPending && regenerateMutation.variables === 'viewer') ? "animate-spin" : ""}`} />
+                {(regenerateMutation.isPending && regenerateMutation.variables === 'viewer') ? "Generating..." : "Generate New"}
+              </Button>
+              {!isOwner && (
+                <p className="text-xs text-center text-slate-500 mt-2">
+                  Only admins can generate a new code
+                </p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-0 shadow-sm border border-slate-200">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Shield className="w-5 h-5 text-rose-500" />
+              Admin Code
+            </CardTitle>
+            <CardDescription>Share this code to invite other Admins</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-3">
+              <div className="flex-1 bg-rose-50 rounded-xl px-4 py-3 text-center">
+                <span className="text-xl font-mono font-bold tracking-[0.2em] text-rose-600">
+                  {adminReferralCode}
+                </span>
+              </div>
+              <Button variant="outline" size="icon" className="h-12 w-12 shadow-sm border-slate-200" onClick={() => copyCode(adminReferralCode, 'admin')}>
+                {copied['admin'] ? <Check className="w-5 h-5 text-green-500" /> : <Copy className="w-5 h-5" />}
+              </Button>
+            </div>
+
+            <div className="mt-4">
+              <Button
+                variant="outline"
+                className="w-full border-slate-200 shadow-sm disabled:opacity-50"
+                onClick={() => isOwner && regenerateMutation.mutate('admin')}
+                disabled={!isOwner || regenerateMutation.isPending}
+              >
+                <RefreshCw className={`w-4 h-4 mr-2 ${(regenerateMutation.isPending && regenerateMutation.variables === 'admin') ? "animate-spin" : ""}`} />
+                {(regenerateMutation.isPending && regenerateMutation.variables === 'admin') ? "Generating..." : "Generate New"}
+              </Button>
+              {!isOwner && (
+                <p className="text-xs text-center text-slate-500 mt-2">
+                  Only admins can generate a new code
+                </p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
       <Card className="border-0 shadow-sm border border-slate-200">
         <CardHeader>
@@ -115,7 +164,7 @@ export function ReferralContent() {
                     ? "bg-indigo-50 text-indigo-700 border-indigo-200" 
                     : "bg-slate-50 text-slate-600 border-slate-200"
                 }`}>
-                  {member.role === "owner" ? "Owner" : "Viewer"}
+                  {member.role === "owner" ? "Admin" : "Viewer"}
                 </span>
               </div>
             ))}
