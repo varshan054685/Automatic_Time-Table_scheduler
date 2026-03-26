@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useLocation } from "wouter";
-import { Calendar, Mail, Lock, ArrowRight, Sparkles } from "lucide-react";
+import { Calendar, Mail, Lock, ArrowRight, Sparkles, Eye, EyeOff } from "lucide-react";
 
 const schema = z.object({
   email: z.string().email("Enter a valid email"),
@@ -17,6 +17,7 @@ const schema = z.object({
 
 export default function Login() {
   const [isRegister, setIsRegister] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const loginMutation = useLogin();
   const registerMutation = useRegister();
   const [, setLocation] = useLocation();
@@ -110,11 +111,22 @@ export default function Login() {
                         <div className="relative">
                           <Lock className="absolute left-3 top-3 h-4 w-4 text-slate-500" />
                           <Input 
-                            type="password" 
+                            type={showPassword ? "text" : "password"} 
                             placeholder="Min 6 characters" 
                             {...field} 
-                            className="h-11 pl-10 bg-white/5 border-white/10 text-white placeholder:text-slate-500 focus:ring-indigo-500" 
+                            className="h-11 px-10 bg-white/5 border-white/10 text-white placeholder:text-slate-500 focus:ring-indigo-500" 
                           />
+                          <button
+                            type="button"
+                            onClick={() => setShowPassword(!showPassword)}
+                            className="absolute right-3 top-3 text-slate-500 hover:text-slate-300 focus:outline-none"
+                          >
+                            {showPassword ? (
+                              <EyeOff className="h-4 w-4" />
+                            ) : (
+                              <Eye className="h-4 w-4" />
+                            )}
+                          </button>
                         </div>
                       </FormControl>
                       <FormMessage />
