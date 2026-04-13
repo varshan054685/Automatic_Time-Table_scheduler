@@ -6,7 +6,7 @@ import { log } from "./index";
  * 5 attempts per 15 minutes per IP.
  */
 export const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
+  windowMs: 15 * 60 * 1000,
   max: 5,
   standardHeaders: true,
   legacyHeaders: false,
@@ -15,7 +15,6 @@ export const authLimiter = rateLimit({
     log(`RATE_LIMIT auth endpoint hit by IP=${req.ip} path=${req.path}`, "security");
     res.status(429).json(options.message);
   },
-  keyGenerator: (req) => req.ip || req.socket.remoteAddress || "unknown",
 });
 
 /**
@@ -32,7 +31,6 @@ export const apiLimiter = rateLimit({
     log(`RATE_LIMIT API hit by IP=${req.ip} path=${req.path}`, "security");
     res.status(429).json(options.message);
   },
-  keyGenerator: (req) => req.ip || req.socket.remoteAddress || "unknown",
 });
 
 /**
@@ -49,5 +47,4 @@ export const generationLimiter = rateLimit({
     log(`RATE_LIMIT generation hit by IP=${req.ip} path=${req.path}`, "security");
     res.status(429).json(options.message);
   },
-  keyGenerator: (req) => req.ip || req.socket.remoteAddress || "unknown",
 });
