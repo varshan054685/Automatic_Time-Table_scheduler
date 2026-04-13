@@ -6,6 +6,7 @@ import cors from "cors";
 import helmet from "helmet";
 import "dotenv/config";
 import { apiLimiter } from "./rate-limit";
+import { pool } from "./db";
 
 const app = express();
 const httpServer = createServer(app);
@@ -63,6 +64,24 @@ app.use("/api/", apiLimiter);
 // ─── Health-check / connectivity test endpoint ───
 app.get("/test", (_req: Request, res: Response) => {
   res.json({ message: "Backend connected successfully" });
+});
+
+// ─── Database connectivity test ───
+app.get("/test-db", async (_req: Request, res: Response) => {
+  try {
+    const result = await pool.query("SELECT NOW()");
+    res.json({
+      success: true,
+      message: "Database connected",
+      time: result.rows[0],
+    });
+  } catch (err: any) {
+    console.error("DB ERROR:", err);
+    res.status(500).json({
+      success: false,
+      error: err.message,
+    });
+  }
 });
 
 export function log(message: string, source = "express") {
