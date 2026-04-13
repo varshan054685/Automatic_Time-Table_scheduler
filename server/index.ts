@@ -27,24 +27,8 @@ app.use(helmet({
   contentSecurityPolicy: process.env.NODE_ENV === "production" ? undefined : false,
 }));
 
-// ─── Security: CORS — whitelist specific origins instead of "*" ───
-const allowedOrigins = (process.env.CORS_ORIGIN || "http://localhost:5000")
-  .split(",")
-  .map((o) => o.trim())
-  .filter(Boolean);
-
-app.use(cors({
-  origin: (origin, callback) => {
-    // Allow requests with no origin (server-to-server, curl, mobile apps)
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.some((ao) => origin === ao || origin.endsWith(".vercel.app"))) {
-      return callback(null, true);
-    }
-    log(`CORS_BLOCKED origin=${origin}`, "security");
-    callback(new Error("Not allowed by CORS"));
-  },
-  credentials: true,
-}));
+// ─── CORS — allow all origins for now ───
+app.use(cors());
 
 // ─── Security: Body size limit — prevent DoS via oversized payloads ───
 app.use(
