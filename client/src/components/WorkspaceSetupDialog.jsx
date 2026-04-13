@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@shared/routes";
+import { apiUrl } from "@/lib/api-base";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -14,7 +15,7 @@ export function WorkspaceSetupDialog() {
 
   const createMutation = useMutation({
     mutationFn: async (name) => {
-      const res = await fetch(api.workspaces.create.path, {
+      const res = await fetch(apiUrl(api.workspaces.create.path), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name }),
@@ -33,7 +34,7 @@ export function WorkspaceSetupDialog() {
 
   const joinMutation = useMutation({
     mutationFn: async (code) => {
-      const res = await fetch(api.workspaces.join.path, {
+      const res = await fetch(apiUrl(api.workspaces.join.path), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ referralCode: code }),

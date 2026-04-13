@@ -2,6 +2,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
+import cors from "cors";
 import "dotenv/config";
 
 const app = express();
@@ -13,6 +14,11 @@ declare module "http" {
   }
 }
 
+app.use(cors({
+  origin: "*",
+  credentials: true,
+}));
+
 app.use(
   express.json({
     verify: (req, _res, buf) => {
@@ -22,6 +28,11 @@ app.use(
 );
 
 app.use(express.urlencoded({ extended: false }));
+
+// Health-check / connectivity test endpoint
+app.get("/test", (_req: Request, res: Response) => {
+  res.json({ message: "Backend connected successfully" });
+});
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {

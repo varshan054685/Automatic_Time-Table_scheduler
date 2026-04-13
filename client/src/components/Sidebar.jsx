@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@shared/routes";
+import { apiUrl } from "@/lib/api-base";
 
 const navItems = [
   { label: "Dashboard", href: "/", icon: LayoutDashboard },
@@ -50,7 +51,7 @@ export function Sidebar() {
   const { data: requests = [] } = useQuery({
     queryKey: [api.changeRequests.list.path],
     queryFn: async () => {
-      const res = await fetch(api.changeRequests.list.path, { credentials: "include" });
+      const res = await fetch(apiUrl(api.changeRequests.list.path), { credentials: "include" });
       if (!res.ok) return [];
       return await res.json();
     },

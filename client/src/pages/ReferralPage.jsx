@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@shared/routes";
+import { apiUrl } from "@/lib/api-base";
 import { useUser } from "@/hooks/use-auth";
 import { Sidebar } from "@/components/Sidebar";
 import { Button } from "@/components/ui/button";
@@ -20,7 +21,7 @@ export function ReferralContent() {
   const { data: wsData } = useQuery({
     queryKey: [api.workspaces.current.path],
     queryFn: async () => {
-      const res = await fetch(api.workspaces.current.path, { credentials: "include" });
+      const res = await fetch(apiUrl(api.workspaces.current.path), { credentials: "include" });
       if (!res.ok) throw new Error("Failed");
       return await res.json();
     },
@@ -29,7 +30,7 @@ export function ReferralContent() {
 
   const regenerateMutation = useMutation({
     mutationFn: async (type) => {
-      const res = await fetch(api.workspaces.regenerateCode.path, {
+      const res = await fetch(apiUrl(api.workspaces.regenerateCode.path), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ type }),

@@ -5,6 +5,7 @@ import { Building2, GraduationCap, Users, BookOpen, CalendarDays, UserCog, Layou
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@shared/routes";
+import { apiUrl } from "@/lib/api-base";
 import { useUser } from "@/hooks/use-auth";
 import { Link } from "wouter";
 
@@ -21,7 +22,7 @@ export default function Dashboard() {
   const { data: requests = [] } = useQuery({
     queryKey: [api.changeRequests.list.path],
     queryFn: async () => {
-      const res = await fetch(api.changeRequests.list.path, { credentials: "include" });
+      const res = await fetch(apiUrl(api.changeRequests.list.path), { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch");
       return await res.json();
     },

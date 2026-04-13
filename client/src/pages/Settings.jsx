@@ -8,6 +8,7 @@ import { useUser } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@shared/routes";
+import { apiUrl } from "@/lib/api-base";
 import { ReferralContent } from "./ReferralPage";
 import { RequestsContent } from "./RequestsPage";
 import { User, Building2, Link2, ClipboardList, Trash2, LogOut, AlertTriangle, Pencil, Phone, Calendar } from "lucide-react";
@@ -31,7 +32,7 @@ export default function Settings() {
 
   const updateProfileMutation = useMutation({
     mutationFn: async (data) => {
-      const res = await fetch(api.auth.updateProfile.path, {
+      const res = await fetch(apiUrl(api.auth.updateProfile.path), {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -53,7 +54,7 @@ export default function Settings() {
   const { data: requests = [] } = useQuery({
     queryKey: [api.changeRequests.list.path],
     queryFn: async () => {
-      const res = await fetch(api.changeRequests.list.path, { credentials: "include" });
+      const res = await fetch(apiUrl(api.changeRequests.list.path), { credentials: "include" });
       if (!res.ok) return [];
       return await res.json();
     },
@@ -65,7 +66,7 @@ export default function Settings() {
 
   const updateWsMutation = useMutation({
     mutationFn: async (data) => {
-      const res = await fetch(api.workspaces.current.path, {
+      const res = await fetch(apiUrl(api.workspaces.current.path), {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -86,7 +87,7 @@ export default function Settings() {
 
   const deleteWsMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch(api.workspaces.delete.path, { method: "DELETE", credentials: "include" });
+      const res = await fetch(apiUrl(api.workspaces.delete.path), { method: "DELETE", credentials: "include" });
       if (!res.ok) throw new Error("Failed to delete workspace");
       return await res.json();
     },
@@ -98,7 +99,7 @@ export default function Settings() {
 
   const leaveWsMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch(api.workspaces.leave.path, { method: "POST", credentials: "include" });
+      const res = await fetch(apiUrl(api.workspaces.leave.path), { method: "POST", credentials: "include" });
       if (!res.ok) throw new Error("Failed to leave workspace");
       return await res.json();
     },

@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, buildUrl } from "@shared/routes";
+import { apiUrl } from "@/lib/api-base";
 import { useUser } from "@/hooks/use-auth";
 import { Sidebar } from "@/components/Sidebar";
 import { Button } from "@/components/ui/button";
@@ -21,7 +22,7 @@ export function RequestsContent() {
   const { data: requests = [], isLoading } = useQuery({
     queryKey: [api.changeRequests.list.path],
     queryFn: async () => {
-      const res = await fetch(api.changeRequests.list.path, { credentials: "include" });
+      const res = await fetch(apiUrl(api.changeRequests.list.path), { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch");
       return await res.json();
     },
@@ -30,7 +31,7 @@ export function RequestsContent() {
 
   const approveMutation = useMutation({
     mutationFn: async (id) => {
-      const res = await fetch(buildUrl(api.changeRequests.approve.path, { id }), {
+      const res = await fetch(apiUrl(buildUrl(api.changeRequests.approve.path, { id })), {
         method: "POST",
         credentials: "include",
       });
@@ -45,7 +46,7 @@ export function RequestsContent() {
 
   const rejectMutation = useMutation({
     mutationFn: async (id) => {
-      const res = await fetch(buildUrl(api.changeRequests.reject.path, { id }), {
+      const res = await fetch(apiUrl(buildUrl(api.changeRequests.reject.path, { id })), {
         method: "POST",
         credentials: "include",
       });
@@ -61,7 +62,7 @@ export function RequestsContent() {
   const { data: departments = [] } = useQuery({
     queryKey: [api.departments.list.path],
     queryFn: async () => {
-      const res = await fetch(api.departments.list.path, { credentials: "include" });
+      const res = await fetch(apiUrl(api.departments.list.path), { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch");
       return await res.json();
     },
