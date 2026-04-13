@@ -4,8 +4,11 @@ import { storage } from "./storage";
 import { setupAuth } from "./auth";
 import { api, generateTimetableSchema } from "@shared/routes";
 import { generateWithPython } from "./python-scheduler";
+import { generationLimiter } from "./rate-limit";
+import { z } from "zod";
+import { log } from "./index";
 
-// Middleware: require authenticated user with workspace
+// ─── Middleware: require authenticated user with workspace ───
 async function requireWorkspace(req: Request, res: Response, next: NextFunction) {
   if (!req.isAuthenticated()) return res.sendStatus(401);
   const user = req.user as any;
@@ -21,7 +24,7 @@ async function requireWorkspace(req: Request, res: Response, next: NextFunction)
   }
 }
 
-// Middleware: require owner role
+// ─── Middleware: require owner role ───
 function requireOwner(req: Request, res: Response, next: NextFunction) {
   if ((req as any).workspaceRole !== "owner") {
     return res.status(403).json({ message: "Only workspace owners can perform this action." });
@@ -29,9 +32,99 @@ function requireOwner(req: Request, res: Response, next: NextFunction) {
   next();
 }
 
-// Helper to safely parse param id
-function paramId(req: Request): number {
-  return parseInt(String(req.params.id), 10);
+// ─── Helper: safely parse and validate param ID ───
+function paramId(req: Request, res: Response): number | null {
+  const id = parseInt(String(req.params.id), 10);
+  if (isNaN(id) || id <= 0) {
+    res.status(400).json({ message: "Invalid ID parameter" });
+    return null;
+  }
+  return id;
+}
+
+// ─── SECURITY: Workspace ownership check for resources ───
+// Verifies the resource with :id belongs to the requesting user's workspace
+type ScopedLookup = (id: number, workspaceId: number) => Promise<any>;
+function requireResourceOwnership(lookupFn: ScopedLookup, resourceName: string) {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    const id = paramId(req, res);
+    if (id === null) return; // already sent 400
+    const wsId = (req as any).workspaceId;
+    const resource = await lookupFn(id, wsId);
+    if (!resource) {
+      return res.status(404).json({ message: `${resourceName} not found` });
+    }
+    (req as any).resource = resource;
+    next();
+  };
+}
+
+// ─── Validation schemas for CRUD input ───
+const departmentSchema = z.object({
+  name: z.string().min(1).max(200).trim(),
+  code: z.string().min(1).max(50).trim(),
+}).strict();
+
+const classroomSchema = z.object({
+  roomNumber: z.string().min(1).max(100).trim(),
+  capacity: z.number().int().min(1).max(10000),
+  type: z.enum(["lecture", "lab"]).optional(),
+}).strict();
+
+const subjectSchema = z.object({
+  code: z.string().min(1).max(50).trim(),
+  name: z.string().min(1).max(200).trim(),
+  weeklyHours: z.number().int().min(1).max(50),
+  departmentId: z.number().int().positive(),
+  facultyId: z.number().int().positive().nullable().optional(),
+  sectionId: z.number().int().positive().nullable().optional(),
+  type: z.enum(["lecture", "lab"]).optional(),
+}).strict();
+
+const facultySchema = z.object({
+  name: z.string().min(1).max(200).trim(),
+  code: z.string().min(1).max(50).trim(),
+  departmentId: z.number().int().positive(),
+  email: z.string().email().max(255).nullable().optional(),
+  availability: z.array(z.string()).optional(),
+}).strict();
+
+const sectionSchema = z.object({
+  name: z.string().min(1).max(100).trim(),
+  year: z.number().int().min(1).max(10),
+  semester: z.number().int().min(1).max(20),
+  departmentId: z.number().int().positive(),
+  classroomId: z.number().int().positive().nullable().optional(),
+}).strict();
+
+const timeSlotSchema = z.object({
+  dayOfWeek: z.enum(["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]),
+  startTime: z.string().regex(/^\d{2}:\d{2}$/, "Must be HH:MM format"),
+  endTime: z.string().regex(/^\d{2}:\d{2}$/, "Must be HH:MM format"),
+  label: z.string().min(1).max(100).trim(),
+}).strict();
+
+const workspaceNameSchema = z.object({
+  name: z.string().min(1).max(200).trim(),
+}).strict();
+
+const workspaceUpdateSchema = z.object({
+  name: z.string().min(1).max(200).trim().optional(),
+  academicYear: z.string().max(50).trim().optional(),
+}).strict();
+
+const referralCodeSchema = z.object({
+  referralCode: z.string().min(1).max(20).trim(),
+}).strict();
+
+// ─── Helper: validate request body ───
+function validateBody<T>(schema: z.ZodSchema<T>, req: Request, res: Response): T | null {
+  const result = schema.safeParse(req.body);
+  if (!result.success) {
+    res.status(400).json({ message: "Invalid input: " + result.error.issues.map(i => i.message).join(", ") });
+    return null;
+  }
+  return result.data;
 }
 
 export async function registerRoutes(
@@ -45,16 +138,16 @@ export async function registerRoutes(
     if (!req.isAuthenticated()) return res.sendStatus(401);
     const user = req.user as any;
     try {
-      const { name } = req.body;
-      if (!name) return res.status(400).json({ message: "Workspace name is required" });
+      const data = validateBody(workspaceNameSchema, req, res);
+      if (!data) return;
       
       const existing = await storage.getUserWorkspaceMembership(user.id);
       if (existing) return res.status(400).json({ message: "You already belong to a workspace" });
 
-      const ws = await storage.createWorkspace(name, user.id);
+      const ws = await storage.createWorkspace(data.name, user.id);
       res.status(201).json(ws);
     } catch (err: any) {
-      res.status(500).json({ message: err.message });
+      res.status(500).json({ message: "Failed to create workspace" });
     }
   });
 
@@ -62,19 +155,19 @@ export async function registerRoutes(
     if (!req.isAuthenticated()) return res.sendStatus(401);
     const user = req.user as any;
     try {
-      const { referralCode } = req.body;
-      if (!referralCode) return res.status(400).json({ message: "Referral code is required" });
+      const data = validateBody(referralCodeSchema, req, res);
+      if (!data) return;
       
       const existing = await storage.getUserWorkspaceMembership(user.id);
       if (existing) return res.status(400).json({ message: "You already belong to a workspace" });
 
-      const wsData = await storage.getWorkspaceByReferralCode(referralCode);
+      const wsData = await storage.getWorkspaceByReferralCode(data.referralCode);
       if (!wsData) return res.status(404).json({ message: "Invalid referral code" });
 
       const member = await storage.joinWorkspace(wsData.ws.id, user.id, wsData.type);
       res.json({ workspace: wsData.ws, member });
     } catch (err: any) {
-      res.status(500).json({ message: err.message });
+      res.status(500).json({ message: "Failed to join workspace" });
     }
   });
 
@@ -88,6 +181,9 @@ export async function registerRoutes(
   app.post(api.workspaces.regenerateCode.path, requireWorkspace, requireOwner, async (req: Request, res: Response) => {
     const wsId = (req as any).workspaceId;
     const { type } = req.body;
+    if (type !== 'admin' && type !== 'viewer') {
+      return res.status(400).json({ message: "Type must be 'admin' or 'viewer'" });
+    }
     const codeType = type === 'admin' ? 'owner' : 'viewer';
     const newCode = await storage.regenerateReferralCode(wsId, codeType);
     res.json({ referralCode: newCode, type: codeType === 'owner' ? 'admin' : 'viewer' });
@@ -95,12 +191,13 @@ export async function registerRoutes(
 
   app.patch("/api/workspaces/current", requireWorkspace, requireOwner, async (req: Request, res: Response) => {
     const wsId = (req as any).workspaceId;
-    const { name, academicYear } = req.body;
     try {
-      const updated = await storage.updateWorkspace(wsId, { name, academicYear });
+      const data = validateBody(workspaceUpdateSchema, req, res);
+      if (!data) return;
+      const updated = await storage.updateWorkspace(wsId, data);
       res.json(updated);
     } catch (err: any) {
-      res.status(500).json({ message: err.message });
+      res.status(500).json({ message: "Failed to update workspace" });
     }
   });
 
@@ -110,7 +207,7 @@ export async function registerRoutes(
       await storage.deleteWorkspace(wsId);
       res.json({ message: "Workspace deleted" });
     } catch (err: any) {
-      res.status(500).json({ message: err.message });
+      res.status(500).json({ message: "Failed to delete workspace" });
     }
   });
 
@@ -124,7 +221,7 @@ export async function registerRoutes(
       await storage.leaveWorkspace(userId, wsId);
       res.json({ message: "Left workspace" });
     } catch (err: any) {
-      res.status(500).json({ message: err.message });
+      res.status(500).json({ message: "Failed to leave workspace" });
     }
   });
 
@@ -137,9 +234,11 @@ export async function registerRoutes(
 
   app.post(api.changeRequests.approve.path, requireWorkspace, requireOwner, async (req: Request, res: Response) => {
     try {
-      const id = paramId(req);
+      const id = paramId(req, res);
+      if (id === null) return;
       const cr = await storage.getChangeRequest(id);
       if (!cr) return res.status(404).json({ message: "Change request not found" });
+      // SECURITY: Verify change request belongs to this workspace
       if (cr.workspaceId !== (req as any).workspaceId) return res.status(403).json({ message: "Not your workspace" });
       if (cr.status !== "pending") return res.status(400).json({ message: "Request already processed" });
 
@@ -173,13 +272,14 @@ export async function registerRoutes(
       await storage.updateChangeRequestStatus(id, "approved");
       res.json({ message: "Change request approved and applied" });
     } catch (err: any) {
-      res.status(500).json({ message: err.message });
+      res.status(500).json({ message: "Failed to approve change request" });
     }
   });
 
   app.post(api.changeRequests.reject.path, requireWorkspace, requireOwner, async (req: Request, res: Response) => {
     try {
-      const id = paramId(req);
+      const id = paramId(req, res);
+      if (id === null) return;
       const cr = await storage.getChangeRequest(id);
       if (!cr) return res.status(404).json({ message: "Change request not found" });
       if (cr.workspaceId !== (req as any).workspaceId) return res.status(403).json({ message: "Not your workspace" });
@@ -187,7 +287,7 @@ export async function registerRoutes(
       await storage.updateChangeRequestStatus(id, "rejected");
       res.json({ message: "Change request rejected" });
     } catch (err: any) {
-      res.status(500).json({ message: err.message });
+      res.status(500).json({ message: "Failed to reject change request" });
     }
   });
 
@@ -294,19 +394,22 @@ export async function registerRoutes(
     Promise.allSettled(unique.map(async (deptId) => {
       try {
         const count = await generateAndPersistTimetable(deptId, workspaceId);
-        console.log(`[Auto-regen] Department ${deptId} → saved ${count.saved} entries`);
+        log(`[Auto-regen] Department ${deptId} → saved ${count.saved} entries`);
       } catch (err: any) {
-        console.warn(`[Auto-regen] Department ${deptId} → skipped: ${err.message}`);
+        log(`[Auto-regen] Department ${deptId} → skipped: ${err.message}`);
       }
     }));
   };
 
   // ─── CRUD Routes (workspace-scoped) ───
+  // SECURITY: viewerCheck creates a change request instead of directly modifying
   const viewerCheck = (tableName: string) => {
     return async (req: Request, res: Response, next: NextFunction) => {
       if ((req as any).workspaceRole !== "owner") {
+        const id = paramId(req, res);
+        if (id === null) return;
         const type = req.method === "DELETE" ? "delete" : "edit";
-        const data: any = { table: tableName, id: paramId(req) };
+        const data: any = { table: tableName, id };
         if (type === "edit") data.changes = req.body;
 
         await storage.createChangeRequest({
@@ -321,19 +424,19 @@ export async function registerRoutes(
     };
   };
 
-  // Timetable generation
-  app.post(api.timetable.generatePython.path, requireWorkspace, requireOwner, async (req: Request, res: Response) => {
+  // Timetable generation (rate limited)
+  app.post(api.timetable.generatePython.path, requireWorkspace, requireOwner, generationLimiter, async (req: Request, res: Response) => {
     try {
       const parsed = generateTimetableSchema.safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ message: "Invalid payload" });
       const count = await generateAndPersistTimetable(parsed.data.departmentId, (req as any).workspaceId, parsed.data.semester);
       res.json({ message: "Timetable generated successfully", count });
     } catch (error: any) {
-      res.status(500).json({ message: "Failed to generate timetable: " + error.message });
+      res.status(500).json({ message: "Failed to generate timetable" });
     }
   });
 
-  app.post("/api/timetable/regenerate-all", requireWorkspace, requireOwner, async (req: Request, res: Response) => {
+  app.post("/api/timetable/regenerate-all", requireWorkspace, requireOwner, generationLimiter, async (req: Request, res: Response) => {
     try {
       const wsId = (req as any).workspaceId;
       await storage.clearAllTimetable(wsId);
@@ -344,143 +447,265 @@ export async function registerRoutes(
       const summary = results.map((r, i) => ({
         deptId: allDepts[i].id, deptName: allDepts[i].name, status: r.status,
         result: r.status === "fulfilled" ? r.value : undefined,
-        error: r.status === "rejected" ? (r.reason?.message || String(r.reason)) : undefined,
+        error: r.status === "rejected" ? "Generation failed" : undefined,
       }));
       const totalSaved = summary.reduce((acc, s) => acc + (s.result?.saved || 0), 0);
       res.json({ message: `Regenerated for ${allDepts.length} department(s). Total: ${totalSaved}.`, summary, totalSaved });
     } catch (error: any) {
-      res.status(500).json({ message: "Failed to regenerate: " + error.message });
+      res.status(500).json({ message: "Failed to regenerate timetables" });
     }
   });
 
-  // Departments
+  // ─── Departments (IDOR protected) ───
   app.get(api.departments.list.path, requireWorkspace, async (req: Request, res: Response) => {
     const depts = await storage.getDepartments((req as any).workspaceId);
     res.json(depts);
   });
+
   app.post(api.departments.create.path, requireWorkspace, requireOwner, async (req: Request, res: Response) => {
-    const dept = await storage.createDepartment({ ...req.body, workspaceId: (req as any).workspaceId });
+    const data = validateBody(departmentSchema, req, res);
+    if (!data) return;
+    const dept = await storage.createDepartment({ ...data, workspaceId: (req as any).workspaceId });
     res.status(201).json(dept);
     triggerRegenForDepartments([dept.id], (req as any).workspaceId);
   });
-  app.patch(api.departments.update.path, requireWorkspace, viewerCheck("departments"), async (req: Request, res: Response) => {
-    const dept = await storage.updateDepartment(paramId(req), req.body);
-    res.json(dept);
-    triggerRegenForDepartments([dept.id], (req as any).workspaceId);
-  });
-  app.delete(api.departments.delete.path, requireWorkspace, viewerCheck("departments"), async (req: Request, res: Response) => {
-    await storage.deleteDepartment(paramId(req));
-    res.status(204).send();
-  });
 
-  // Classrooms
+  app.patch(api.departments.update.path, requireWorkspace,
+    requireResourceOwnership((id, wsId) => storage.getDepartmentScoped(id, wsId), "Department"),
+    viewerCheck("departments"),
+    async (req: Request, res: Response) => {
+      const data = validateBody(departmentSchema.partial(), req, res);
+      if (!data) return;
+      const id = paramId(req, res);
+      if (id === null) return;
+      const dept = await storage.updateDepartment(id, data);
+      res.json(dept);
+      triggerRegenForDepartments([dept.id], (req as any).workspaceId);
+    }
+  );
+
+  app.delete(api.departments.delete.path, requireWorkspace,
+    requireResourceOwnership((id, wsId) => storage.getDepartmentScoped(id, wsId), "Department"),
+    viewerCheck("departments"),
+    async (req: Request, res: Response) => {
+      const id = paramId(req, res);
+      if (id === null) return;
+      await storage.deleteDepartment(id);
+      res.status(204).send();
+    }
+  );
+
+  // ─── Classrooms (IDOR protected) ───
   app.get(api.classrooms.list.path, requireWorkspace, async (req: Request, res: Response) => {
     const rooms = await storage.getClassrooms((req as any).workspaceId);
     res.json(rooms);
   });
+
   app.post(api.classrooms.create.path, requireWorkspace, requireOwner, async (req: Request, res: Response) => {
-    const room = await storage.createClassroom({ ...req.body, workspaceId: (req as any).workspaceId });
+    const data = validateBody(classroomSchema, req, res);
+    if (!data) return;
+    const room = await storage.createClassroom({ ...data, workspaceId: (req as any).workspaceId });
     res.status(201).json(room);
   });
-  app.patch(api.classrooms.update.path, requireWorkspace, viewerCheck("classrooms"), async (req: Request, res: Response) => {
-    const room = await storage.updateClassroom(paramId(req), req.body);
-    res.json(room);
-  });
-  app.delete(api.classrooms.delete.path, requireWorkspace, viewerCheck("classrooms"), async (req: Request, res: Response) => {
-    await storage.deleteClassroom(paramId(req));
-    res.status(204).send();
-  });
 
-  // Subjects
+  app.patch(api.classrooms.update.path, requireWorkspace,
+    requireResourceOwnership((id, wsId) => storage.getClassroomScoped(id, wsId), "Classroom"),
+    viewerCheck("classrooms"),
+    async (req: Request, res: Response) => {
+      const data = validateBody(classroomSchema.partial(), req, res);
+      if (!data) return;
+      const id = paramId(req, res);
+      if (id === null) return;
+      const room = await storage.updateClassroom(id, data);
+      res.json(room);
+    }
+  );
+
+  app.delete(api.classrooms.delete.path, requireWorkspace,
+    requireResourceOwnership((id, wsId) => storage.getClassroomScoped(id, wsId), "Classroom"),
+    viewerCheck("classrooms"),
+    async (req: Request, res: Response) => {
+      const id = paramId(req, res);
+      if (id === null) return;
+      await storage.deleteClassroom(id);
+      res.status(204).send();
+    }
+  );
+
+  // ─── Subjects (IDOR protected) ───
   app.get(api.subjects.list.path, requireWorkspace, async (req: Request, res: Response) => {
     const subjs = await storage.getSubjects((req as any).workspaceId);
     res.json(subjs);
   });
+
   app.post(api.subjects.create.path, requireWorkspace, requireOwner, async (req: Request, res: Response) => {
-    const subj = await storage.createSubject({ ...req.body, workspaceId: (req as any).workspaceId });
+    const data = validateBody(subjectSchema, req, res);
+    if (!data) return;
+    const subj = await storage.createSubject({ ...data, workspaceId: (req as any).workspaceId });
     res.status(201).json(subj);
   });
-  app.patch(api.subjects.update.path, requireWorkspace, viewerCheck("subjects"), async (req: Request, res: Response) => {
-    const subj = await storage.updateSubject(paramId(req), req.body);
-    res.json(subj);
-  });
-  app.delete(api.subjects.delete.path, requireWorkspace, viewerCheck("subjects"), async (req: Request, res: Response) => {
-    await storage.deleteSubject(paramId(req));
-    res.status(204).send();
-  });
 
-  // Faculty
+  app.patch(api.subjects.update.path, requireWorkspace,
+    requireResourceOwnership((id, wsId) => storage.getSubjectScoped(id, wsId), "Subject"),
+    viewerCheck("subjects"),
+    async (req: Request, res: Response) => {
+      const data = validateBody(subjectSchema.partial(), req, res);
+      if (!data) return;
+      const id = paramId(req, res);
+      if (id === null) return;
+      const subj = await storage.updateSubject(id, data);
+      res.json(subj);
+    }
+  );
+
+  app.delete(api.subjects.delete.path, requireWorkspace,
+    requireResourceOwnership((id, wsId) => storage.getSubjectScoped(id, wsId), "Subject"),
+    viewerCheck("subjects"),
+    async (req: Request, res: Response) => {
+      const id = paramId(req, res);
+      if (id === null) return;
+      await storage.deleteSubject(id);
+      res.status(204).send();
+    }
+  );
+
+  // ─── Faculty (IDOR protected) ───
   app.get(api.faculty.list.path, requireWorkspace, async (req: Request, res: Response) => {
     const facs = await storage.getFaculty((req as any).workspaceId);
     res.json(facs);
   });
+
   app.post(api.faculty.create.path, requireWorkspace, requireOwner, async (req: Request, res: Response) => {
-    const data = req.body;
-    if (!data.code) data.code = `FAC${Date.now()}`;
+    const data = validateBody(facultySchema, req, res);
+    if (!data) return;
+    if (!data.code) (data as any).code = `FAC${Date.now()}`;
     const fac = await storage.createFaculty({ ...data, workspaceId: (req as any).workspaceId });
     res.status(201).json(fac);
   });
-  app.patch(api.faculty.update.path, requireWorkspace, viewerCheck("faculty"), async (req: Request, res: Response) => {
-    const fac = await storage.updateFaculty(paramId(req), req.body);
-    res.json(fac);
-  });
-  app.delete(api.faculty.delete.path, requireWorkspace, viewerCheck("faculty"), async (req: Request, res: Response) => {
-    await storage.deleteFaculty(paramId(req));
-    res.status(204).send();
-  });
 
-  // Sections
+  app.patch(api.faculty.update.path, requireWorkspace,
+    requireResourceOwnership((id, wsId) => storage.getFacultyScoped(id, wsId), "Faculty"),
+    viewerCheck("faculty"),
+    async (req: Request, res: Response) => {
+      const data = validateBody(facultySchema.partial(), req, res);
+      if (!data) return;
+      const id = paramId(req, res);
+      if (id === null) return;
+      const fac = await storage.updateFaculty(id, data);
+      res.json(fac);
+    }
+  );
+
+  app.delete(api.faculty.delete.path, requireWorkspace,
+    requireResourceOwnership((id, wsId) => storage.getFacultyScoped(id, wsId), "Faculty"),
+    viewerCheck("faculty"),
+    async (req: Request, res: Response) => {
+      const id = paramId(req, res);
+      if (id === null) return;
+      await storage.deleteFaculty(id);
+      res.status(204).send();
+    }
+  );
+
+  // ─── Sections (IDOR protected) ───
   app.get(api.sections.list.path, requireWorkspace, async (req: Request, res: Response) => {
     const secs = await storage.getSections((req as any).workspaceId);
     res.json(secs);
   });
+
   app.post(api.sections.create.path, requireWorkspace, requireOwner, async (req: Request, res: Response) => {
-    const sec = await storage.createSection({ ...req.body, workspaceId: (req as any).workspaceId });
+    const data = validateBody(sectionSchema, req, res);
+    if (!data) return;
+    const sec = await storage.createSection({ ...data, workspaceId: (req as any).workspaceId });
     res.status(201).json(sec);
   });
-  app.patch(api.sections.update.path, requireWorkspace, viewerCheck("sections"), async (req: Request, res: Response) => {
-    const sec = await storage.updateSection(paramId(req), req.body);
-    res.json(sec);
-  });
-  app.delete(api.sections.delete.path, requireWorkspace, viewerCheck("sections"), async (req: Request, res: Response) => {
-    await storage.deleteSection(paramId(req));
-    res.status(204).send();
-  });
 
-  // TimeSlots
+  app.patch(api.sections.update.path, requireWorkspace,
+    requireResourceOwnership((id, wsId) => storage.getSectionScoped(id, wsId), "Section"),
+    viewerCheck("sections"),
+    async (req: Request, res: Response) => {
+      const data = validateBody(sectionSchema.partial(), req, res);
+      if (!data) return;
+      const id = paramId(req, res);
+      if (id === null) return;
+      const sec = await storage.updateSection(id, data);
+      res.json(sec);
+    }
+  );
+
+  app.delete(api.sections.delete.path, requireWorkspace,
+    requireResourceOwnership((id, wsId) => storage.getSectionScoped(id, wsId), "Section"),
+    viewerCheck("sections"),
+    async (req: Request, res: Response) => {
+      const id = paramId(req, res);
+      if (id === null) return;
+      await storage.deleteSection(id);
+      res.status(204).send();
+    }
+  );
+
+  // ─── TimeSlots (IDOR protected) ───
   app.get(api.timeSlots.list.path, requireWorkspace, async (req: Request, res: Response) => {
     const slots = await storage.getTimeSlots((req as any).workspaceId);
     res.json(slots);
   });
+
   app.post(api.timeSlots.create.path, requireWorkspace, requireOwner, async (req: Request, res: Response) => {
-    const slot = await storage.createTimeSlot({ ...req.body, workspaceId: (req as any).workspaceId });
+    const data = validateBody(timeSlotSchema, req, res);
+    if (!data) return;
+    const slot = await storage.createTimeSlot({ ...data, workspaceId: (req as any).workspaceId });
     res.status(201).json(slot);
   });
-  app.patch(api.timeSlots.update.path, requireWorkspace, viewerCheck("timeSlots"), async (req: Request, res: Response) => {
-    const slot = await storage.updateTimeSlot(paramId(req), req.body);
-    res.json(slot);
-  });
-  app.delete(api.timeSlots.delete.path, requireWorkspace, viewerCheck("timeSlots"), async (req: Request, res: Response) => {
-    await storage.deleteTimeSlot(paramId(req));
-    res.status(204).send();
-  });
 
-  // Timetable
+  app.patch(api.timeSlots.update.path, requireWorkspace,
+    requireResourceOwnership((id, wsId) => storage.getTimeSlotScoped(id, wsId), "Time slot"),
+    viewerCheck("timeSlots"),
+    async (req: Request, res: Response) => {
+      const data = validateBody(timeSlotSchema.partial(), req, res);
+      if (!data) return;
+      const id = paramId(req, res);
+      if (id === null) return;
+      const slot = await storage.updateTimeSlot(id, data);
+      res.json(slot);
+    }
+  );
+
+  app.delete(api.timeSlots.delete.path, requireWorkspace,
+    requireResourceOwnership((id, wsId) => storage.getTimeSlotScoped(id, wsId), "Time slot"),
+    viewerCheck("timeSlots"),
+    async (req: Request, res: Response) => {
+      const id = paramId(req, res);
+      if (id === null) return;
+      await storage.deleteTimeSlot(id);
+      res.status(204).send();
+    }
+  );
+
+  // ─── Timetable (workspace-scoped queries) ───
   app.get(api.timetable.list.path, requireWorkspace, async (req: Request, res: Response) => {
     const sectionId = req.query.sectionId ? parseInt(String(req.query.sectionId), 10) : undefined;
     const facultyId = req.query.facultyId ? parseInt(String(req.query.facultyId), 10) : undefined;
+    
+    // Validate query params
+    if (req.query.sectionId && (isNaN(sectionId!) || sectionId! <= 0)) {
+      return res.status(400).json({ message: "Invalid sectionId" });
+    }
+    if (req.query.facultyId && (isNaN(facultyId!) || facultyId! <= 0)) {
+      return res.status(400).json({ message: "Invalid facultyId" });
+    }
+
     const entries = await storage.getTimetable(sectionId, facultyId, (req as any).workspaceId);
     res.json(entries);
   });
 
-  app.post(api.timetable.generate.path, requireWorkspace, requireOwner, async (req: Request, res: Response) => {
+  app.post(api.timetable.generate.path, requireWorkspace, requireOwner, generationLimiter, async (req: Request, res: Response) => {
     try {
       const parsed = generateTimetableSchema.safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ message: "Invalid payload" });
       const count = await generateAndPersistTimetable(parsed.data.departmentId, (req as any).workspaceId, parsed.data.semester);
       res.json({ message: "Timetable generated successfully", count });
     } catch (error: any) {
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: "Failed to generate timetable" });
     }
   });
 

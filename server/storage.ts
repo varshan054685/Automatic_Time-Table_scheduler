@@ -20,7 +20,7 @@ export class DatabaseStorage {
   }
 
   async getUserByEmail(email: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.email, email));
+    const [user] = await db.select().from(users).where(eq(users.email, email.trim().toLowerCase()));
     return user;
   }
 
@@ -30,7 +30,9 @@ export class DatabaseStorage {
   }
 
   async updateUser(id: number, data: Partial<User>): Promise<User> {
-    const [u] = await db.update(users).set(data).where(eq(users.id, id)).returning();
+    // Strip sensitive fields that should never be updated via this method
+    const { password: _, id: __, ...safeData } = data as any;
+    const [u] = await db.update(users).set(safeData).where(eq(users.id, id)).returning();
     return u;
   }
 
@@ -175,15 +177,19 @@ export class DatabaseStorage {
   }
 
   // ─── Departments (workspace-scoped) ───
-  async getDepartments(workspaceId?: number): Promise<Department[]> {
-    if (workspaceId) {
-      return await db.select().from(departments).where(eq(departments.workspaceId, workspaceId));
-    }
-    return await db.select().from(departments);
+  // SECURITY: Always require workspaceId — no unscoped queries
+  async getDepartments(workspaceId: number): Promise<Department[]> {
+    return await db.select().from(departments).where(eq(departments.workspaceId, workspaceId));
   }
 
   async getDepartment(id: number): Promise<Department | undefined> {
     const [d] = await db.select().from(departments).where(eq(departments.id, id));
+    return d;
+  }
+
+  /** SECURITY: Workspace-scoped single lookup for ownership verification */
+  async getDepartmentScoped(id: number, workspaceId: number): Promise<Department | undefined> {
+    const [d] = await db.select().from(departments).where(and(eq(departments.id, id), eq(departments.workspaceId, workspaceId)));
     return d;
   }
 
@@ -203,15 +209,17 @@ export class DatabaseStorage {
   }
 
   // ─── Classrooms (workspace-scoped) ───
-  async getClassrooms(workspaceId?: number): Promise<Classroom[]> {
-    if (workspaceId) {
-      return await db.select().from(classrooms).where(eq(classrooms.workspaceId, workspaceId));
-    }
-    return await db.select().from(classrooms);
+  async getClassrooms(workspaceId: number): Promise<Classroom[]> {
+    return await db.select().from(classrooms).where(eq(classrooms.workspaceId, workspaceId));
   }
 
   async getClassroom(id: number): Promise<Classroom | undefined> {
     const [c] = await db.select().from(classrooms).where(eq(classrooms.id, id));
+    return c;
+  }
+
+  async getClassroomScoped(id: number, workspaceId: number): Promise<Classroom | undefined> {
+    const [c] = await db.select().from(classrooms).where(and(eq(classrooms.id, id), eq(classrooms.workspaceId, workspaceId)));
     return c;
   }
 
@@ -231,15 +239,17 @@ export class DatabaseStorage {
   }
 
   // ─── Subjects (workspace-scoped) ───
-  async getSubjects(workspaceId?: number): Promise<Subject[]> {
-    if (workspaceId) {
-      return await db.select().from(subjects).where(eq(subjects.workspaceId, workspaceId));
-    }
-    return await db.select().from(subjects);
+  async getSubjects(workspaceId: number): Promise<Subject[]> {
+    return await db.select().from(subjects).where(eq(subjects.workspaceId, workspaceId));
   }
 
   async getSubject(id: number): Promise<Subject | undefined> {
     const [s] = await db.select().from(subjects).where(eq(subjects.id, id));
+    return s;
+  }
+
+  async getSubjectScoped(id: number, workspaceId: number): Promise<Subject | undefined> {
+    const [s] = await db.select().from(subjects).where(and(eq(subjects.id, id), eq(subjects.workspaceId, workspaceId)));
     return s;
   }
 
@@ -263,15 +273,17 @@ export class DatabaseStorage {
   }
 
   // ─── Faculty (workspace-scoped) ───
-  async getFaculty(workspaceId?: number): Promise<Faculty[]> {
-    if (workspaceId) {
-      return await db.select().from(faculty).where(eq(faculty.workspaceId, workspaceId));
-    }
-    return await db.select().from(faculty);
+  async getFaculty(workspaceId: number): Promise<Faculty[]> {
+    return await db.select().from(faculty).where(eq(faculty.workspaceId, workspaceId));
   }
 
   async getFacultyById(id: number): Promise<Faculty | undefined> {
     const [f] = await db.select().from(faculty).where(eq(faculty.id, id));
+    return f;
+  }
+
+  async getFacultyScoped(id: number, workspaceId: number): Promise<Faculty | undefined> {
+    const [f] = await db.select().from(faculty).where(and(eq(faculty.id, id), eq(faculty.workspaceId, workspaceId)));
     return f;
   }
 
@@ -291,20 +303,20 @@ export class DatabaseStorage {
   }
 
   // ─── Sections (workspace-scoped) ───
-  async getSections(workspaceId?: number): Promise<Section[]> {
-    if (workspaceId) {
-      return await db.query.sections.findMany({
-        where: eq(sections.workspaceId, workspaceId),
-        with: { department: true, classroom: true },
-      }) as any;
-    }
+  async getSections(workspaceId: number): Promise<Section[]> {
     return await db.query.sections.findMany({
+      where: eq(sections.workspaceId, workspaceId),
       with: { department: true, classroom: true },
     }) as any;
   }
 
   async getSection(id: number): Promise<Section | undefined> {
     const [s] = await db.select().from(sections).where(eq(sections.id, id));
+    return s;
+  }
+
+  async getSectionScoped(id: number, workspaceId: number): Promise<Section | undefined> {
+    const [s] = await db.select().from(sections).where(and(eq(sections.id, id), eq(sections.workspaceId, workspaceId)));
     return s;
   }
 
@@ -324,15 +336,17 @@ export class DatabaseStorage {
   }
 
   // ─── TimeSlots (workspace-scoped) ───
-  async getTimeSlots(workspaceId?: number): Promise<TimeSlot[]> {
-    if (workspaceId) {
-      return await db.select().from(timeSlots).where(eq(timeSlots.workspaceId, workspaceId)).orderBy(timeSlots.id);
-    }
-    return await db.select().from(timeSlots).orderBy(timeSlots.id);
+  async getTimeSlots(workspaceId: number): Promise<TimeSlot[]> {
+    return await db.select().from(timeSlots).where(eq(timeSlots.workspaceId, workspaceId)).orderBy(timeSlots.id);
   }
 
   async getTimeSlot(id: number): Promise<TimeSlot | undefined> {
     const [t] = await db.select().from(timeSlots).where(eq(timeSlots.id, id));
+    return t;
+  }
+
+  async getTimeSlotScoped(id: number, workspaceId: number): Promise<TimeSlot | undefined> {
+    const [t] = await db.select().from(timeSlots).where(and(eq(timeSlots.id, id), eq(timeSlots.workspaceId, workspaceId)));
     return t;
   }
 
@@ -352,14 +366,14 @@ export class DatabaseStorage {
   }
 
   // ─── Timetable (workspace-scoped) ───
-  async getTimetable(sectionId?: number, facultyId?: number, workspaceId?: number): Promise<any[]> {
-    const conditions = [];
+  // SECURITY: workspaceId is now required — never query without workspace scope
+  async getTimetable(sectionId: number | undefined, facultyId: number | undefined, workspaceId: number): Promise<any[]> {
+    const conditions = [eq(timetable.workspaceId, workspaceId)];
     if (sectionId) conditions.push(eq(timetable.sectionId, sectionId));
     if (facultyId) conditions.push(eq(timetable.facultyId, facultyId));
-    if (workspaceId) conditions.push(eq(timetable.workspaceId, workspaceId));
     
     return await db.query.timetable.findMany({
-      where: conditions.length ? and(...conditions) : undefined,
+      where: and(...conditions),
       with: {
         subject: true,
         faculty: true,
@@ -379,16 +393,8 @@ export class DatabaseStorage {
     await db.delete(timetable).where(eq(timetable.sectionId, sectionId));
   }
 
-  async clearAllTimetable(workspaceId?: number): Promise<void> {
-    if (workspaceId) {
-      await db.delete(timetable).where(eq(timetable.workspaceId, workspaceId));
-    } else {
-      await db.delete(timetable);
-    }
-  }
-
-  async getAllAllocatedSlots(departmentId: number): Promise<TimetableEntry[]> {
-    return await db.select().from(timetable);
+  async clearAllTimetable(workspaceId: number): Promise<void> {
+    await db.delete(timetable).where(eq(timetable.workspaceId, workspaceId));
   }
 }
 
