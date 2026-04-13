@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@shared/routes";
+import { apiUrl } from "@/lib/api-base";
 
 export function useTimetable(filters) {
   const queryKey = [api.timetable.list.path, filters?.sectionId, filters?.facultyId];
@@ -10,7 +11,7 @@ export function useTimetable(filters) {
       if (filters?.sectionId && filters.sectionId !== "none") params.append("sectionId", filters.sectionId);
       if (filters?.facultyId && filters.facultyId !== "none") params.append("facultyId", filters.facultyId);
       
-      const res = await fetch(`${api.timetable.list.path}?${params}`, { credentials: "include" });
+      const res = await fetch(apiUrl(`${api.timetable.list.path}?${params}`), { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch timetable");
       return api.timetable.list.responses[200].parse(await res.json());
     },
@@ -22,7 +23,7 @@ export function useGenerateTimetable() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (data) => {
-      const res = await fetch(api.timetable.generate.path, {
+      const res = await fetch(apiUrl(api.timetable.generate.path), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
@@ -48,7 +49,7 @@ export function useRegenerateAll() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async () => {
-      const res = await fetch("/api/timetable/regenerate-all", {
+      const res = await fetch(apiUrl("/api/timetable/regenerate-all"), {
         method: "POST",
         credentials: "include",
       });
@@ -60,3 +61,4 @@ export function useRegenerateAll() {
     },
   });
 }
+

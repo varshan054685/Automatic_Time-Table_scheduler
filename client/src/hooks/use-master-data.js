@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, buildUrl } from "@shared/routes";
+import { apiUrl } from "@/lib/api-base";
 
 // Helper: invalidate both the entity list and the timetable
 const invalidateTimetable = (queryClient) =>
@@ -10,7 +11,7 @@ export function useDepartments() {
   return useQuery({
     queryKey: [api.departments.list.path],
     queryFn: async () => {
-      const res = await fetch(api.departments.list.path, { credentials: "include" });
+      const res = await fetch(apiUrl(api.departments.list.path), { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch departments");
       return api.departments.list.responses[200].parse(await res.json());
     },
@@ -23,7 +24,7 @@ export function useCreateDepartment() {
   return useMutation({
     mutationFn: async (data) => {
       const validated = api.departments.create.input.parse(data);
-      const res = await fetch(api.departments.create.path, {
+      const res = await fetch(apiUrl(api.departments.create.path), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(validated),
@@ -44,7 +45,7 @@ export function useUpdateDepartment() {
   return useMutation({
     mutationFn: async ({ id, ...data }) => {
       const url = buildUrl(api.departments.update.path, { id });
-      const res = await fetch(url, {
+      const res = await fetch(apiUrl(url), {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
@@ -65,7 +66,7 @@ export function useDeleteDepartment() {
   return useMutation({
     mutationFn: async (id) => {
       const url = buildUrl(api.departments.delete.path, { id });
-      const res = await fetch(url, { method: "DELETE", credentials: "include" });
+      const res = await fetch(apiUrl(url), { method: "DELETE", credentials: "include" });
       if (!res.ok) throw new Error("Failed to delete department");
     },
     onSuccess: () => {
@@ -80,7 +81,7 @@ export function useClassrooms() {
   return useQuery({
     queryKey: [api.classrooms.list.path],
     queryFn: async () => {
-      const res = await fetch(api.classrooms.list.path, { credentials: "include" });
+      const res = await fetch(apiUrl(api.classrooms.list.path), { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch classrooms");
       return api.classrooms.list.responses[200].parse(await res.json());
     },
@@ -96,7 +97,7 @@ export function useCreateClassroom() {
         ...data,
         capacity: Number(data.capacity)
       });
-      const res = await fetch(api.classrooms.create.path, {
+      const res = await fetch(apiUrl(api.classrooms.create.path), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(validated),
@@ -117,7 +118,7 @@ export function useUpdateClassroom() {
   return useMutation({
     mutationFn: async ({ id, ...data }) => {
       const url = buildUrl(api.classrooms.update.path, { id });
-      const res = await fetch(url, {
+      const res = await fetch(apiUrl(url), {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...data, capacity: Number(data.capacity) }),
@@ -138,7 +139,7 @@ export function useDeleteClassroom() {
   return useMutation({
     mutationFn: async (id) => {
       const url = buildUrl(api.classrooms.delete.path, { id });
-      const res = await fetch(url, { method: "DELETE", credentials: "include" });
+      const res = await fetch(apiUrl(url), { method: "DELETE", credentials: "include" });
       if (!res.ok) throw new Error("Failed to delete classroom");
     },
     onSuccess: () => {
@@ -153,7 +154,7 @@ export function useSubjects() {
   return useQuery({
     queryKey: [api.subjects.list.path],
     queryFn: async () => {
-      const res = await fetch(api.subjects.list.path, { credentials: "include" });
+      const res = await fetch(apiUrl(api.subjects.list.path), { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch subjects");
       return api.subjects.list.responses[200].parse(await res.json());
     },
@@ -170,7 +171,7 @@ export function useCreateSubject() {
         weeklyHours: Number(data.weeklyHours),
         departmentId: Number(data.departmentId)
       });
-      const res = await fetch(api.subjects.create.path, {
+      const res = await fetch(apiUrl(api.subjects.create.path), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(validated),
@@ -191,7 +192,7 @@ export function useUpdateSubject() {
   return useMutation({
     mutationFn: async ({ id, ...data }) => {
       const url = buildUrl(api.subjects.update.path, { id });
-      const res = await fetch(url, {
+      const res = await fetch(apiUrl(url), {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -216,7 +217,7 @@ export function useDeleteSubject() {
   return useMutation({
     mutationFn: async (id) => {
       const url = buildUrl(api.subjects.delete.path, { id });
-      const res = await fetch(url, { method: "DELETE", credentials: "include" });
+      const res = await fetch(apiUrl(url), { method: "DELETE", credentials: "include" });
       if (!res.ok) throw new Error("Failed to delete subject");
     },
     onSuccess: () => {
@@ -231,7 +232,7 @@ export function useFaculty() {
   return useQuery({
     queryKey: [api.faculty.list.path],
     queryFn: async () => {
-      const res = await fetch(api.faculty.list.path, { credentials: "include" });
+      const res = await fetch(apiUrl(api.faculty.list.path), { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch faculty");
       return api.faculty.list.responses[200].parse(await res.json());
     },
@@ -247,7 +248,7 @@ export function useCreateFaculty() {
         ...data,
         departmentId: Number(data.departmentId)
       });
-      const res = await fetch(api.faculty.create.path, {
+      const res = await fetch(apiUrl(api.faculty.create.path), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(validated),
@@ -268,7 +269,7 @@ export function useUpdateFaculty() {
   return useMutation({
     mutationFn: async ({ id, ...data }) => {
       const url = buildUrl(api.faculty.update.path, { id });
-      const res = await fetch(url, {
+      const res = await fetch(apiUrl(url), {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...data, departmentId: Number(data.departmentId) }),
@@ -289,7 +290,7 @@ export function useDeleteFaculty() {
   return useMutation({
     mutationFn: async (id) => {
       const url = buildUrl(api.faculty.delete.path, { id });
-      const res = await fetch(url, { method: "DELETE", credentials: "include" });
+      const res = await fetch(apiUrl(url), { method: "DELETE", credentials: "include" });
       if (!res.ok) throw new Error("Failed to delete faculty");
     },
     onSuccess: () => {
@@ -304,7 +305,7 @@ export function useSections() {
   return useQuery({
     queryKey: [api.sections.list.path],
     queryFn: async () => {
-      const res = await fetch(api.sections.list.path, { credentials: "include" });
+      const res = await fetch(apiUrl(api.sections.list.path), { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch sections");
       return api.sections.list.responses[200].parse(await res.json());
     },
@@ -323,7 +324,7 @@ export function useCreateSection() {
         year: Number(data.year),
         semester: Number(data.semester)
       });
-      const res = await fetch(api.sections.create.path, {
+      const res = await fetch(apiUrl(api.sections.create.path), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(validated),
@@ -348,7 +349,7 @@ export function useUpdateSection() {
   return useMutation({
     mutationFn: async ({ id, ...data }) => {
       const url = buildUrl(api.sections.update.path, { id });
-      const res = await fetch(url, {
+      const res = await fetch(apiUrl(url), {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -379,7 +380,7 @@ export function useDeleteSection() {
   return useMutation({
     mutationFn: async (id) => {
       const url = buildUrl(api.sections.delete.path, { id });
-      const res = await fetch(url, { method: "DELETE", credentials: "include" });
+      const res = await fetch(apiUrl(url), { method: "DELETE", credentials: "include" });
       if (!res.ok) throw new Error("Failed to delete section");
     },
     onSuccess: () => {
@@ -394,7 +395,7 @@ export function useTimeSlots() {
   return useQuery({
     queryKey: [api.timeSlots.list.path],
     queryFn: async () => {
-      const res = await fetch(api.timeSlots.list.path, { credentials: "include" });
+      const res = await fetch(apiUrl(api.timeSlots.list.path), { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch time slots");
       return api.timeSlots.list.responses[200].parse(await res.json());
     },
@@ -407,7 +408,7 @@ export function useCreateTimeSlot() {
   return useMutation({
     mutationFn: async (data) => {
       const validated = api.timeSlots.create.input.parse(data);
-      const res = await fetch(api.timeSlots.create.path, {
+      const res = await fetch(apiUrl(api.timeSlots.create.path), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(validated),
@@ -428,7 +429,7 @@ export function useUpdateTimeSlot() {
   return useMutation({
     mutationFn: async ({ id, ...data }) => {
       const url = buildUrl(api.timeSlots.update.path, { id });
-      const res = await fetch(url, {
+      const res = await fetch(apiUrl(url), {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
@@ -449,7 +450,7 @@ export function useDeleteTimeSlot() {
   return useMutation({
     mutationFn: async (id) => {
       const url = buildUrl(api.timeSlots.delete.path, { id });
-      const res = await fetch(url, { method: "DELETE", credentials: "include" });
+      const res = await fetch(apiUrl(url), { method: "DELETE", credentials: "include" });
       if (!res.ok) throw new Error("Failed to delete time slot");
     },
     onSuccess: () => {
