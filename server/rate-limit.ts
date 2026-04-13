@@ -3,11 +3,11 @@ import { log } from "./index";
 
 /**
  * Rate limiter for authentication endpoints (login, register).
- * 5 attempts per 15 minutes per IP.
+ * 10 attempts per 15 minutes per IP.
  */
 export const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 5,
+  max: 10,
   standardHeaders: true,
   legacyHeaders: false,
   message: { message: "Too many attempts. Please try again in 15 minutes." },
@@ -19,11 +19,11 @@ export const authLimiter = rateLimit({
 
 /**
  * Rate limiter for general API endpoints.
- * 100 requests per 15 minutes per IP.
+ * 1000 requests per 15 minutes per IP (generous for polling).
  */
 export const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 100,
+  max: 1000,
   standardHeaders: true,
   legacyHeaders: false,
   message: { message: "Too many requests. Please slow down." },
@@ -35,11 +35,11 @@ export const apiLimiter = rateLimit({
 
 /**
  * Rate limiter for timetable generation (expensive CPU operation).
- * 3 requests per 15 minutes per IP.
+ * 5 requests per 15 minutes per IP.
  */
 export const generationLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 3,
+  max: 5,
   standardHeaders: true,
   legacyHeaders: false,
   message: { message: "Timetable generation rate limit reached. Please wait before generating again." },

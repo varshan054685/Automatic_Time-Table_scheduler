@@ -68,6 +68,25 @@ app.get("/test-db", async (_req: Request, res: Response) => {
   }
 });
 
+// ─── Database debug — shows DB name and users table schema ───
+app.get("/debug-db", async (_req: Request, res: Response) => {
+  try {
+    const dbResult = await pool.query("SELECT current_database()");
+    const tables = await pool.query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'users'
+    `);
+
+    res.json({
+      database: dbResult.rows,
+      columns: tables.rows,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message, detail: err });
+  }
+});
+
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
     hour: "numeric",
