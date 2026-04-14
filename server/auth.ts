@@ -122,11 +122,8 @@ export function setupAuth(app: Express) {
 
   app.post("/api/auth/register", authLimiter, async (req, res, next) => {
     try {
-      console.log("REGISTER BODY:", req.body);
-
       const parsed = registerSchema.safeParse(req.body);
       if (!parsed.success) {
-        console.log("REGISTER VALIDATION FAILED:", parsed.error.issues);
         return res.status(400).json({ message: "Invalid input: " + parsed.error.issues.map(i => i.message).join(", ") });
       }
 
@@ -153,11 +150,8 @@ export function setupAuth(app: Express) {
         res.status(201).json({ ...safeUser, workspace: membership || null });
       });
     } catch (err: any) {
-      console.error("REGISTER ERROR FULL:", err);
-      res.status(500).json({
-        error: err.message,
-        detail: err,
-      });
+      console.error("Registration error:", err.message);
+      res.status(500).json({ message: "Registration failed" });
     }
   });
 

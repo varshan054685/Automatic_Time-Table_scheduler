@@ -1,6 +1,0 @@
-
-> rest-express@1.0.0 dev
-> concurrently "npm run dev:node" "npm run dev:python"
-
-[1] npm run dev:python exited with code 1
-[0] npm run dev:node exited with code 1

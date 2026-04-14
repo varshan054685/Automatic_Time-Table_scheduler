@@ -4,7 +4,7 @@ import random
 import time
 
 def generate_timetable(data: dict):
-    print(f"DEBUG: Generating timetable for {len(data.get('sections', []))} sections")
+
     model = cp_model.CpModel()
 
     days = data.get("days", []) or ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
@@ -55,7 +55,7 @@ def generate_timetable(data: dict):
 
     morning_p_indices_set = set(morning_p_indices)
     afternoon_p_indices_set = set(afternoon_p_indices)
-    print(f"DEBUG: Morning: {morning_p_indices}, Afternoon: {afternoon_p_indices}")
+
 
     classrooms = data.get("classrooms", [])
     rooms = [c['roomNumber'] for c in classrooms]
@@ -93,7 +93,7 @@ def generate_timetable(data: dict):
         for p_idx, period in enumerate(periods):
             if (day, period) in slot_lookup: day_period_indices[d_idx].append(p_idx)
     for d_idx in day_period_indices: day_period_indices[d_idx].sort()
-    print("DEBUG day_period_indices:", dict(day_period_indices))
+
     
     num_rooms = len(rooms)
     
@@ -132,7 +132,7 @@ def generate_timetable(data: dict):
                             # Pre-cache for B2B penalty calculation
                             subj_slot_active.setdefault((d_idx, p_idx, s_id, sub.get('id')), []).append(v)
 
-    print(f"DEBUG: Variables: {len(x)}")
+
     for b_idx in range(len(all_blocks)):
         if v_by_block[b_idx]: model.AddAtMostOne(v_by_block[b_idx])
     for cov in v_by_slot_room.values(): model.AddAtMostOne(cov)
@@ -191,8 +191,7 @@ def generate_timetable(data: dict):
                                     model.Add(v_i + v_k <= 1)
                             else:
                                 model.Add(v_j >= v_i + v_k - 1)
-                                if s_id == 1 and d_idx == 0:
-                                    print(f"DEBUG ADDED: {v_j} >= {v_i} + {v_k} - 1")
+
 
     for f_id in set(b['faculty_id'] for b in all_blocks):
         for d_idx in day_period_indices:
@@ -308,8 +307,7 @@ def generate_timetable(data: dict):
                 for o in range(blk['size']):
                     timetable.append({"day": days[d], "period": periods[p_s+o], "sectionId": blk['section_id'], "subjectId": blk['subject_id'], "facultyId": blk['faculty_id'], "room": rooms[r]})
         
-        for s_id, req in total_requested_hours.items():
-            print(f"DEBUG: Section {s_id}: Requested {req}, Scheduled {scheduled_hours[s_id]}")
+
             
         return {"timetable": timetable}
     else: return {"error": "Constraints might be too strict."}

@@ -6,7 +6,6 @@ import cors from "cors";
 import helmet from "helmet";
 import "dotenv/config";
 import { apiLimiter } from "./rate-limit";
-import { pool } from "./db";
 
 const app = express();
 const httpServer = createServer(app);
@@ -45,47 +44,7 @@ app.use(express.urlencoded({ extended: false, limit: "1mb" }));
 // ─── Security: General API rate limiting ───
 app.use("/api/", apiLimiter);
 
-// ─── Health-check / connectivity test endpoint ───
-app.get("/test", (_req: Request, res: Response) => {
-  res.json({ message: "Backend connected successfully" });
-});
 
-// ─── Database connectivity test ───
-app.get("/test-db", async (_req: Request, res: Response) => {
-  try {
-    const result = await pool.query("SELECT NOW()");
-    res.json({
-      success: true,
-      message: "Database connected",
-      time: result.rows[0],
-    });
-  } catch (err: any) {
-    console.error("DB ERROR:", err);
-    res.status(500).json({
-      success: false,
-      error: err.message,
-    });
-  }
-});
-
-// ─── Database debug — shows DB name and users table schema ───
-app.get("/debug-db", async (_req: Request, res: Response) => {
-  try {
-    const dbResult = await pool.query("SELECT current_database()");
-    const tables = await pool.query(`
-      SELECT column_name 
-      FROM information_schema.columns 
-      WHERE table_name = 'users'
-    `);
-
-    res.json({
-      database: dbResult.rows,
-      columns: tables.rows,
-    });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message, detail: err });
-  }
-});
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
