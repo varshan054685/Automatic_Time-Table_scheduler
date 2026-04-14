@@ -225,6 +225,33 @@ export async function registerRoutes(
     }
   });
 
+  // Remove a member from workspace (owner only)
+  app.delete(api.workspaces.removeMember.path, requireWorkspace, requireOwner, async (req: Request, res: Response) => {
+    try {
+      const id = paramId(req, res);
+      if (id === null) return;
+      const wsId = (req as any).workspaceId;
+
+      // Get all members to verify the target member
+      const members = await storage.getWorkspaceMembers(wsId);
+      const member = members.find((m: any) => m.id === id);
+
+      if (!member) {
+        return res.status(404).json({ message: "Member not found in this workspace" });
+      }
+
+      // Prevent owner from removing themselves
+      if (member.userId === (req as any).wsUserId) {
+        return res.status(400).json({ message: "You cannot remove yourself. Use 'Delete Workspace' instead." });
+      }
+
+      await storage.removeMember(id, wsId);
+      res.json({ message: "Member removed successfully" });
+    } catch (err: any) {
+      res.status(500).json({ message: "Failed to remove member" });
+    }
+  });
+
   // ─── Change Request Routes ───
   app.get(api.changeRequests.list.path, requireWorkspace, async (req: Request, res: Response) => {
     const wsId = (req as any).workspaceId;

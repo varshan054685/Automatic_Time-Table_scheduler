@@ -5,19 +5,17 @@ import { useUser } from "@/hooks/use-auth";
 import { Sidebar } from "@/components/Sidebar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Copy, RefreshCw, Users, Shield, Check, LayoutDashboard, Building2, AlertCircle, Clock, FileEdit, Trash2, ArrowLeft, Search, X } from "lucide-react";
+import { Copy, RefreshCw, Users, Shield, Check, LayoutDashboard, AlertCircle, Clock, FileEdit, Trash2, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
-import { useState, useMemo } from "react";
+import { useState } from "react";
 
 export function RequestsContent() {
   const { user } = useUser();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const isOwner = user?.workspace?.role === "owner";
-  const [selectedDept, setSelectedDept] = useState(null);
-  const [searchQuery, setSearchQuery] = useState("");
 
   const { data: requests = [], isLoading } = useQuery({
     queryKey: [api.changeRequests.list.path],
@@ -59,30 +57,7 @@ export function RequestsContent() {
     },
   });
 
-  const { data: departments = [] } = useQuery({
-    queryKey: [api.departments.list.path],
-    queryFn: async () => {
-      const res = await fetch(apiUrl(api.departments.list.path), { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch");
-      return await res.json();
-    },
-  });
-
-  const filteredDepartments = useMemo(() => {
-    if (!searchQuery) return departments;
-    const q = searchQuery.toLowerCase();
-    return departments.filter(d => 
-      d.name.toLowerCase().includes(q) || 
-      (d.code && d.code.toLowerCase().includes(q))
-    );
-  }, [departments, searchQuery]);
-
-  // Filter requests by selected department or show all
-  const filteredPending = selectedDept
-    ? requests.filter((r) => r.status === "pending" && r.departmentId === selectedDept.id)
-    : requests.filter((r) => r.status === "pending");
-
-  const pending = filteredPending;
+  const pending = requests.filter((r) => r.status === "pending");
   const processed = requests.filter((r) => r.status !== "pending");
 
   return (
@@ -110,104 +85,18 @@ export function RequestsContent() {
         </CardContent>
       </Card>
 
-      {/* Available Departments */}
-      <Card className="border-0 shadow-sm border border-slate-200">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Building2 className="w-5 h-5 text-blue-500" />
-            Available Departments
-          </CardTitle>
-          <CardDescription>
-            {selectedDept
-              ? `Showing requests for ${selectedDept.name}`
-              : "Click a department to filter requests"}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="mb-4 relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <Input 
-              placeholder="Search departments..." 
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 border-slate-200 bg-slate-50 focus-visible:ring-primary/20"
-            />
-          </div>
-          {filteredDepartments.length === 0 ? (
-            <div className="text-center py-8 text-slate-400">
-              <AlertCircle className="w-10 h-10 mx-auto mb-2 opacity-50 text-slate-300" />
-              <p>No departments found</p>
-            </div>
-          ) : (
-            <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
-              {filteredDepartments.map((dept) => {
-                const deptRequestCount = requests.filter(
-                  (r) => r.status === "pending" && r.departmentId === dept.id
-                ).length;
-                const isSelected = selectedDept?.id === dept.id;
-
-                return (
-                  <div
-                    key={dept.id}
-                    onClick={() => setSelectedDept(isSelected ? null : dept)}
-                    className={`flex items-center justify-between p-3 border rounded-lg cursor-pointer transition-colors ${
-                      isSelected
-                        ? "bg-blue-50 border-blue-200 hover:bg-blue-100"
-                        : "bg-slate-50 border-slate-200 hover:bg-slate-100"
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <Building2 className={`w-4 h-4 ${isSelected ? "text-blue-500" : "text-slate-400"}`} />
-                      <div>
-                        <p className={`font-medium ${isSelected ? "text-blue-900" : "text-slate-900"}`}>
-                          {dept.name}
-                        </p>
-                        <p className="text-xs text-slate-500">Code: {dept.code}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {deptRequestCount > 0 && (
-                        <span className="bg-amber-100 text-amber-700 text-xs px-2 py-0.5 rounded-full font-medium">
-                          {deptRequestCount} request{deptRequestCount > 1 ? "s" : ""}
-                        </span>
-                      )}
-                      <span className={`text-xs ${isSelected ? "text-blue-500" : "text-slate-400"}`}>
-                        {isSelected ? "Showing →" : "Filter →"}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-          {selectedDept && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="mt-4 gap-2 text-slate-500"
-              onClick={() => setSelectedDept(null)}
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Show all departments
-            </Button>
-          )}
-        </CardContent>
-      </Card>
-
       {/* Pending Requests */}
       <Card className="border-0 shadow-sm border border-slate-200">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Clock className="w-5 h-5 text-amber-500" />
-            {selectedDept ? `Pending Requests - ${selectedDept.name}` : "All Pending Requests"}
+            Pending Requests
             {pending.length > 0 && (
               <span className="bg-amber-100 text-amber-700 text-xs px-2 py-0.5 rounded-full">{pending.length}</span>
             )}
           </CardTitle>
           <CardDescription>
-            {selectedDept
-              ? `Showing pending requests for ${selectedDept.name}`
-              : "All pending change requests"}
+            All pending change requests
           </CardDescription>
         </CardHeader>
         <CardContent>

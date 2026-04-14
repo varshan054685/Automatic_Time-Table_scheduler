@@ -12,6 +12,7 @@ import { useDepartments, useCreateDepartment, useUpdateDepartment, useDeleteDepa
 import { useToast } from "@/hooks/use-toast";
 import { api } from "@shared/routes";
 import * as XLSX from "xlsx";
+import { ExportHint } from "@/components/ExportHint";
 
 function DepartmentImport({ departments, onImportComplete }) {
   const [isImporting, setIsImporting] = useState(false);
@@ -108,7 +109,7 @@ function DepartmentImport({ departments, onImportComplete }) {
       />
       <Button variant="outline" className="gap-2" asChild disabled={isImporting}>
         <label htmlFor="import-excel" className="cursor-pointer">
-          {isImporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+          {isImporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
           {isImporting ? "Importing..." : "Import Excel"}
         </label>
       </Button>
@@ -147,6 +148,7 @@ export default function Departments() {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Departments");
     XLSX.writeFile(wb, "departments_template.xlsx");
+    localStorage.setItem("hasExportedOnce", "true");
   };
 
   const onSubmit = (values) => {
@@ -230,10 +232,10 @@ export default function Departments() {
             </div>
             
             <div className="flex gap-2">
-              <Button variant="outline" className="gap-2" onClick={handleExport}>
-                <Download className="w-4 h-4" /> Export Excel
-              </Button>
               <DepartmentImport departments={departments} onImportComplete={refetch} />
+              <Button variant="outline" className="gap-2" onClick={handleExport}>
+                <Upload className="w-4 h-4" /> Export Excel
+              </Button>
 
               <Dialog open={open} onOpenChange={(v) => { setOpen(v); if(!v) { setEditingId(null); form.reset(); } }}>
                 <DialogTrigger asChild>
@@ -278,6 +280,8 @@ export default function Departments() {
               </Dialog>
             </div>
           </div>
+
+          <ExportHint />
 
           <div className="flex items-center gap-4 mb-4">
             <div className="relative flex-1">

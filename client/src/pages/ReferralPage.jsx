@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api } from "@shared/routes";
+import { api, buildUrl } from "@shared/routes";
 import { apiUrl } from "@/lib/api-base";
 import { useUser } from "@/hooks/use-auth";
 import { Sidebar } from "@/components/Sidebar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Copy, RefreshCw, Users, Shield, Check } from "lucide-react";
+import { Copy, RefreshCw, Users, Shield, Check, UserMinus, AlertTriangle } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 
 export function ReferralContent() {
@@ -14,6 +15,7 @@ export function ReferralContent() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [copied, setCopied] = useState(false);
+  const [removingMember, setRemovingMember] = useState(null);
 
   const workspace = user?.workspace;
   const isOwner = workspace?.role === "owner";
@@ -56,6 +58,29 @@ export function ReferralContent() {
     toast({ title: `${type === 'admin' ? 'Admin' : 'Viewer'} referral code copied!` });
     setTimeout(() => setCopied({ ...copied, [type]: false }), 2000);
   }
+
+  const removeMemberMutation = useMutation({
+    mutationFn: async (memberId) => {
+      const res = await fetch(apiUrl(buildUrl(api.workspaces.removeMember.path, { id: memberId })), {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || "Failed to remove member");
+      }
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.workspaces.current.path] });
+      toast({ title: "Member removed successfully" });
+      setRemovingMember(null);
+    },
+    onError: (error) => {
+      toast({ title: "Failed to remove member", description: error.message, variant: "destructive" });
+      setRemovingMember(null);
+    },
+  });
 
   return (
     <div className="space-y-6">
@@ -160,18 +185,61 @@ export function ReferralContent() {
                   <p className="font-medium text-slate-900">{member.name}</p>
                   <p className="text-sm text-slate-500">{member.email}</p>
                 </div>
-                <span className={`px-2.5 py-1 rounded-full text-xs font-semibold shadow-sm border ${
-                  member.role === "owner" 
-                    ? "bg-indigo-50 text-indigo-700 border-indigo-200" 
-                    : "bg-slate-50 text-slate-600 border-slate-200"
-                }`}>
-                  {member.role === "owner" ? "Admin" : "Viewer"}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className={`px-2.5 py-1 rounded-full text-xs font-semibold shadow-sm border ${
+                    member.role === "owner" 
+                      ? "bg-indigo-50 text-indigo-700 border-indigo-200" 
+                      : "bg-slate-50 text-slate-600 border-slate-200"
+                  }`}>
+                    {member.role === "owner" ? "Admin" : "Viewer"}
+                  </span>
+                  {isOwner && member.userId !== user?.id && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="text-red-500 hover:text-red-700 hover:bg-red-50 h-8 w-8"
+                      onClick={() => setRemovingMember(member)}
+                    >
+                      <UserMinus className="w-4 h-4" />
+                    </Button>
+                  )}
+                </div>
               </div>
             ))}
           </div>
         </CardContent>
       </Card>
+
+      {/* Remove Member Confirmation Dialog */}
+      <Dialog open={!!removingMember} onOpenChange={(v) => !v && setRemovingMember(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <AlertTriangle className="w-5 h-5" />
+              Remove Member
+            </DialogTitle>
+            <DialogDescription className="pt-2">
+              Are you sure you want to remove <span className="font-semibold text-slate-900">{removingMember?.name}</span> ({removingMember?.email}) from this workspace?
+              <br /><br />
+              They will lose all access to this workspace immediately, but can rejoin later using a valid referral code.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setRemovingMember(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => removeMemberMutation.mutate(removingMember?.id)}
+              disabled={removeMemberMutation.isPending}
+              className="gap-2"
+            >
+              <UserMinus className="w-4 h-4" />
+              {removeMemberMutation.isPending ? "Removing..." : "Remove Member"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

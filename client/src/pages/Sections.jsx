@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { api } from "@shared/routes";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import * as XLSX from "xlsx";
+import { ExportHint } from "@/components/ExportHint";
 
 function SectionImport({ departments, classrooms, sections, onImportComplete }) {
   const [isImporting, setIsImporting] = useState(false);
@@ -177,7 +178,7 @@ function SectionImport({ departments, classrooms, sections, onImportComplete }) 
       <Input type="file" accept=".xlsx, .xls" className="hidden" id="import-excel" ref={fileInputRef} onChange={handleImport} disabled={isImporting} />
       <Button variant="outline" className="gap-2" asChild disabled={isImporting}>
         <label htmlFor="import-excel" className="cursor-pointer">
-          {isImporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+          {isImporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
           {isImporting ? "Importing..." : "Import Excel"}
         </label>
       </Button>
@@ -224,6 +225,7 @@ export default function Sections() {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Sections");
     XLSX.writeFile(wb, "sections_template.xlsx");
+    localStorage.setItem("hasExportedOnce", "true");
   };
 
   const onSubmit = (values) => {
@@ -319,10 +321,10 @@ export default function Sections() {
             </div>
             
             <div className="flex gap-2">
-              <Button variant="outline" className="gap-2" onClick={handleExport}>
-                <Download className="w-4 h-4" /> Export Excel
-              </Button>
               <SectionImport departments={departments} classrooms={classrooms} sections={sections} onImportComplete={refetch} />
+              <Button variant="outline" className="gap-2" onClick={handleExport}>
+                <Upload className="w-4 h-4" /> Export Excel
+              </Button>
 
               <Dialog open={open} onOpenChange={(v) => { setOpen(v); if(!v) { setEditingId(null); form.reset(); } }}>
                 <DialogTrigger asChild>
@@ -423,6 +425,8 @@ export default function Sections() {
               </Dialog>
             </div>
           </div>
+
+          <ExportHint />
 
           <div className="flex items-center gap-4 mb-4">
             <div className="relative flex-1">

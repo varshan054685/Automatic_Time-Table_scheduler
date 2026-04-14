@@ -106,6 +106,11 @@ export const api = {
       path: '/api/workspaces/leave' as const,
       responses: { 200: z.any() },
     },
+    removeMember: {
+      method: 'DELETE' as const,
+      path: '/api/workspaces/members/:id' as const,
+      responses: { 200: z.any() },
+    },
   },
   changeRequests: {
     list: {

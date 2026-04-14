@@ -14,6 +14,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import * as XLSX from "xlsx";
+import { ExportHint } from "@/components/ExportHint";
 
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
@@ -324,7 +325,7 @@ function TimeSlotImport({ timeSlots, onImportComplete, variant = "outline" }) {
       <Input type="file" accept=".xlsx, .xls" className="hidden" id="import-excel" ref={fileInputRef} onChange={handleImport} disabled={isImporting} />
       <Button variant={variant} className="gap-2" asChild disabled={isImporting}>
         <label htmlFor="import-excel" className="cursor-pointer">
-          {isImporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+          {isImporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
           {isImporting ? "Importing..." : "Import Excel"}
         </label>
       </Button>
@@ -512,6 +513,7 @@ export default function TimeSlots() {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "TimeSlots");
     XLSX.writeFile(wb, "timeslots.xlsx");
+    localStorage.setItem("hasExportedOnce", "true");
   };
 
   const uniquePeriods = useMemo(() => {
@@ -575,7 +577,7 @@ export default function TimeSlots() {
                 <TimeSlotImport timeSlots={timeSlots} onImportComplete={refetch} />
 
                 <Button variant="outline" className="gap-2" onClick={handleExport}>
-                  <Download className="w-4 h-4" /> Export Excel
+                  <Upload className="w-4 h-4" /> Export Excel
                 </Button>
 
                 <Dialog open={bulkOpen} onOpenChange={setBulkOpen}>
@@ -593,6 +595,8 @@ export default function TimeSlots() {
                 </Dialog>
               </div>
             </div>
+
+            <ExportHint />
 
             <Dialog open={!!editGroup} onOpenChange={(v) => !v && setEditGroup(null)}>
               <DialogContent>

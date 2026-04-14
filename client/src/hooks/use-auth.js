@@ -71,6 +71,10 @@ export function useLogout() {
       });
     },
     onSuccess: () => {
+      // Clear timetable selections so next login starts fresh
+      localStorage.removeItem("tt_selectedDept");
+      localStorage.removeItem("tt_selectedSection");
+      localStorage.removeItem("tt_selectedFaculty");
       queryClient.setQueryData([api.auth.me.path], null);
     },
   });

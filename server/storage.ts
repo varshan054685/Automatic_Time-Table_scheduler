@@ -138,6 +138,10 @@ export class DatabaseStorage {
     await db.delete(workspaceMembers).where(and(eq(workspaceMembers.userId, userId), eq(workspaceMembers.workspaceId, workspaceId)));
   }
 
+  async removeMember(membershipId: number, workspaceId: number): Promise<void> {
+    await db.delete(workspaceMembers).where(and(eq(workspaceMembers.id, membershipId), eq(workspaceMembers.workspaceId, workspaceId)));
+  }
+
   async updateWorkspace(id: number, data: Partial<Workspace>): Promise<Workspace> {
     const [ws] = await db.update(workspaces).set(data).where(eq(workspaces.id, id)).returning();
     return ws;
