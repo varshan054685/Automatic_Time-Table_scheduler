@@ -26,9 +26,15 @@ app.use(helmet({
   contentSecurityPolicy: process.env.NODE_ENV === "production" ? undefined : false,
 }));
 
-// ─── CORS — allow all origins for now ───
-app.use(cors());
-
+// ─── CORS configuration ───
+app.use(cors({
+  origin: [
+    "https://automatic-time-table-scheduler-oke3-kofsnrhib.vercel.app",
+    "https://automatic-time-table-scheduler.onrender.com",
+    "http://localhost:5173"
+  ],
+  credentials: true
+}));
 // ─── Security: Body size limit — prevent DoS via oversized payloads ───
 app.use(
   express.json({
