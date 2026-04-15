@@ -66,7 +66,7 @@ export const api = {
     updateProfile: {
       method: 'PATCH' as const,
       path: '/api/auth/profile' as const,
-      input: z.object({ name: z.string().optional(), email: z.string().email().optional(), phone: z.string().optional() }),
+      input: z.object({ name: z.string().optional(), email: z.string().email().optional() }),
       responses: {
         200: z.any(),
         400: z.object({ message: z.string() })

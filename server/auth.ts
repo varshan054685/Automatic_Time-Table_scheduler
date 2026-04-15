@@ -86,7 +86,6 @@ export function setupAuth(app: Express) {
   const profileSchema = z.object({
     name: z.string().min(1).max(100).trim().optional(),
     email: z.string().email().max(255).trim().toLowerCase().optional(),
-    phone: z.string().max(20).trim().optional(),
   }).strict();
 
   app.patch("/api/auth/profile", async (req, res, next) => {
