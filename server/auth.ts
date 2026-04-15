@@ -5,12 +5,12 @@ import session from "express-session";
 import createMemoryStore from "memorystore";
 import { storage } from "./storage";
 import { z } from "zod";
-import bcrypt from "bcryptjs";
+import bcrypt from "bcrypt";
 import { log } from "./index";
 import { authLimiter } from "./rate-limit";
 
-// Bcrypt cost factor — 12 rounds provides stronger hashing than default 10
-const BCRYPT_ROUNDS = 12;
+// Bcrypt cost factor
+const BCRYPT_ROUNDS = 10;
 
 // Session max age — 24 hours
 const SESSION_MAX_AGE = 24 * 60 * 60 * 1000;
@@ -136,8 +136,8 @@ export function setupAuth(app: Express) {
       const user = await storage.createUser({
         email: parsed.data.email,
         password: hashedPassword,
-        name: parsed.data.name,
-        role: "staff",
+        name: parsed.data.name || "Admin",
+        role: "admin",
       });
 
       log(`REGISTER_SUCCESS email=${parsed.data.email} userId=${user.id} IP=${req.ip}`, "security");
