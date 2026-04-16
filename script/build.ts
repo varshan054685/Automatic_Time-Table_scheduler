@@ -12,20 +12,29 @@ async function buildServer() {
     bundle: true,
     format: "cjs",
     outfile: "dist/index.cjs",
-    define: {
-      "process.env.NODE_ENV": '"production"',
-    },
-    minify: true,
+    target: "node18",
+
+    // ✅ IMPORTANT FIX
     external: [
       "pg",
+      "bcrypt",
+      "bcryptjs",
       "ws",
       "express",
       "cors",
       "jsonwebtoken",
       "passport",
       "passport-local",
-      "express-session"
+      "express-session",
+      "connect-pg-simple",
+      "memorystore"
     ],
+
+    define: {
+      "process.env.NODE_ENV": '"production"',
+    },
+
+    minify: false,
     logLevel: "info",
   });
 
