@@ -1,46 +1,12 @@
-import { build as esbuild } from "esbuild";
-import { build as viteBuild } from "vite";
-import { rm, readFile } from "fs/promises";
+import { build } from "esbuild";
+import { rm } from "fs/promises";
 
-// server deps to bundle to reduce openat(2) syscalls
-// which helps cold start times
-const allowlist = [
-  "axios",
-  "connect-pg-simple",
-  "cors",
-  "date-fns",
-  "drizzle-orm",
-  "drizzle-zod",
-  "express",
-  "express-rate-limit",
-  "express-session",
-  "jsonwebtoken",
-  "memorystore",
-  "nanoid",
-  "passport",
-  "passport-local",
-  "pg",
-  "ws",
-  "xlsx",
-  "zod",
-  "zod-validation-error",
-];
-
-async function buildAll() {
+async function buildServer() {
   await rm("dist", { recursive: true, force: true });
 
-  console.log("building client...");
-  await viteBuild();
+  console.log("🚀 Building server...");
 
-  console.log("building server...");
-  const pkg = JSON.parse(await readFile("package.json", "utf-8"));
-  const allDeps = [
-    ...Object.keys(pkg.dependencies || {}),
-    ...Object.keys(pkg.devDependencies || {}),
-  ];
-  const externals = allDeps.filter((dep) => !allowlist.includes(dep));
-
-  await esbuild({
+  await build({
     entryPoints: ["server/index.ts"],
     platform: "node",
     bundle: true,
@@ -50,12 +16,23 @@ async function buildAll() {
       "process.env.NODE_ENV": '"production"',
     },
     minify: true,
-    external: externals,
+    external: [
+      "pg",
+      "ws",
+      "express",
+      "cors",
+      "jsonwebtoken",
+      "passport",
+      "passport-local",
+      "express-session"
+    ],
     logLevel: "info",
   });
+
+  console.log("✅ Server build complete");
 }
 
-buildAll().catch((err) => {
-  console.error(err);
+buildServer().catch((err) => {
+  console.error("❌ Build failed:", err);
   process.exit(1);
 });
