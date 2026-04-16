@@ -27,11 +27,7 @@ app.use(helmet({
 
 // ─── CORS configuration ───
 app.use(cors({
-  origin: [
-    "https://automatic-time-table-scheduler-oke3-kofsnrhib.vercel.app",
-    "https://automatic-time-table-scheduler.onrender.com",
-    "http://localhost:5173"
-  ],
+  origin: process.env.CORS_ORIGIN,
   credentials: true
 }));
 // ─── Security: Body size limit — prevent DoS via oversized payloads ───
