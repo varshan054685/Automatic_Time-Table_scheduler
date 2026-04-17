@@ -1,0 +1,564 @@
+{
+  "classrooms": [
+    {
+      "roomNumber": "A"
+    },
+    {
+      "roomNumber": "B"
+    },
+    {
+      "roomNumber": "L1"
+    },
+    {
+      "roomNumber": "L2"
+    },
+    {
+      "roomNumber": "C"
+    },
+    {
+      "roomNumber": "D"
+    },
+    {
+      "roomNumber": "E"
+    },
+    {
+      "roomNumber": "L3"
+    },
+    {
+      "roomNumber": "L4"
+    },
+    {
+      "roomNumber": "L5"
+    }
+  ],
+  "subjects": [
+    {
+      "id": 1,
+      "name": "Corporate Accounting I",
+      "departmentId": 1,
+      "sectionId": 2,
+      "facultyId": 5,
+      "weeklyHours": 6,
+      "type": "lecture"
+    },
+    {
+      "id": 2,
+      "name": "Financial Accounting I",
+      "departmentId": 1,
+      "sectionId": 1,
+      "facultyId": 5,
+      "weeklyHours": 6,
+      "type": "lecture"
+    },
+    {
+      "id": 3,
+      "name": "Principles of Management",
+      "departmentId": 1,
+      "sectionId": 1,
+      "facultyId": 1,
+      "weeklyHours": 5,
+      "type": "lecture"
+    },
+    {
+      "id": 4,
+      "name": "Company Law",
+      "departmentId": 1,
+      "sectionId": 2,
+      "facultyId": 1,
+      "weeklyHours": 5,
+      "type": "lecture"
+    },
+    {
+      "id": 5,
+      "name": "Computer Applications: Web Designing",
+      "departmentId": 1,
+      "sectionId": 3,
+      "facultyId": 1,
+      "weeklyHours": 4,
+      "type": "lab"
+    },
+    {
+      "id": 6,
+      "name": "Cost Accounting",
+      "departmentId": 1,
+      "sectionId": 3,
+      "facultyId": 1,
+      "weeklyHours": 4,
+      "type": "lecture"
+    },
+    {
+      "id": 7,
+      "name": "Programming in C++",
+      "departmentId": 1,
+      "sectionId": 2,
+      "facultyId": 4,
+      "weeklyHours": 6,
+      "type": "lab"
+    },
+    {
+      "id": 8,
+      "name": "Software Engineering",
+      "departmentId": 1,
+      "sectionId": 3,
+      "facultyId": 4,
+      "weeklyHours": 6,
+      "type": "lab"
+    },
+    {
+      "id": 9,
+      "name": "Principles of Web Designing",
+      "departmentId": 1,
+      "sectionId": 3,
+      "facultyId": 4,
+      "weeklyHours": 4,
+      "type": "lab"
+    },
+    {
+      "id": 16,
+      "name": "Actuarial Statistics",
+      "departmentId": 1,
+      "sectionId": 2,
+      "facultyId": 3,
+      "weeklyHours": 3,
+      "type": "lecture"
+    },
+    {
+      "id": 18,
+      "name": "English - I",
+      "departmentId": 1,
+      "sectionId": 1,
+      "facultyId": 8,
+      "weeklyHours": 6,
+      "type": "lecture"
+    },
+    {
+      "id": 20,
+      "name": "English – III",
+      "departmentId": 1,
+      "sectionId": 2,
+      "facultyId": 7,
+      "weeklyHours": 4,
+      "type": "lecture"
+    },
+    {
+      "id": 10,
+      "name": "Business Economics",
+      "departmentId": 1,
+      "sectionId": 1,
+      "facultyId": 2,
+      "weeklyHours": 5,
+      "type": "lecture"
+    },
+    {
+      "id": 11,
+      "name": "Technology Management",
+      "departmentId": 1,
+      "sectionId": 3,
+      "facultyId": 2,
+      "weeklyHours": 5,
+      "type": "lecture"
+    },
+    {
+      "id": 12,
+      "name": "Insurance and Risk Management",
+      "departmentId": 1,
+      "sectionId": 3,
+      "facultyId": 2,
+      "weeklyHours": 3,
+      "type": "lecture"
+    },
+    {
+      "id": 13,
+      "name": "Environmental Studies",
+      "departmentId": 1,
+      "sectionId": 1,
+      "facultyId": 2,
+      "weeklyHours": 2,
+      "type": "lecture"
+    },
+    {
+      "id": 14,
+      "name": "I Yoga for Human Excellence",
+      "departmentId": 1,
+      "sectionId": 2,
+      "facultyId": 2,
+      "weeklyHours": 2,
+      "type": "lecture"
+    },
+    {
+      "id": 19,
+      "name": "Language – III",
+      "departmentId": 1,
+      "sectionId": 2,
+      "facultyId": 8,
+      "weeklyHours": 4,
+      "type": "lecture"
+    },
+    {
+      "id": 17,
+      "name": "Language - I",
+      "departmentId": 1,
+      "sectionId": 1,
+      "facultyId": 8,
+      "weeklyHours": 6,
+      "type": "lecture"
+    },
+    {
+      "id": 15,
+      "name": "Management Accounting",
+      "departmentId": 1,
+      "sectionId": 3,
+      "facultyId": 3,
+      "weeklyHours": 4,
+      "type": "lecture"
+    }
+  ],
+  "faculty": [
+    {
+      "id": 1,
+      "name": "Dr. S. Kowsalya",
+      "departmentId": 1
+    },
+    {
+      "id": 2,
+      "name": "Dr. Udhaya",
+      "departmentId": 1
+    },
+    {
+      "id": 3,
+      "name": "Dr. Supriya",
+      "departmentId": 1
+    },
+    {
+      "id": 4,
+      "name": "Mr. A. Srinivasan",
+      "departmentId": 1
+    },
+    {
+      "id": 5,
+      "name": "Dr. R. Prema",
+      "departmentId": 1
+    },
+    {
+      "id": 6,
+      "name": "Dr. Amritha",
+      "departmentId": 1
+    },
+    {
+      "id": 7,
+      "name": "Dr. T. Ramkumar",
+      "departmentId": 1
+    },
+    {
+      "id": 8,
+      "name": "Ms.Gayathri",
+      "departmentId": 1
+    }
+  ],
+  "sections": [
+    {
+      "id": 1,
+      "name": "I B.com.(IT)",
+      "departmentId": 1
+    },
+    {
+      "id": 2,
+      "name": "II B.com.(IT)",
+      "departmentId": 1
+    },
+    {
+      "id": 3,
+      "name": "III B.com.(IT)",
+      "departmentId": 1
+    }
+  ],
+  "timeslots": [
+    {
+      "id": 1,
+      "dayOfWeek": "Monday",
+      "label": "Period 1",
+      "startTime": "09:15",
+      "endTime": "10:10"
+    },
+    {
+      "id": 2,
+      "dayOfWeek": "Tuesday",
+      "label": "Period 1",
+      "startTime": "09:15",
+      "endTime": "10:10"
+    },
+    {
+      "id": 3,
+      "dayOfWeek": "Wednesday",
+      "label": "Period 1",
+      "startTime": "09:15",
+      "endTime": "10:10"
+    },
+    {
+      "id": 4,
+      "dayOfWeek": "Thursday",
+      "label": "Period 1",
+      "startTime": "09:15",
+      "endTime": "10:10"
+    },
+    {
+      "id": 5,
+      "dayOfWeek": "Friday",
+      "label": "Period 1",
+      "startTime": "09:15",
+      "endTime": "10:10"
+    },
+    {
+      "id": 6,
+      "dayOfWeek": "Monday",
+      "label": "Period 2",
+      "startTime": "10:10",
+      "endTime": "11:05"
+    },
+    {
+      "id": 7,
+      "dayOfWeek": "Tuesday",
+      "label": "Period 2",
+      "startTime": "10:10",
+      "endTime": "11:05"
+    },
+    {
+      "id": 8,
+      "dayOfWeek": "Wednesday",
+      "label": "Period 2",
+      "startTime": "10:10",
+      "endTime": "11:05"
+    },
+    {
+      "id": 9,
+      "dayOfWeek": "Thursday",
+      "label": "Period 2",
+      "startTime": "10:10",
+      "endTime": "11:05"
+    },
+    {
+      "id": 10,
+      "dayOfWeek": "Friday",
+      "label": "Period 2",
+      "startTime": "10:10",
+      "endTime": "11:05"
+    },
+    {
+      "id": 12,
+      "dayOfWeek": "Monday",
+      "label": "Break",
+      "startTime": "11:05",
+      "endTime": "11:30"
+    },
+    {
+      "id": 13,
+      "dayOfWeek": "Tuesday",
+      "label": "Break",
+      "startTime": "11:05",
+      "endTime": "11:30"
+    },
+    {
+      "id": 14,
+      "dayOfWeek": "Wednesday",
+      "label": "Break",
+      "startTime": "11:05",
+      "endTime": "11:30"
+    },
+    {
+      "id": 15,
+      "dayOfWeek": "Thursday",
+      "label": "Break",
+      "startTime": "11:05",
+      "endTime": "11:30"
+    },
+    {
+      "id": 16,
+      "dayOfWeek": "Friday",
+      "label": "Break",
+      "startTime": "11:05",
+      "endTime": "11:30"
+    },
+    {
+      "id": 17,
+      "dayOfWeek": "Monday",
+      "label": "Period 3",
+      "startTime": "11:30",
+      "endTime": "12:25"
+    },
+    {
+      "id": 18,
+      "dayOfWeek": "Tuesday",
+      "label": "Period 3",
+      "startTime": "11:30",
+      "endTime": "12:25"
+    },
+    {
+      "id": 19,
+      "dayOfWeek": "Wednesday",
+      "label": "Period 3",
+      "startTime": "11:30",
+      "endTime": "12:25"
+    },
+    {
+      "id": 20,
+      "dayOfWeek": "Thursday",
+      "label": "Period 3",
+      "startTime": "11:30",
+      "endTime": "12:25"
+    },
+    {
+      "id": 21,
+      "dayOfWeek": "Friday",
+      "label": "Period 3",
+      "startTime": "11:30",
+      "endTime": "12:25"
+    },
+    {
+      "id": 22,
+      "dayOfWeek": "Monday",
+      "label": "Period 4",
+      "startTime": "12:25",
+      "endTime": "13:20"
+    },
+    {
+      "id": 23,
+      "dayOfWeek": "Tuesday",
+      "label": "Period 4",
+      "startTime": "12:25",
+      "endTime": "13:20"
+    },
+    {
+      "id": 24,
+      "dayOfWeek": "Wednesday",
+      "label": "Period 4",
+      "startTime": "12:25",
+      "endTime": "13:20"
+    },
+    {
+      "id": 25,
+      "dayOfWeek": "Thursday",
+      "label": "Period 4",
+      "startTime": "12:25",
+      "endTime": "13:20"
+    },
+    {
+      "id": 26,
+      "dayOfWeek": "Friday",
+      "label": "Period 4",
+      "startTime": "12:25",
+      "endTime": "13:20"
+    },
+    {
+      "id": 27,
+      "dayOfWeek": "Monday",
+      "label": "Lunch",
+      "startTime": "13:20",
+      "endTime": "14:15"
+    },
+    {
+      "id": 28,
+      "dayOfWeek": "Tuesday",
+      "label": "Lunch",
+      "startTime": "13:20",
+      "endTime": "14:15"
+    },
+    {
+      "id": 29,
+      "dayOfWeek": "Wednesday",
+      "label": "Lunch",
+      "startTime": "13:20",
+      "endTime": "14:15"
+    },
+    {
+      "id": 30,
+      "dayOfWeek": "Thursday",
+      "label": "Lunch",
+      "startTime": "13:20",
+      "endTime": "14:15"
+    },
+    {
+      "id": 31,
+      "dayOfWeek": "Friday",
+      "label": "Lunch",
+      "startTime": "13:20",
+      "endTime": "14:15"
+    },
+    {
+      "id": 32,
+      "dayOfWeek": "Monday",
+      "label": "Period 5",
+      "startTime": "14:15",
+      "endTime": "15:10"
+    },
+    {
+      "id": 33,
+      "dayOfWeek": "Tuesday",
+      "label": "Period 5",
+      "startTime": "14:15",
+      "endTime": "15:10"
+    },
+    {
+      "id": 34,
+      "dayOfWeek": "Wednesday",
+      "label": "Period 5",
+      "startTime": "14:15",
+      "endTime": "15:10"
+    },
+    {
+      "id": 35,
+      "dayOfWeek": "Thursday",
+      "label": "Period 5",
+      "startTime": "14:15",
+      "endTime": "15:10"
+    },
+    {
+      "id": 36,
+      "dayOfWeek": "Friday",
+      "label": "Period 5",
+      "startTime": "14:15",
+      "endTime": "15:10"
+    },
+    {
+      "id": 38,
+      "dayOfWeek": "Monday",
+      "label": "Period 6",
+      "startTime": "15:10",
+      "endTime": "16:05"
+    },
+    {
+      "id": 39,
+      "dayOfWeek": "Tuesday",
+      "label": "Period 6",
+      "startTime": "15:10",
+      "endTime": "16:05"
+    },
+    {
+      "id": 40,
+      "dayOfWeek": "Wednesday",
+      "label": "Period 6",
+      "startTime": "15:10",
+      "endTime": "16:05"
+    },
+    {
+      "id": 41,
+      "dayOfWeek": "Thursday",
+      "label": "Period 6",
+      "startTime": "15:10",
+      "endTime": "16:05"
+    },
+    {
+      "id": 42,
+      "dayOfWeek": "Friday",
+      "label": "Period 6",
+      "startTime": "15:10",
+      "endTime": "16:05"
+    }
+  ],
+  "days": [
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday"
+  ]
+}

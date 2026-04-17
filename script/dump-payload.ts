@@ -1,9 +1,8 @@
-import axios from "axios";
 import { storage } from "../server/storage";
+import fs from "fs";
 import "dotenv/config";
 
 async function run() {
-  process.env.PYTHON_SERVICE_URL = "https://automatic-time-table-scheduler.onrender.com";
   const wsId = 1;
   const depts = await storage.getDepartments(wsId);
   if (!depts.length) { console.log("NO DEPTS"); return; }
@@ -45,18 +44,8 @@ async function run() {
     days,
   };
 
-  console.log("Pinging Remote Python...");
-  try {
-    const start = Date.now();
-    const res = await axios.post("https://automatic-time-table-scheduler.onrender.com/generate-timetable", payload);
-    console.log("Success! Timetable size:", res.data.timetable.length);
-    console.log("Time taken:", (Date.now() - start) / 1000, "seconds");
-  } catch(e: any) {
-    if (e.response) {
-      console.error("Remote failed:", e.response.status, e.response.data);
-    } else {
-      console.error("Remote failed:", e.message || e);
-    }
-  }
+  fs.writeFileSync("payload.json", JSON.stringify(payload, null, 2));
+  console.log("Dumped to payload.json");
+  process.exit(0);
 }
 run();
