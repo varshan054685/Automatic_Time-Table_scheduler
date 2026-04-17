@@ -53,12 +53,17 @@ class GenerateRequest(BaseModel):
 
 @app.post("/generate-timetable")
 def generate(payload: GenerateRequest):
+    print("Incoming payload:", payload)
+    
     data = payload.model_dump() if hasattr(payload, 'model_dump') else payload.dict()
     result = generate_timetable(data)
-    
+
+    print("Generated result:", result)
+
     if "error" in result:
+        print("Scheduler error:", result["error"])
         raise HTTPException(status_code=400, detail=result["error"])
-        
+
     return result
 
 @app.get("/health")

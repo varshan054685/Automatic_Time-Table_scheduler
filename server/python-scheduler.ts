@@ -44,9 +44,7 @@ export async function generateWithPython(
   console.log("📡 Using Python Service:", baseUrl);
 
   try {
-    // ✅ Debug input (VERY IMPORTANT)
-    console.log("📤 Sending payload to Python:");
-    console.log(JSON.stringify(payload, null, 2));
+    console.log("Sending to Python:", JSON.stringify(payload, null, 2));
 
     const response = await axios.post<SchedulerOutput>(
       `${baseUrl}/generate-timetable`,
@@ -65,19 +63,7 @@ export async function generateWithPython(
 
     return response.data;
   } catch (error: any) {
-    console.error("❌ Python service error:");
-
-    if (error.response) {
-      console.error("Status:", error.response.status);
-      console.error("Data:", error.response.data);
-
-      if (error.response.data?.detail) {
-        throw new Error(error.response.data.detail);
-      }
-    } else {
-      console.error(error.message);
-    }
-
-    throw new Error("Failed to generate timetable from Python service");
+    console.error("Python ERROR FULL:", error.response?.data || error.message);
+    throw new Error("Python failed");
   }
 }
