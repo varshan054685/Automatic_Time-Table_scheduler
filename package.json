@@ -7,7 +7,7 @@
     "dev": "concurrently \"npm run dev:node\" \"npm run dev:client\" \"npm run dev:python\"",
     "dev:client": "vite dev",
     "dev:node": "NODE_ENV=development tsx watch server/index.ts",
-    "dev:python": "cd python-service && ./venv/bin/python3 -m uvicorn app:app --host 0.0.0.0 --port 8000",
+    "dev:python": "cd python-service && ./venv/bin/python3 -m uvicorn app:app --host 0.0.0.0 --port 8000 --reload",
     "backend-build": "node script/build.ts",
     "start": "NODE_ENV=production node dist/index.cjs",
     "check": "tsc",

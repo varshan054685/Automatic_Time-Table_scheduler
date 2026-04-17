@@ -397,6 +397,8 @@ export async function registerRoutes(
       const slot = slotByKey.get(`${row.day.trim()}__${row.period.trim()}`);
 
       if (!section || !subject || !facultyMember || !room || !slot) {
+        console.error(`Failed to map row: section=${!!section}, subject=${!!subject}, faculty=${!!facultyMember}, room=${!!room}, slot=${!!slot}`);
+        console.error(`Row Payload:`, row);
         failed += 1;
         continue;
       }
@@ -477,9 +479,16 @@ export async function registerRoutes(
         error: r.status === "rejected" ? "Generation failed" : undefined,
       }));
       const totalSaved = summary.reduce((acc, s) => acc + (s.result?.saved || 0), 0);
+      
+      const failedCount = summary.filter((s) => s.status === "rejected").length;
+      if (failedCount === allDepts.length && allDepts.length > 0) {
+        throw new Error("Failed to generate timetables for all departments (possibly constraint impossible or timeout).");
+      }
+      
       res.json({ message: `Regenerated for ${allDepts.length} department(s). Total: ${totalSaved}.`, summary, totalSaved });
     } catch (error: any) {
-      res.status(500).json({ message: "Failed to regenerate timetables" });
+      console.error("Regenerate All Error:", error);
+      res.status(500).json({ message: error.message || "Failed to regenerate timetables" });
     }
   });
 

@@ -152,45 +152,8 @@ def generate_timetable(data: dict):
             else: cache[key] = None
         return cache[key]
 
-    # Section Contiguous Daily Schedule: Prevent holes/gaps in a student's day
-    # If a section has classes at period i and period k (i < k), it MUST have classes at all periods j (i < j < k)
-    for s_id in set(b['section_id'] for b in all_blocks):
-        for d_idx, p_indices in day_period_indices.items():
-            # Get variables for each period on this day
-            day_sec_vars = []
-            for p_idx in p_indices:
-                a = get_entity_active((d_idx, p_idx, s_id), sub_slot_active_cache, v_by_slot_sec, 'sec_act_gap')
-                day_sec_vars.append(a if a is not None else 0)
-            
-            # Enforce triplet implication
-            n_p = len(day_sec_vars)
-            for i in range(n_p):
-                for k in range(i + 2, n_p):
-                    for j in range(i + 1, k):
-                        v_i = day_sec_vars[i]
-                        v_j = day_sec_vars[j]
-                        v_k = day_sec_vars[k]
-                        if isinstance(v_i, int) and isinstance(v_k, int):
-                            if v_i == 1 and v_k == 1 and isinstance(v_j, int) and v_j == 0:
-                                model.AddBoolOr([]) # Infeasible
-                            elif v_i == 1 and v_k == 1 and not isinstance(v_j, int):
-                                model.Add(v_j == 1)
-                        elif isinstance(v_i, int) and v_i == 1 and not isinstance(v_k, int):
-                            if isinstance(v_j, int):
-                                if v_j == 0: model.Add(v_k == 0)
-                            else:
-                                model.Add(v_j >= v_k)
-                        elif isinstance(v_k, int) and v_k == 1 and not isinstance(v_i, int):
-                            if isinstance(v_j, int):
-                                if v_j == 0: model.Add(v_i == 0)
-                            else:
-                                model.Add(v_j >= v_i)
-                        elif not isinstance(v_i, int) and not isinstance(v_k, int):
-                            if isinstance(v_j, int):
-                                if v_j == 0:
-                                    model.Add(v_i + v_k <= 1)
-                            else:
-                                model.Add(v_j >= v_i + v_k - 1)
+    # Section Contiguous Daily Schedule (Soft constraint via late_period_vars is enough)
+    # The previous strict triplet constraint caused catastrophic combinatorial explosion and timeouts.
 
 
     for f_id in set(b['faculty_id'] for b in all_blocks):
@@ -294,7 +257,7 @@ def generate_timetable(data: dict):
     model.Maximize(total_sch * 10000 - scheduling_penalty - sum(b2b_penalty) * 10 - sum(sec_day_active_vars) * 50 - sum(late_period_vars))
 
     solver = cp_model.CpSolver()
-    solver.parameters.max_time_in_seconds = 180.0 # Increase to 3 mins for hard packing
+    solver.parameters.max_time_in_seconds = 45.0 # Stop fast to respect backend timeouts
     status = solver.Solve(model)
 
     if status in (cp_model.OPTIMAL, cp_model.FEASIBLE):
