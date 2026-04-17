@@ -95,6 +95,11 @@ app.use((req, res, next) => {
 (async () => {
   await registerRoutes(httpServer, app);
 
+  // Health check endpoint for the root URL
+  app.get('/', (req: Request, res: Response) => {
+    res.json({ message: 'Timetable API Backend is running!' });
+  });
+
   // ─── Security: Global error handler — never leak internal details in production ───
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
