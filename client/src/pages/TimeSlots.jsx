@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
-import { Plus, Trash2, Pencil, Calendar, Upload, Download, Loader2, Sparkles, Clock, CalendarDays } from "lucide-react";
+import { Plus, Trash2, Pencil, Calendar, Upload, Download, Loader2, Sparkles, Clock, CalendarDays, MousePointer2, Settings2, FileSpreadsheet, ChevronRight, Activity } from "lucide-react";
 import { useTimeSlots, useCreateTimeSlot, useUpdateTimeSlot, useDeleteTimeSlot } from "@/hooks/use-master-data";
 import { useToast } from "@/hooks/use-toast";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -15,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import * as XLSX from "xlsx";
 import { ExportHint } from "@/components/ExportHint";
+import { motion, AnimatePresence } from "framer-motion";
 
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
@@ -32,39 +33,39 @@ function TimePicker({ value, onChange }) {
   };
 
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl border border-slate-200 shadow-inner">
       <Select value={displayHours.toString()} onValueChange={(h) => updateTime(h, minutes, isPM)}>
-        <SelectTrigger className="w-[70px]">
+        <SelectTrigger className="w-[70px] h-10 border-0 bg-white ring-0 focus:ring-0 rounded-lg font-bold">
           <SelectValue />
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent className="rounded-xl">
           {Array.from({ length: 12 }, (_, i) => i + 1).map(h => (
-            <SelectItem key={h} value={h.toString()}>{h}</SelectItem>
+            <SelectItem key={h} value={h.toString()} className="font-bold">{h}</SelectItem>
           ))}
         </SelectContent>
       </Select>
-      <span className="text-slate-400">:</span>
+      <span className="text-slate-400 font-bold">:</span>
       <Select value={minutes} onValueChange={(m) => updateTime(displayHours, m, isPM)}>
-        <SelectTrigger className="w-[70px]">
+        <SelectTrigger className="w-[70px] h-10 border-0 bg-white ring-0 focus:ring-0 rounded-lg font-bold">
           <SelectValue />
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent className="rounded-xl">
           {["00", "05", "10", "15", "20", "25", "30", "35", "40", "45", "50", "55"].map(m => (
-            <SelectItem key={m} value={m}>{m}</SelectItem>
+            <SelectItem key={m} value={m} className="font-bold">{m}</SelectItem>
           ))}
         </SelectContent>
       </Select>
-      <div className="flex border rounded-md overflow-hidden ml-1">
+      <div className="flex bg-white/50 p-1 rounded-lg gap-1 border border-slate-200">
         <button
           type="button"
-          className={`px-2 py-1 text-xs ${!isPM ? 'bg-primary text-white' : 'bg-white text-slate-600'}`}
+          className={`px-3 py-1 text-[10px] font-black rounded-md transition-all ${!isPM ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-200'}`}
           onClick={() => updateTime(displayHours, minutes, false)}
         >
           AM
         </button>
         <button
           type="button"
-          className={`px-2 py-1 text-xs ${isPM ? 'bg-primary text-white' : 'bg-white text-slate-600'}`}
+          className={`px-3 py-1 text-[10px] font-black rounded-md transition-all ${isPM ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-200'}`}
           onClick={() => updateTime(displayHours, minutes, true)}
         >
           PM
@@ -98,17 +99,15 @@ function BulkTimeSlotDialog({ onSuccess, editingGroup = null, onClose }) {
     try {
       if (editingGroup) {
         if (values.days.length === 0) {
-          toast({ title: "Error", description: "Please select at least one day", variant: "destructive" });
+          toast({ title: "Configuration Error", description: "Select at least one day for this slot group", variant: "destructive" });
           return;
         }
 
         const newDays = [...values.days];
         
-        // Update existing slots where the day matches, delete if unchecked
         for (const oldSlot of editingGroup) {
           const dayIndex = newDays.indexOf(oldSlot.dayOfWeek);
           if (dayIndex !== -1) {
-            // Keep and update this slot's time/label
             await updateMutation.mutateAsync({
               id: oldSlot.id,
               dayOfWeek: oldSlot.dayOfWeek,
@@ -116,15 +115,12 @@ function BulkTimeSlotDialog({ onSuccess, editingGroup = null, onClose }) {
               startTime: values.startTime,
               endTime: values.endTime
             });
-            // Remove from newDays because it's handled
             newDays.splice(dayIndex, 1);
           } else {
-            // Day was unchecked, delete this slot
             await deleteMutation.mutateAsync(oldSlot.id);
           }
         }
         
-        // Any remaining newDays are completely new slots added to this group
         for (const day of newDays) {
           await createMutation.mutateAsync({
             dayOfWeek: day,
@@ -133,11 +129,10 @@ function BulkTimeSlotDialog({ onSuccess, editingGroup = null, onClose }) {
             endTime: values.endTime
           });
         }
-
-        toast({ title: "Success", description: "Time slot updated" });
+        toast({ title: "Group Sync Complete", description: "All instances of this time slot have been synchronized." });
       } else {
         if (values.days.length === 0) {
-          toast({ title: "Error", description: "Please select at least one day", variant: "destructive" });
+          toast({ title: "Configuration Error", description: "At least one target day is required", variant: "destructive" });
           return;
         }
         for (const day of values.days) {
@@ -148,44 +143,47 @@ function BulkTimeSlotDialog({ onSuccess, editingGroup = null, onClose }) {
             endTime: values.endTime
           });
         }
-        toast({ title: "Success", description: `Added slots for ${values.days.length} days` });
+        toast({ title: "Generation Successful", description: `Injected periods across ${values.days.length} academic days` });
       }
       onSuccess();
       if (onClose) onClose();
     } catch (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      toast({ title: "Transaction Failed", description: error.message, variant: "destructive" });
     }
   };
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
         <FormField
           control={form.control}
           name="days"
           render={() => (
             <FormItem>
-              <FormLabel>Select Days</FormLabel>
-              <div className="grid grid-cols-2 gap-2">
+              <FormLabel className="font-bold text-slate-700">Scope of Application (Days)</FormLabel>
+              <div className="flex flex-wrap gap-2 pt-2">
                 {DAYS.map((day) => (
                   <FormField
                     key={day}
                     control={form.control}
                     name="days"
                     render={({ field }) => (
-                      <FormItem key={day} className="flex flex-row items-start space-x-3 space-y-0">
-                        <FormControl>
-                          <Checkbox
-                            checked={field.value?.includes(day)}
-                            onCheckedChange={(checked) => {
-                              return checked
-                                ? field.onChange([...field.value, day])
-                                : field.onChange(field.value?.filter((value) => value !== day))
+                        <button
+                            type="button"
+                            onClick={() => {
+                                const checked = field.value?.includes(day);
+                                return checked
+                                    ? field.onChange(field.value?.filter((value) => value !== day))
+                                    : field.onChange([...field.value, day])
                             }}
-                          />
-                        </FormControl>
-                        <FormLabel className="font-normal">{day}</FormLabel>
-                      </FormItem>
+                            className={`px-4 py-2 rounded-xl text-xs font-black transition-all ${
+                                field.value?.includes(day)
+                                    ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/20 scale-105'
+                                    : 'bg-slate-50 text-slate-400 hover:bg-indigo-50 hover:text-indigo-500'
+                            }`}
+                        >
+                            {day.slice(0, 3).toUpperCase()}
+                        </button>
                     )}
                   />
                 ))}
@@ -199,18 +197,23 @@ function BulkTimeSlotDialog({ onSuccess, editingGroup = null, onClose }) {
           name="label"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Label</FormLabel>
-              <FormControl><Input placeholder="Period 1" {...field} /></FormControl>
+              <FormLabel className="font-bold text-slate-700">Academic Period Label</FormLabel>
+              <FormControl>
+                <div className="relative">
+                    <Clock className="absolute left-3 top-3.5 h-4 w-4 text-slate-400" />
+                    <Input className="h-12 pl-10 rounded-xl bg-slate-50/50 border-slate-200 border-2 font-bold focus:border-indigo-600 transition-all" placeholder="e.g. Period 1 or Lunch Break" {...field} />
+                </div>
+              </FormControl>
             </FormItem>
           )}
         />
-        <div className="grid grid-cols-1 gap-4">
+        <div className="grid grid-cols-2 gap-6">
           <FormField
             control={form.control}
             name="startTime"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Start Time</FormLabel>
+                <FormLabel className="font-bold text-slate-700">Interval Start</FormLabel>
                 <FormControl>
                   <TimePicker value={field.value} onChange={field.onChange} />
                 </FormControl>
@@ -222,7 +225,7 @@ function BulkTimeSlotDialog({ onSuccess, editingGroup = null, onClose }) {
             name="endTime"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>End Time</FormLabel>
+                <FormLabel className="font-bold text-slate-700">Interval End</FormLabel>
                 <FormControl>
                   <TimePicker value={field.value} onChange={field.onChange} />
                 </FormControl>
@@ -230,8 +233,8 @@ function BulkTimeSlotDialog({ onSuccess, editingGroup = null, onClose }) {
             )}
           />
         </div>
-        <Button type="submit" className="w-full" disabled={createMutation.isPending || updateMutation.isPending || deleteMutation.isPending}>
-          {editingGroup ? "Update Time Slot" : "Create for Selected Days"}
+        <Button type="submit" className="w-full h-12 premium-gradient shadow-xl shadow-indigo-500/20 text-base font-black rounded-xl transition-all hover:scale-[1.02]" disabled={createMutation.isPending || updateMutation.isPending || deleteMutation.isPending}>
+          {editingGroup ? "Synchronize Updates" : "Create Active Periods"}
         </Button>
       </form>
     </Form>
@@ -297,21 +300,19 @@ function TimeSlotImport({ timeSlots, onImportComplete, variant = "outline" }) {
                 successCount++;
               }
             } catch (err) {
-              console.error(`Failed to import/update time slot ${label}:`, err);
               errorCount++;
             }
           }
         }
 
         toast({ 
-          title: "Import Complete", 
-          description: `Imported ${successCount} new, updated ${updateCount} time slots.${errorCount > 0 ? ` Failed ${errorCount} records.` : ""}`,
+          title: "Import Chain Resolved", 
+          description: `Ingested ${successCount} entries, synchronized ${updateCount}. ${errorCount > 0 ? `${errorCount} failures observed.` : ""}`,
         });
         
         if (onImportComplete) onImportComplete();
       } catch (error) {
-        console.error("Excel import error:", error);
-        toast({ title: "Import Failed", description: error?.message || "Failed to read Excel file", variant: "destructive" });
+        toast({ title: "IO Error", description: "Failed to parse academic data stream.", variant: "destructive" });
       } finally {
         setIsImporting(false);
         if (fileInputRef.current) fileInputRef.current.value = "";
@@ -323,10 +324,10 @@ function TimeSlotImport({ timeSlots, onImportComplete, variant = "outline" }) {
   return (
     <div className="relative">
       <Input type="file" accept=".xlsx, .xls" className="hidden" id="import-excel" ref={fileInputRef} onChange={handleImport} disabled={isImporting} />
-      <Button variant={variant} className="gap-2" asChild disabled={isImporting}>
+      <Button variant={variant} className={`gap-2 h-11 px-6 rounded-xl font-bold transition-all ${variant === 'outline' ? 'border-2 border-slate-200' : ''}`} asChild disabled={isImporting}>
         <label htmlFor="import-excel" className="cursor-pointer">
-          {isImporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-          {isImporting ? "Importing..." : "Import Excel"}
+          {isImporting ? <Loader2 className="w-4 h-4 animate-spin text-indigo-600" /> : <FileSpreadsheet className="w-4 h-4" />}
+          {isImporting ? "Injecting Data..." : "Import Dataset"}
         </label>
       </Button>
     </div>
@@ -344,7 +345,7 @@ function FirstTimeSetup({ onComplete, timeSlots }) {
 
   const handleGenerate = async () => {
     if (selectedDays.length === 0) {
-      toast({ title: "Validation Error", description: "Select at least one day", variant: "destructive" });
+      toast({ title: "Scope Incomplete", description: "Please designate active academic days.", variant: "destructive" });
       return;
     }
     
@@ -375,129 +376,147 @@ function FirstTimeSetup({ onComplete, timeSlots }) {
     }
     
     try {
-      // Create sequentially to ensure ordering and not overload client
       for (const slot of slotsToCreate) {
         await createMutation.mutateAsync(slot);
       }
-      toast({ title: "Success", description: "Schedule structure created successfully!" });
+      toast({ title: "Architecture Deployed", description: "Your weekly period structure has been successfully initialized." });
       onComplete();
     } catch (error) {
-      toast({ title: "Error", description: error.message || "Failed to generate slots", variant: "destructive" });
+      toast({ title: "Deployment Error", description: error.message || "Failed to generate structure.", variant: "destructive" });
     } finally {
       setIsGenerating(false);
     }
   };
 
   return (
-    <Card className="max-w-3xl mx-auto shadow-xl border-slate-200/60 overflow-hidden">
-      <div className="h-1 bg-gradient-to-r from-indigo-500 to-purple-600" />
-      <CardHeader className="text-center pb-8 pt-10">
-        <div className="mx-auto w-16 h-16 bg-indigo-50 text-indigo-600 rounded-full flex items-center justify-center mb-6">
-          <CalendarDays className="w-8 h-8" />
-        </div>
-        <CardTitle className="text-3xl font-display">Let's set up your Schedule Weekly Structure</CardTitle>
-        <CardDescription className="text-base mt-2">
-          It looks like you haven't set up your daily time periods yet. 
-          Use this wizard to auto-generate your college timings or import them via Excel.
-        </CardDescription>
-        
-        <div className="flex justify-center mt-6">
-          <TimeSlotImport timeSlots={timeSlots} onImportComplete={onComplete} variant="secondary" />
-        </div>
-      </CardHeader>
-
-      <CardContent className="space-y-8 px-10">
-        <div className="relative">
-          <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-slate-200" /></div>
-          <div className="relative flex justify-center text-xs uppercase"><span className="bg-white px-2 text-slate-500 font-medium tracking-wider">OR GENERATE MANUALLY</span></div>
-        </div>
-
-        <div className="bg-slate-50/50 p-6 rounded-xl border border-slate-100 space-y-6">
-          <div>
-            <Label className="text-base mb-3 block text-slate-700">How many days for a week?</Label>
-            <div className="flex flex-wrap gap-2">
-              {DAYS.map(day => {
-                const isSelected = selectedDays.includes(day);
-                return (
-                  <button
-                    key={day}
-                    onClick={() => {
-                      if (isSelected) {
-                        setSelectedDays(selectedDays.filter(d => d !== day));
-                      } else {
-                        setSelectedDays([...selectedDays, day]);
-                      }
-                    }}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                      isSelected 
-                        ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200' 
-                        : 'bg-white text-slate-600 border border-slate-200 hover:border-indigo-300'
-                    }`}
-                  >
-                    {day}
-                  </button>
-                )
-              })}
+    <motion.div 
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="max-w-4xl mx-auto"
+    >
+        <Card className="border-0 shadow-2xl shadow-indigo-500/10 rounded-[3rem] overflow-hidden bg-white">
+        <div className="h-2 premium-gradient" />
+        <CardHeader className="text-center pb-12 pt-16 px-12">
+            <motion.div 
+                initial={{ y: -20 }}
+                animate={{ y: 0 }}
+                className="mx-auto w-24 h-24 bg-indigo-50 text-indigo-600 rounded-[2.5rem] flex items-center justify-center mb-10 shadow-xl shadow-indigo-100/50"
+            >
+            <CalendarDays className="w-12 h-12" />
+            </motion.div>
+            <CardTitle className="text-4xl font-display font-black tracking-tight text-slate-900 leading-tight">
+                Architect Your Weekly <br /><span className="text-indigo-600">Period Structure</span>
+            </CardTitle>
+            <CardDescription className="text-lg font-medium mt-6 text-slate-500 max-w-xl mx-auto leading-relaxed">
+                Initialize your institution's academic cadence. Utilize our automation wizard or synchronize existing datasets from Excel.
+            </CardDescription>
+            
+            <div className="flex justify-center mt-10">
+            <TimeSlotImport timeSlots={timeSlots} onImportComplete={onComplete} variant="secondary" />
             </div>
-          </div>
+        </CardHeader>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4">
-            <div className="space-y-2">
-              <Label className="text-slate-700">Periods for a day</Label>
-              <Input 
-                type="number" 
-                min="1" 
-                max="15" 
-                value={periods} 
-                onChange={e => setPeriods(e.target.value)}
-                className="bg-white"
-              />
+        <CardContent className="space-y-12 px-16 pb-16">
+            <div className="relative">
+                <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-slate-100" /></div>
+                <div className="relative flex justify-center text-[10px] font-black uppercase tracking-[0.3em]"><span className="bg-white px-6 text-slate-400">Manual Configuration</span></div>
             </div>
-            <div className="space-y-2">
-              <Label className="text-slate-700">College Start Time</Label>
-              <div className="bg-white rounded-md border p-2 shadow-sm">
-                <TimePicker value={startTime} onChange={setStartTime} />
-              </div>
+
+            <div className="grid gap-12">
+            <div className="space-y-6">
+                <Label className="text-sm font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-indigo-500" /> Active Academic Horizons
+                </Label>
+                <div className="flex flex-wrap gap-4">
+                {DAYS.map(day => {
+                    const isSelected = selectedDays.includes(day);
+                    return (
+                    <motion.button
+                        key={day}
+                        whileHover={{ y: -2 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => {
+                        if (isSelected) {
+                            setSelectedDays(selectedDays.filter(d => d !== day));
+                        } else {
+                            setSelectedDays([...selectedDays, day]);
+                        }
+                        }}
+                        className={`px-6 py-4 rounded-[1.2rem] text-sm font-black transition-all border-2 ${
+                        isSelected 
+                            ? 'bg-indigo-600 text-white border-indigo-600 shadow-xl shadow-indigo-500/30' 
+                            : 'bg-slate-50 text-slate-400 border-transparent hover:border-slate-200'
+                        }`}
+                    >
+                        {day}
+                    </motion.button>
+                    )
+                })}
+                </div>
             </div>
-            <div className="space-y-2">
-              <Label className="text-slate-700">Duration per period (mins)</Label>
-              <div className="relative">
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
+                <div className="space-y-4">
+                <Label className="text-sm font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                    <Activity className="w-4 h-4 text-indigo-500" /> Daily Periods
+                </Label>
                 <Input 
-                  type="number" 
-                  min="15" 
-                  step="5"
-                  value={duration} 
-                  onChange={e => setDuration(e.target.value)}
-                  className="bg-white pr-10"
+                    type="number" 
+                    min="1" 
+                    max="15" 
+                    value={periods} 
+                    onChange={e => setPeriods(e.target.value)}
+                    className="h-14 rounded-2xl bg-slate-50 border-transparent focus:border-indigo-500 font-black text-lg text-slate-900"
                 />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">min</span>
-              </div>
+                </div>
+                <div className="space-y-4">
+                <Label className="text-sm font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-indigo-500" /> Start Epoch
+                </Label>
+                <div className="bg-slate-50 rounded-2xl p-2 border border-slate-100">
+                    <TimePicker value={startTime} onChange={setStartTime} />
+                </div>
+                </div>
+                <div className="space-y-4">
+                <Label className="text-sm font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                    <MousePointer2 className="w-4 h-4 text-indigo-500" /> Unit Duration
+                </Label>
+                <div className="relative">
+                    <Input 
+                    type="number" 
+                    min="15" 
+                    step="5"
+                    value={duration} 
+                    onChange={e => setDuration(e.target.value)}
+                    className="h-14 rounded-2xl bg-slate-50 border-transparent focus:border-indigo-500 font-black text-lg text-slate-900 pr-14"
+                    />
+                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 font-black text-[10px] uppercase">min</span>
+                </div>
+                </div>
             </div>
-          </div>
-        </div>
-      </CardContent>
+            </div>
 
-      <CardFooter className="px-10 pb-10 pt-4">
-        <Button 
-          size="lg" 
-          className="w-full text-base h-12 gap-2 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700" 
-          onClick={handleGenerate}
-          disabled={isGenerating}
-        >
-          {isGenerating ? (
-            <><Loader2 className="w-5 h-5 animate-spin" /> Generating Structure...</>
-          ) : (
-            <><Sparkles className="w-5 h-5" /> Generate Timetable Structure</>
-          )}
-        </Button>
-      </CardFooter>
-    </Card>
+            <Button 
+                size="lg" 
+                className="w-full h-16 text-lg font-black tracking-tight gap-3 premium-gradient shadow-[0_20px_40px_-15px_rgba(79,70,229,0.3)] rounded-3xl transition-all hover:scale-[1.02] active:scale-[0.98]" 
+                onClick={handleGenerate}
+                disabled={isGenerating}
+            >
+            {isGenerating ? (
+                <><Loader2 className="w-6 h-6 animate-spin" /> Finalizing Architecture...</>
+            ) : (
+                <><Sparkles className="w-6 h-6" /> Deploy Period Structure</>
+            )}
+            </Button>
+        </CardContent>
+        </Card>
+    </motion.div>
   );
 }
 
 export default function TimeSlots() {
   const [bulkOpen, setBulkOpen] = useState(false);
-  const [editGroup, setEditGroup] = useState(null); // array of slots
+  const [editGroup, setEditGroup] = useState(null);
   const { toast } = useToast();
   const { data: timeSlots, isLoading, refetch } = useTimeSlots();
   const deleteMutation = useDeleteTimeSlot();
@@ -530,7 +549,6 @@ export default function TimeSlots() {
   }, [timeSlots]);
 
   const handleEdit = (prototypeSlot) => {
-    // Collect all actual slots that share this exact time and label across different days
     const relatedSlots = timeSlots.filter(s => 
       s.label === prototypeSlot.label && 
       s.startTime === prototypeSlot.startTime && 
@@ -549,46 +567,51 @@ export default function TimeSlots() {
 
   if (isLoading) {
     return (
-      <div className="flex min-h-screen bg-slate-50/50 items-center justify-center">
+      <div className="flex min-h-screen bg-[#f8fafc] items-center justify-center">
         <Sidebar className="hidden lg:block z-0" />
-        <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+        <Loader2 className="w-12 h-12 animate-spin text-indigo-600" />
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen bg-slate-50/50">
+    <div className="flex min-h-screen bg-[#f8fafc]">
       <Sidebar />
-      <main className="flex-1  p-4 lg:p-8">
+      <main className="flex-1 p-4 lg:p-8 overflow-y-auto">
         
         {timeSlots.length === 0 ? (
           <div className="pt-12 lg:pt-8 min-h-[calc(100vh-4rem)] flex flex-col justify-center">
             <FirstTimeSetup onComplete={refetch} timeSlots={timeSlots} />
           </div>
         ) : (
-          <div className="max-w-5xl mx-auto space-y-6 pt-12 lg:pt-0">
-            <div className="flex justify-between items-center">
-              <div>
-                <h1 className="text-3xl font-display font-bold text-slate-900">Time Slots</h1>
-                <p className="text-slate-500 mt-1">Manage class periods across the week.</p>
-              </div>
+          <div className="max-w-6xl mx-auto space-y-10 pt-12 lg:pt-0">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+              <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
+                <div className="flex items-center gap-4 mb-2">
+                    <div className="p-3 bg-white rounded-2xl shadow-sm border border-slate-100">
+                        <Settings2 className="w-8 h-8 text-indigo-600" />
+                    </div>
+                    <h1 className="text-4xl font-display font-black text-slate-900 tracking-tight">Time Slots</h1>
+                </div>
+                <p className="text-slate-500 font-medium">Orchestrate and manage academic intervals and period synchronization.</p>
+              </motion.div>
               
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-3">
                 <TimeSlotImport timeSlots={timeSlots} onImportComplete={refetch} />
 
-                <Button variant="outline" className="gap-2" onClick={handleExport}>
-                  <Upload className="w-4 h-4" /> Export Excel
+                <Button variant="outline" className="gap-2 h-11 px-6 rounded-xl border-2 border-slate-200 font-bold hover:bg-slate-50 hover:border-slate-300 transition-all" onClick={handleExport}>
+                  <Upload className="w-4 h-4" /> Export Dataset
                 </Button>
 
                 <Dialog open={bulkOpen} onOpenChange={setBulkOpen}>
                   <DialogTrigger asChild>
-                    <Button className="gap-2 shadow-lg shadow-primary/20 bg-indigo-600 hover:bg-indigo-700 text-white">
-                      <Calendar className="w-4 h-4" /> Add custom Period
+                    <Button className="premium-gradient premium-gradient-hover gap-2 h-11 px-8 shadow-xl shadow-indigo-500/20 text-white font-black rounded-xl transition-all hover:scale-105 active:scale-95">
+                      <Plus className="w-5 h-5" /> Add New Period
                     </Button>
                   </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Add Custom Time Slot</DialogTitle>
+                  <DialogContent className="sm:max-w-md rounded-[2.5rem] border-0 p-8 shadow-2xl">
+                    <DialogHeader className="mb-6">
+                      <DialogTitle className="text-2xl font-black text-slate-900">Define Custom Interval</DialogTitle>
                     </DialogHeader>
                     <BulkTimeSlotDialog onSuccess={refetch} onClose={() => setBulkOpen(false)} />
                   </DialogContent>
@@ -599,9 +622,9 @@ export default function TimeSlots() {
             <ExportHint />
 
             <Dialog open={!!editGroup} onOpenChange={(v) => !v && setEditGroup(null)}>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Edit Time Slot for {editGroup?.[0]?.label}</DialogTitle>
+              <DialogContent className="sm:max-w-md rounded-[2.5rem] border-0 p-8 shadow-2xl">
+                <DialogHeader className="mb-6">
+                  <DialogTitle className="text-2xl font-black text-slate-900">Modify Period Chain</DialogTitle>
                 </DialogHeader>
                 {editGroup && (
                   <BulkTimeSlotDialog 
@@ -613,74 +636,92 @@ export default function TimeSlots() {
               </DialogContent>
             </Dialog>
 
-            <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+            <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden"
+            >
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-slate-50 hover:bg-slate-50">
-                    <TableHead className="w-[180px]">Period Label</TableHead>
-                    <TableHead>Time Range</TableHead>
-                    <TableHead>Active Days</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                  <TableRow className="bg-slate-50/50 hover:bg-slate-50/50 border-b border-slate-100">
+                    <TableHead className="py-6 px-8 font-black text-slate-400 uppercase tracking-widest text-[10px]">Reference Label</TableHead>
+                    <TableHead className="py-6 px-6 font-black text-slate-400 uppercase tracking-widest text-[10px]">Temporal Scope</TableHead>
+                    <TableHead className="py-6 px-6 font-black text-slate-400 uppercase tracking-widest text-[10px]">Active Synchronicity</TableHead>
+                    <TableHead className="py-6 px-8 text-right font-black text-slate-400 uppercase tracking-widest text-[10px]">Operations</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {uniquePeriods.map((slot, idx) => {
-                    const activeDays = timeSlots
-                      .filter(s => s.label === slot.label && s.startTime === slot.startTime)
-                      .map(s => s.dayOfWeek);
+                  <AnimatePresence mode="popLayout">
+                    {uniquePeriods.map((slot, idx) => {
+                        const activeDaysGroup = timeSlots
+                        .filter(s => s.label === slot.label && s.startTime === slot.startTime)
+                        .map(s => s.dayOfWeek);
 
-                    return (
-                      <TableRow key={idx} className="group hover:bg-slate-50/50">
-                        <TableCell className="font-medium text-slate-900">
-                          <div className="flex items-center gap-2">
-                            <Clock className="w-4 h-4 text-indigo-400" />
-                            {slot.label}
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-slate-600">
-                          {formatTime(slot.startTime)} - {formatTime(slot.endTime)}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex flex-wrap gap-1">
-                            {activeDays.map(d => (
-                              <span key={d} className="px-2 py-1 bg-indigo-50 text-indigo-700 text-xs rounded-md font-medium shadow-sm border border-indigo-100">
-                                {d.slice(0, 3)}
-                              </span>
-                            ))}
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-2">
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="text-blue-500 hover:text-blue-600 hover:bg-blue-50 transition-colors h-8 w-8"
-                              onClick={() => handleEdit(slot)}
-                            >
-                              <Pencil className="w-4 h-4" />
-                            </Button>
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="text-red-500 hover:text-red-600 hover:bg-red-50 transition-colors h-8 w-8"
-                              onClick={() => {
-                                if(confirm(`Remove all ${activeDays.length} instances of ${slot.label} for all days?`)) {
-                                  timeSlots
-                                    .filter(s => s.label === slot.label && s.startTime === slot.startTime)
-                                    .forEach(s => deleteMutation.mutate(s.id));
-                                }
-                              }}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
+                        return (
+                        <motion.tr 
+                            key={`${slot.label}-${slot.startTime}`}
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="group border-b border-slate-50 last:border-0 hover:bg-slate-50/30 transition-all"
+                        >
+                            <TableCell className="py-6 px-8">
+                                <div className="flex items-center gap-4">
+                                    <div className={`p-2 rounded-xl ${slot.label.toLowerCase().includes('break') ? 'bg-rose-50 text-rose-500' : 'bg-indigo-50 text-indigo-500'}`}>
+                                        <Clock className="w-5 h-5" />
+                                    </div>
+                                    <span className="font-bold text-slate-900 text-base">{slot.label}</span>
+                                </div>
+                            </TableCell>
+                            <TableCell className="py-6 px-6">
+                                <div className="flex items-center gap-2 font-mono text-sm font-bold text-slate-500">
+                                    {formatTime(slot.startTime)} 
+                                    <ChevronRight className="w-4 h-4 text-slate-300" />
+                                    {formatTime(slot.endTime)}
+                                </div>
+                            </TableCell>
+                            <TableCell className="py-6 px-6 text-slate-600">
+                                <div className="flex flex-wrap gap-1.5">
+                                    {activeDaysGroup.map(d => (
+                                    <span key={d} className="px-3 py-1 bg-white text-slate-600 text-[10px] rounded-lg font-black uppercase tracking-tighter shadow-sm border border-slate-100">
+                                        {d.slice(0, 3)}
+                                    </span>
+                                    ))}
+                                </div>
+                            </TableCell>
+                            <TableCell className="py-6 px-8 text-right">
+                                <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-all transform translate-x-2 group-hover:translate-x-0">
+                                    <Button 
+                                        variant="ghost" 
+                                        size="icon" 
+                                        className="h-10 w-10 rounded-xl text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 transition-all shadow-sm bg-white border border-slate-100"
+                                        onClick={() => handleEdit(slot)}
+                                    >
+                                    <Pencil className="w-4 h-4" />
+                                    </Button>
+                                    <Button 
+                                        variant="ghost" 
+                                        size="icon" 
+                                        className="h-10 w-10 rounded-xl text-rose-500 hover:text-rose-600 hover:bg-rose-50 transition-all shadow-sm bg-white border border-slate-100"
+                                        onClick={() => {
+                                            if(confirm(`Obliterate all ${activeDaysGroup.length} instances of this period across all days? This cannot be undone.`)) {
+                                            timeSlots
+                                                .filter(s => s.label === slot.label && s.startTime === slot.startTime)
+                                                .forEach(s => deleteMutation.mutate(s.id));
+                                            }
+                                        }}
+                                    >
+                                    <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                </div>
+                            </TableCell>
+                        </motion.tr>
+                        );
+                    })}
+                  </AnimatePresence>
                 </TableBody>
               </Table>
-            </div>
+            </motion.div>
           </div>
         )}
       </main>

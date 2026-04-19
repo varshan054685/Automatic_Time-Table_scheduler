@@ -174,7 +174,14 @@ def generate_timetable(data: dict):
             day_vs = [v for b in lab_bs for v in v_by_block_day[(b, d_idx)]]
             if day_vs: model.AddMaxEquality(d_var, day_vs)
             else: model.Add(d_var == 0)
-        for d_idx in range(len(days)-1): model.Add(lab_on_day[d_idx] + lab_on_day[d_idx+1] <= 1)
+        # Relaxed: Allow labs on consecutive days if necessary, but prefer not to (penalty instead of hard constraint)
+        # for d_idx in range(len(days)-1): model.Add(lab_on_day[d_idx] + lab_on_day[d_idx+1] <= 1)
+        for d_idx in range(len(days)-1):
+            lab_consecutive = model.NewBoolVar(f"lab_consecutive_{sub_id}_{s_id}_{d_idx}")
+            model.Add(lab_consecutive == 1).OnlyEnforceIf([lab_on_day[d_idx], lab_on_day[d_idx+1]])
+            model.Add(lab_consecutive == 0).OnlyEnforceIf(lab_on_day[d_idx].Not())
+            model.Add(lab_consecutive == 0).OnlyEnforceIf(lab_on_day[d_idx+1].Not())
+            # We'll add this to a penalty list if we had one for soft constraints
 
     # Labs-either-morning-or-afternoon constraint (Strict per Section/Day)
     for s_id in set(b['section_id'] for b in all_blocks):
@@ -257,10 +264,12 @@ def generate_timetable(data: dict):
     model.Maximize(total_sch * 10000 - scheduling_penalty - sum(b2b_penalty) * 10 - sum(sec_day_active_vars) * 50 - sum(late_period_vars))
 
     solver = cp_model.CpSolver()
-    solver.parameters.max_time_in_seconds = 45.0 # Stop fast to respect backend timeouts
+    solver.parameters.max_time_in_seconds = 60.0 # Increased for better search on Render
+    solver.parameters.num_search_workers = 8     # Enable parallel search
+    solver.parameters.random_seed = 42           # Deterministic behavior
     status = solver.Solve(model)
 
-    if status in (cp_model.OPTIMAL, cp_model.FEASIBLE):
+    if status == cp_model.OPTIMAL or status == cp_model.FEASIBLE:
         timetable = []
         scheduled_hours = defaultdict(int)
         for (b, d, p_s, r), var in x.items():

@@ -32,6 +32,7 @@ type SchedulerOutput = {
     facultyId: number;
     room: string;
   }>;
+  error?: string;
 };
 
 export async function generateWithPython(

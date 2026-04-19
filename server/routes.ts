@@ -351,10 +351,6 @@ export async function registerRoutes(
       return { received: 0, saved: 0, failed: 0 };
     }
 
-    for (const section of filteredSections) {
-      await storage.clearTimetable((section as any).id);
-    }
-
     // Determine days from timeslots
     const daySet: Set<string> = new Set();
     allTimeSlots.forEach(s => daySet.add(s.dayOfWeek));
@@ -378,6 +374,15 @@ export async function registerRoutes(
       })),
       days,
     });
+
+    if (!pythonResult || !pythonResult.timetable) {
+      throw new Error(pythonResult?.error || "Solver failed to return a valid timetable");
+    }
+
+    // ONLY clear the existing timetable AFTER receiving a valid result from Python
+    for (const section of filteredSections) {
+      await storage.clearTimetable((section as any).id);
+    }
 
     const sectionById = new Map(filteredSections.map((s: any) => [s.id, s]));
     const facultyById = new Map(facultyForDept.map((f) => [f.id, f]));
