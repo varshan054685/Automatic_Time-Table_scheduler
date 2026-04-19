@@ -7,13 +7,14 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Trash2, Search, ArrowUpDown, Pencil, Upload, Loader2, Download } from "lucide-react";
+import { Plus, Trash2, Search, ArrowUpDown, Pencil, Upload, Loader2, Download, LayoutGrid, Building2, School, GraduationCap, Calendar, FileSpreadsheet } from "lucide-react";
 import { useSections, useCreateSection, useUpdateSection, useDeleteSection, useDepartments, useClassrooms } from "@/hooks/use-master-data";
 import { useToast } from "@/hooks/use-toast";
 import { api } from "@shared/routes";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import * as XLSX from "xlsx";
 import { ExportHint } from "@/components/ExportHint";
+import { motion } from "framer-motion";
 
 function SectionImport({ departments, classrooms, sections, onImportComplete }) {
   const [isImporting, setIsImporting] = useState(false);
@@ -176,7 +177,7 @@ function SectionImport({ departments, classrooms, sections, onImportComplete }) 
   return (
     <div className="relative">
       <Input type="file" accept=".xlsx, .xls" className="hidden" id="import-excel" ref={fileInputRef} onChange={handleImport} disabled={isImporting} />
-      <Button variant="outline" className="gap-2" asChild disabled={isImporting}>
+      <Button variant="outline" className="gap-2 h-11 px-5 border-slate-200 hover:border-indigo-200 hover:bg-indigo-50 transition-all rounded-xl" asChild disabled={isImporting}>
         <label htmlFor="import-excel" className="cursor-pointer">
           {isImporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
           {isImporting ? "Importing..." : "Import Excel"}
@@ -310,80 +311,104 @@ export default function Sections() {
   }, [sections, searchTerm, sortConfig]);
 
   return (
-    <div className="flex min-h-screen bg-slate-50/50">
+    <div className="flex min-h-screen bg-[#f8fafc]">
       <Sidebar />
-      <main className="flex-1  p-4 lg:p-8">
-        <div className="max-w-5xl mx-auto space-y-6 pt-12 lg:pt-0">
-          <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-3xl font-display font-bold text-slate-900">Sections</h1>
-              <p className="text-slate-500 mt-1">Manage class sections.</p>
-            </div>
+      <main className="flex-1 p-4 lg:p-8 overflow-y-auto">
+        <div className="max-w-6xl mx-auto space-y-8 pt-12 lg:pt-0">
+          
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
+              <h1 className="text-4xl font-display font-bold text-slate-900 tracking-tight flex items-center gap-3">
+                <LayoutGrid className="w-10 h-10 text-indigo-600" />
+                Sections
+              </h1>
+              <p className="text-slate-500 mt-2 font-medium">Coordinate class groups and academic cohorts.</p>
+            </motion.div>
             
-            <div className="flex gap-2">
+            <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="flex flex-wrap gap-3">
               <SectionImport departments={departments} classrooms={classrooms} sections={sections} onImportComplete={refetch} />
-              <Button variant="outline" className="gap-2" onClick={handleExport}>
-                <Upload className="w-4 h-4" /> Export Excel
+              <Button variant="outline" className="gap-2 h-11 px-5 border-slate-200 hover:border-indigo-200 hover:bg-indigo-50 transition-all rounded-xl" onClick={handleExport}>
+                <FileSpreadsheet className="w-4 h-4" /> Export
               </Button>
 
               <Dialog open={open} onOpenChange={(v) => { setOpen(v); if(!v) { setEditingId(null); form.reset(); } }}>
                 <DialogTrigger asChild>
-                  <Button className="gap-2 shadow-lg shadow-primary/20">
+                  <Button className="premium-gradient premium-gradient-hover gap-2 h-11 px-6 shadow-xl shadow-indigo-500/20 rounded-xl">
                     <Plus className="w-4 h-4" /> Add Section
                   </Button>
                 </DialogTrigger>
-                <DialogContent>
+                <DialogContent className="sm:max-w-md rounded-2xl">
                   <DialogHeader>
-                    <DialogTitle>{editingId ? "Edit Section" : "Add Section"}</DialogTitle>
+                    <DialogTitle className="text-2xl font-bold">{editingId ? "Edit Section" : "Add New Cohort"}</DialogTitle>
                   </DialogHeader>
                   <Form {...form}>
-                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
                       <FormField
                         control={form.control}
                         name="name"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Name</FormLabel>
-                            <FormControl><Input placeholder="CS-A" {...field} /></FormControl>
+                            <FormLabel className="text-slate-700 font-semibold">Section Name</FormLabel>
+                            <FormControl>
+                              <div className="relative">
+                                <LayoutGrid className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                                <Input placeholder="CS-A" className="pl-10 h-11 rounded-xl" {...field} />
+                              </div>
+                            </FormControl>
                             <FormMessage />
                           </FormItem>
                         )}
                       />
-                      <FormField
-                        control={form.control}
-                        name="year"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Year</FormLabel>
-                            <FormControl><Input type="number" {...field} onChange={e => field.onChange(parseInt(e.target.value))} /></FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="semester"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Semester</FormLabel>
-                            <FormControl><Input type="number" {...field} onChange={e => field.onChange(parseInt(e.target.value))} /></FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+                      <div className="grid grid-cols-2 gap-4">
+                        <FormField
+                            control={form.control}
+                            name="year"
+                            render={({ field }) => (
+                            <FormItem>
+                                <FormLabel className="text-slate-700 font-semibold">Study Year</FormLabel>
+                                <FormControl>
+                                <div className="relative">
+                                    <Calendar className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                                    <Input type="number" className="pl-10 h-11 rounded-xl" {...field} onChange={e => field.onChange(parseInt(e.target.value))} />
+                                </div>
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={form.control}
+                            name="semester"
+                            render={({ field }) => (
+                            <FormItem>
+                                <FormLabel className="text-slate-700 font-semibold">Semester</FormLabel>
+                                <FormControl>
+                                <div className="relative">
+                                    <GraduationCap className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                                    <Input type="number" className="pl-10 h-11 rounded-xl" {...field} onChange={e => field.onChange(parseInt(e.target.value))} />
+                                </div>
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                            )}
+                        />
+                      </div>
                       <FormField
                         control={form.control}
                         name="departmentId"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Department</FormLabel>
+                            <FormLabel className="text-slate-700 font-semibold">Department</FormLabel>
                             <Select onValueChange={(val) => field.onChange(parseInt(val))} value={field.value?.toString()}>
                               <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select Department" />
+                                <SelectTrigger className="h-11 rounded-xl">
+                                  <div className="flex items-center gap-2">
+                                    <Building2 className="w-4 h-4 text-slate-400" />
+                                    <SelectValue placeholder="Select Department" />
+                                  </div>
                                 </SelectTrigger>
                               </FormControl>
-                              <SelectContent>
+                              <SelectContent className="rounded-xl">
                                 {departments?.map(dept => (
                                   <SelectItem key={dept.id} value={dept.id.toString()}>{dept.name}</SelectItem>
                                 ))}
@@ -398,15 +423,18 @@ export default function Sections() {
                         name="classroomId"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Classroom</FormLabel>
+                            <FormLabel className="text-slate-700 font-semibold">Default Classroom</FormLabel>
                             <Select onValueChange={(val) => field.onChange(parseInt(val))} value={field.value?.toString()}>
                               <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select Classroom (Optional)" />
+                                <SelectTrigger className="h-11 rounded-xl">
+                                  <div className="flex items-center gap-2">
+                                    <School className="w-4 h-4 text-slate-400" />
+                                    <SelectValue placeholder="Optional" />
+                                  </div>
                                 </SelectTrigger>
                               </FormControl>
-                              <SelectContent>
-                                <SelectItem value="0">None</SelectItem>
+                              <SelectContent className="rounded-xl">
+                                <SelectItem value="0">Unassigned</SelectItem>
                                 {classrooms?.map(room => (
                                   <SelectItem key={room.id} value={room.id.toString()}>{room.roomNumber}</SelectItem>
                                 ))}
@@ -416,87 +444,113 @@ export default function Sections() {
                           </FormItem>
                         )}
                       />
-                      <Button type="submit" className="w-full" disabled={createMutation.isPending || updateMutation.isPending}>
-                        {editingId ? (updateMutation.isPending ? "Updating..." : "Update Section") : (createMutation.isPending ? "Creating..." : "Create Section")}
+                      <Button type="submit" className="w-full h-12 premium-gradient premium-gradient-hover rounded-xl text-base font-bold shadow-lg shadow-indigo-500/20 mt-2" disabled={createMutation.isPending || updateMutation.isPending}>
+                        {editingId ? (updateMutation.isPending ? "Updating..." : "Save Cohort") : (createMutation.isPending ? "Creating..." : "Add Section")}
                       </Button>
                     </form>
                   </Form>
                 </DialogContent>
               </Dialog>
-            </div>
+            </motion.div>
           </div>
 
           <ExportHint />
 
-          <div className="flex items-center gap-4 mb-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }} 
+            animate={{ opacity: 1, y: 0 }}
+            className="flex flex-col gap-4"
+          >
+            <div className="relative group">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
               <Input 
-                placeholder="Search sections..." 
-                className="pl-10" 
+                placeholder="Search by section name..." 
+                className="pl-12 h-14 bg-white border-slate-100 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 rounded-2xl text-lg transition-all" 
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-          </div>
 
-          <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="cursor-pointer hover:bg-slate-50" onClick={() => handleSort('name')}>
-                    <div className="flex items-center gap-2">Name <ArrowUpDown className="w-3 h-3" /></div>
-                  </TableHead>
-                  <TableHead className="cursor-pointer hover:bg-slate-50" onClick={() => handleSort('year')}>
-                    <div className="flex items-center gap-2">Year <ArrowUpDown className="w-3 h-3" /></div>
-                  </TableHead>
-                  <TableHead className="cursor-pointer hover:bg-slate-50" onClick={() => handleSort('semester')}>
-                    <div className="flex items-center gap-2">Semester <ArrowUpDown className="w-3 h-3" /></div>
-                  </TableHead>
-                   <TableHead>Department</TableHead>
-                   <TableHead>Classroom</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
-                  <TableRow><TableCell colSpan={5} className="text-center py-8">Loading...</TableCell></TableRow>
-                ) : filteredAndSortedSections.length === 0 ? (
-                  <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">No sections found</TableCell></TableRow>
-                ) : (
-                  filteredAndSortedSections.map((section) => (
-                    <TableRow key={section.id}>
-                      <TableCell className="font-medium">{section.name}</TableCell>
-                      <TableCell>{section.year}</TableCell>
-                      <TableCell>{section.semester}</TableCell>
-                       <TableCell>{departments?.find(d => d.id === section.departmentId)?.name || section.department?.name || "Unknown"}</TableCell>
-                       <TableCell>{classrooms?.find(c => c.id === section.classroomId)?.roomNumber || section.classroom?.roomNumber || "None"}</TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="text-slate-500 hover:text-primary hover:bg-primary/10"
-                            onClick={() => handleEdit(section)}
-                          >
-                            <Pencil className="w-4 h-4" />
-                          </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                            onClick={() => handleDelete(section.id)}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
+            <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+              <Table>
+                <TableHeader className="bg-slate-50/50">
+                  <TableRow>
+                    <TableHead className="w-16 h-14"></TableHead>
+                    <TableHead className="cursor-pointer hover:text-indigo-600 transition-colors py-4 px-6" onClick={() => handleSort('name')}>
+                      <div className="flex items-center gap-2 font-bold uppercase tracking-wider text-xs">Section <ArrowUpDown className="w-3 h-3" /></div>
+                    </TableHead>
+                    <TableHead className="cursor-pointer hover:text-indigo-600 transition-colors py-4 px-6" onClick={() => handleSort('year')}>
+                      <div className="flex items-center gap-2 font-bold uppercase tracking-wider text-xs">Level <ArrowUpDown className="w-3 h-3" /></div>
+                    </TableHead>
+                    <TableHead className="py-4 px-6 font-bold uppercase tracking-wider text-xs">Department</TableHead>
+                    <TableHead className="py-4 px-6 font-bold uppercase tracking-wider text-xs">Primary Space</TableHead>
+                    <TableHead className="text-right py-4 px-6 font-bold uppercase tracking-wider text-xs">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {isLoading ? (
+                    <TableRow><TableCell colSpan={6} className="text-center py-20"><Loader2 className="w-8 h-8 animate-spin text-indigo-500 mx-auto" /></TableCell></TableRow>
+                  ) : filteredAndSortedSections.length === 0 ? (
+                    <TableRow><TableCell colSpan={6} className="text-center py-20 text-slate-400 font-medium">No sections found matching your search.</TableCell></TableRow>
+                  ) : (
+                    filteredAndSortedSections.map((section, idx) => (
+                      <motion.tr 
+                        key={section.id} 
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: idx * 0.05 }}
+                        className="group hover:bg-slate-50/50 transition-colors border-b border-slate-50 last:border-0"
+                      >
+                        <TableCell className="py-4 pl-6">
+                            <div className="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 font-bold group-hover:bg-indigo-600 group-hover:text-white group-hover:scale-110 transition-all">
+                                {String(section.name).charAt(0)}
+                            </div>
+                        </TableCell>
+                        <TableCell className="py-4 px-6">
+                            <p className="font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">{section.name}</p>
+                        </TableCell>
+                        <TableCell className="py-4 px-6">
+                            <div className="flex flex-col gap-1">
+                                <span className="text-sm font-bold text-slate-700">Year {section.year}</span>
+                                <span className="text-xs text-slate-400 font-medium">Semester {section.semester}</span>
+                            </div>
+                        </TableCell>
+                         <TableCell className="py-4 px-6">
+                            <span className="text-sm font-medium text-slate-600">{departments?.find(d => d.id === section.departmentId)?.name || section.department?.name || "N/A"}</span>
+                         </TableCell>
+                         <TableCell className="py-4 px-6">
+                            <div className="flex items-center gap-2">
+                                <School className="w-3 h-3 text-slate-400" />
+                                <span className="text-sm font-medium text-slate-700">{classrooms?.find(c => c.id === section.classroomId)?.roomNumber || section.classroom?.roomNumber || <span className="text-slate-300 italic">None</span>}</span>
+                            </div>
+                         </TableCell>
+                        <TableCell className="py-4 px-6 text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="w-10 h-10 rounded-xl text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-all"
+                              onClick={() => handleEdit(section)}
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="w-10 h-10 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-all"
+                              onClick={() => handleDelete(section.id)}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </motion.tr>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </motion.div>
         </div>
       </main>
     </div>

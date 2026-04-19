@@ -7,13 +7,14 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Trash2, Search, ArrowUpDown, Pencil, Upload, Loader2, Download } from "lucide-react";
+import { Plus, Trash2, Search, ArrowUpDown, Pencil, Upload, Loader2, Download, BookOpen, Fingerprint, Clock, Building2, GraduationCap, LayoutGrid, FileSpreadsheet, FlaskConical } from "lucide-react";
 import { useSubjects, useCreateSubject, useUpdateSubject, useDeleteSubject, useDepartments, useFaculty, useSections } from "@/hooks/use-master-data";
 import { useToast } from "@/hooks/use-toast";
 import { api } from "@shared/routes";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import * as XLSX from "xlsx";
 import { ExportHint } from "@/components/ExportHint";
+import { motion } from "framer-motion";
 
 function SubjectImport({ departments, subjects, faculty, sections, onImportComplete }) {
   const [isImporting, setIsImporting] = useState(false);
@@ -153,7 +154,7 @@ function SubjectImport({ departments, subjects, faculty, sections, onImportCompl
   return (
     <div className="relative">
       <Input type="file" accept=".xlsx, .xls" className="hidden" id="import-excel" ref={fileInputRef} onChange={handleImport} disabled={isImporting} />
-      <Button variant="outline" className="gap-2" asChild disabled={isImporting}>
+      <Button variant="outline" className="gap-2 h-11 px-5 border-slate-200 hover:border-indigo-200 hover:bg-indigo-50 transition-all rounded-xl" asChild disabled={isImporting}>
         <label htmlFor="import-excel" className="cursor-pointer">
           {isImporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
           {isImporting ? "Importing..." : "Import Excel"}
@@ -296,239 +297,309 @@ export default function Subjects() {
   const watchedDeptId = Number(form.watch("departmentId"));
 
   return (
-    <div className="flex min-h-screen bg-slate-50/50">
+    <div className="flex min-h-screen bg-[#f8fafc]">
       <Sidebar />
-      <main className="flex-1  p-4 lg:p-8">
-        <div className="max-w-5xl mx-auto space-y-6 pt-12 lg:pt-0">
-          <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-3xl font-display font-bold text-slate-900">Subjects</h1>
-              <p className="text-slate-500 mt-1">Manage academic subjects.</p>
-            </div>
+      <main className="flex-1 p-4 lg:p-8 overflow-y-auto">
+        <div className="max-w-6xl mx-auto space-y-8 pt-12 lg:pt-0">
+          
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
+              <h1 className="text-4xl font-display font-bold text-slate-900 tracking-tight flex items-center gap-3">
+                <BookOpen className="w-10 h-10 text-indigo-600" />
+                Subjects
+              </h1>
+              <p className="text-slate-500 mt-2 font-medium">Curate and manage your academic curriculum.</p>
+            </motion.div>
             
-            <div className="flex gap-2">
+            <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="flex flex-wrap gap-3">
               <SubjectImport departments={departments} subjects={subjects} faculty={faculty} sections={sections} onImportComplete={refetch} />
-              <Button variant="outline" className="gap-2" onClick={handleExport}>
-                <Upload className="w-4 h-4" /> Export Excel
+              <Button variant="outline" className="gap-2 h-11 px-5 border-slate-200 hover:border-indigo-200 hover:bg-indigo-50 transition-all rounded-xl" onClick={handleExport}>
+                <FileSpreadsheet className="w-4 h-4" /> Export
               </Button>
 
               <Dialog open={open} onOpenChange={(v) => { setOpen(v); if(!v) { setEditingId(null); form.reset(); } }}>
                 <DialogTrigger asChild>
-                  <Button className="gap-2 shadow-lg shadow-primary/20">
+                  <Button className="premium-gradient premium-gradient-hover gap-2 h-11 px-6 shadow-xl shadow-indigo-500/20 rounded-xl">
                     <Plus className="w-4 h-4" /> Add Subject
                   </Button>
                 </DialogTrigger>
-                <DialogContent>
+                <DialogContent className="sm:max-w-xl rounded-2xl">
                   <DialogHeader>
-                    <DialogTitle>{editingId ? "Edit Subject" : "Add Subject"}</DialogTitle>
+                    <DialogTitle className="text-2xl font-bold">{editingId ? "Edit Subject" : "Add New Subject"}</DialogTitle>
                   </DialogHeader>
                   <Form {...form}>
-                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <FormField
+                            control={form.control}
+                            name="name"
+                            render={({ field }) => (
+                            <FormItem>
+                                <FormLabel className="text-slate-700 font-semibold">Subject Name</FormLabel>
+                                <FormControl>
+                                <div className="relative">
+                                    <BookOpen className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                                    <Input placeholder="Data Structures" className="pl-10 h-11 rounded-xl" {...field} />
+                                </div>
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={form.control}
+                            name="code"
+                            render={({ field }) => (
+                            <FormItem>
+                                <FormLabel className="text-slate-700 font-semibold">Subject Code</FormLabel>
+                                <FormControl>
+                                <div className="relative">
+                                    <Fingerprint className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                                    <Input placeholder="CS201" className="pl-10 h-11 rounded-xl uppercase" {...field} />
+                                </div>
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                            )}
+                        />
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-4">
+                        <FormField
+                            control={form.control}
+                            name="weeklyHours"
+                            render={({ field }) => (
+                            <FormItem>
+                                <FormLabel className="text-slate-700 font-semibold">Weekly Hours</FormLabel>
+                                <FormControl>
+                                <div className="relative">
+                                    <Clock className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                                    <Input type="number" className="pl-10 h-11 rounded-xl" {...field} onChange={e => field.onChange(parseInt(e.target.value))} />
+                                </div>
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={form.control}
+                            name="type"
+                            render={({ field }) => (
+                            <FormItem>
+                                <FormLabel className="text-slate-700 font-semibold">Learning Mode</FormLabel>
+                                <Select onValueChange={field.onChange} value={field.value}>
+                                <FormControl>
+                                    <SelectTrigger className="h-11 rounded-xl">
+                                    <SelectValue placeholder="Select Mode" />
+                                    </SelectTrigger>
+                                </FormControl>
+                                <SelectContent className="rounded-xl">
+                                    <SelectItem value="lecture">Theory / Lecture</SelectItem>
+                                    <SelectItem value="lab">Practical / Lab</SelectItem>
+                                </SelectContent>
+                                </Select>
+                                <FormMessage />
+                            </FormItem>
+                            )}
+                        />
+                      </div>
+
                       <FormField
-                        control={form.control}
-                        name="name"
-                        render={({ field }) => (
+                          control={form.control}
+                          name="departmentId"
+                          render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Name</FormLabel>
-                            <FormControl><Input placeholder="Data Structures" {...field} /></FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="code"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Code</FormLabel>
-                            <FormControl><Input placeholder="CS201" {...field} /></FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="weeklyHours"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Weekly Hours</FormLabel>
-                            <FormControl><Input type="number" {...field} onChange={e => field.onChange(parseInt(e.target.value))} /></FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="departmentId"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Department</FormLabel>
-                            <Select onValueChange={(val) => field.onChange(parseInt(val))} value={field.value?.toString()}>
+                              <FormLabel className="text-slate-700 font-semibold">Parent Department</FormLabel>
+                              <Select onValueChange={(val) => field.onChange(parseInt(val))} value={field.value?.toString()}>
                               <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select Department" />
-                                </SelectTrigger>
+                                  <SelectTrigger className="h-11 rounded-xl">
+                                    <div className="flex items-center gap-2">
+                                        <Building2 className="w-4 h-4 text-slate-400" />
+                                        <SelectValue placeholder="Select Department" />
+                                    </div>
+                                  </SelectTrigger>
                               </FormControl>
-                              <SelectContent>
-                                {departments?.map(dept => (
+                              <SelectContent className="rounded-xl">
+                                  {departments?.map(dept => (
                                   <SelectItem key={dept.id} value={dept.id.toString()}>{dept.name}</SelectItem>
-                                ))}
+                                  ))}
                               </SelectContent>
-                            </Select>
-                            <FormMessage />
+                              </Select>
+                              <FormMessage />
                           </FormItem>
-                        )}
+                          )}
                       />
-                      <FormField
-                        control={form.control}
-                        name="facultyId"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Default Faculty</FormLabel>
-                            <Select onValueChange={(val) => field.onChange(parseInt(val))} value={field.value?.toString()}>
-                              <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select Faculty (Optional)" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                <SelectItem value="0">None</SelectItem>
-                                {faculty?.filter(f => Number(f.departmentId) === watchedDeptId).map(f => (
-                                  <SelectItem key={f.id} value={f.id.toString()}>{f.name}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="sectionId"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Target Section</FormLabel>
-                            <Select onValueChange={(val) => field.onChange(parseInt(val))} value={field.value?.toString()}>
-                              <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select Section (Optional)" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                <SelectItem value="0">None</SelectItem>
-                                {sections?.filter(s => Number(s.departmentId) === watchedDeptId).map(s => (
-                                  <SelectItem key={s.id} value={s.id.toString()}>{s.name} (Sem {s.semester})</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="type"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Subject Type</FormLabel>
-                            <Select onValueChange={field.onChange} value={field.value}>
-                              <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select Type" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                <SelectItem value="lecture">Lecture</SelectItem>
-                                <SelectItem value="lab">Lab</SelectItem>
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <Button type="submit" className="w-full" disabled={createMutation.isPending || updateMutation.isPending}>
-                        {editingId ? (updateMutation.isPending ? "Updating..." : "Update Subject") : (createMutation.isPending ? "Creating..." : "Create Subject")}
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <FormField
+                            control={form.control}
+                            name="facultyId"
+                            render={({ field }) => (
+                            <FormItem>
+                                <FormLabel className="text-slate-700 font-semibold">Default Faculty</FormLabel>
+                                <Select onValueChange={(val) => field.onChange(parseInt(val))} value={field.value?.toString()}>
+                                <FormControl>
+                                    <SelectTrigger className="h-11 rounded-xl">
+                                        <div className="flex items-center gap-2">
+                                            <GraduationCap className="w-4 h-4 text-slate-400" />
+                                            <SelectValue placeholder="Optional" />
+                                        </div>
+                                    </SelectTrigger>
+                                </FormControl>
+                                <SelectContent className="rounded-xl">
+                                    <SelectItem value="0">Unassigned</SelectItem>
+                                    {faculty?.filter(f => Number(f.departmentId) === watchedDeptId).map(f => (
+                                    <SelectItem key={f.id} value={f.id.toString()}>{f.name}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                                </Select>
+                                <FormMessage />
+                            </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={form.control}
+                            name="sectionId"
+                            render={({ field }) => (
+                            <FormItem>
+                                <FormLabel className="text-slate-700 font-semibold">Target Section</FormLabel>
+                                <Select onValueChange={(val) => field.onChange(parseInt(val))} value={field.value?.toString()}>
+                                <FormControl>
+                                    <SelectTrigger className="h-11 rounded-xl">
+                                        <div className="flex items-center gap-2">
+                                            <LayoutGrid className="w-4 h-4 text-slate-400" />
+                                            <SelectValue placeholder="Optional" />
+                                        </div>
+                                    </SelectTrigger>
+                                </FormControl>
+                                <SelectContent className="rounded-xl">
+                                    <SelectItem value="0">Unassigned</SelectItem>
+                                    {sections?.filter(s => Number(s.departmentId) === watchedDeptId).map(s => (
+                                    <SelectItem key={s.id} value={s.id.toString()}>{s.name} (S{s.semester})</SelectItem>
+                                    ))}
+                                </SelectContent>
+                                </Select>
+                                <FormMessage />
+                            </FormItem>
+                            )}
+                        />
+                      </div>
+                      
+                      <Button type="submit" className="w-full h-12 premium-gradient premium-gradient-hover rounded-xl text-base font-bold shadow-lg shadow-indigo-500/20 mt-2" disabled={createMutation.isPending || updateMutation.isPending}>
+                        {editingId ? (updateMutation.isPending ? "Updating..." : "Save Changes") : (createMutation.isPending ? "Adding..." : "Add Subject")}
                       </Button>
                     </form>
                   </Form>
                 </DialogContent>
               </Dialog>
-            </div>
+            </motion.div>
           </div>
 
           <ExportHint />
 
-          <div className="flex items-center gap-4 mb-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }} 
+            animate={{ opacity: 1, y: 0 }}
+            className="flex flex-col gap-4"
+          >
+            <div className="relative group">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
               <Input 
-                placeholder="Search subjects..." 
-                className="pl-10" 
+                placeholder="Search by subject name or code..." 
+                className="pl-12 h-14 bg-white border-slate-100 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 rounded-2xl text-lg transition-all" 
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-          </div>
 
-          <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="cursor-pointer hover:bg-slate-50" onClick={() => handleSort('code')}>
-                    <div className="flex items-center gap-2">Code <ArrowUpDown className="w-3 h-3" /></div>
-                  </TableHead>
-                  <TableHead className="cursor-pointer hover:bg-slate-50" onClick={() => handleSort('name')}>
-                    <div className="flex items-center gap-2">Name <ArrowUpDown className="w-3 h-3" /></div>
-                  </TableHead>
-                  <TableHead>Weekly Hours</TableHead>
-                  <TableHead>Department</TableHead>
-                  <TableHead>Default Faculty</TableHead>
-                  <TableHead>Target Section</TableHead>
-                  <TableHead>Subject Type</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
-                  <TableRow><TableCell colSpan={7} className="text-center py-8">Loading...</TableCell></TableRow>
-                ) : filteredAndSortedSubjects.length === 0 ? (
-                  <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">No subjects found</TableCell></TableRow>
-                ) : (
-                  filteredAndSortedSubjects.map((subject) => (
-                    <TableRow key={subject.id}>
-                      <TableCell className="font-mono">{subject.code}</TableCell>
-                      <TableCell className="font-medium">{subject.name}</TableCell>
-                      <TableCell>{subject.weeklyHours}</TableCell>
-                      <TableCell>{departments?.find(d => d.id === subject.departmentId)?.name || "N/A"}</TableCell>
-                      <TableCell>{faculty?.find(f => f.id === subject.facultyId)?.name || "None"}</TableCell>
-                      <TableCell>{sections?.find(s => s.id === subject.sectionId)?.name || "None"}</TableCell>
-                      <TableCell className="capitalize">{subject.type || "lecture"}</TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="text-slate-500 hover:text-primary hover:bg-primary/10"
-                            onClick={() => handleEdit(subject)}
-                          >
-                            <Pencil className="w-4 h-4" />
-                          </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                            onClick={() => handleDelete(subject.id)}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
+            <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+              <Table>
+                <TableHeader className="bg-slate-50/50">
+                  <TableRow>
+                    <TableHead className="w-16 h-14"></TableHead>
+                    <TableHead className="cursor-pointer hover:text-indigo-600 transition-colors py-4 px-6" onClick={() => handleSort('code')}>
+                      <div className="flex items-center gap-2 font-bold uppercase tracking-wider text-xs">Code <ArrowUpDown className="w-3 h-3" /></div>
+                    </TableHead>
+                    <TableHead className="cursor-pointer hover:text-indigo-600 transition-colors py-4 px-6" onClick={() => handleSort('name')}>
+                      <div className="flex items-center gap-2 font-bold uppercase tracking-wider text-xs">Subject Name <ArrowUpDown className="w-3 h-3" /></div>
+                    </TableHead>
+                    <TableHead className="py-4 px-6 font-bold uppercase tracking-wider text-xs">Hours</TableHead>
+                    <TableHead className="py-4 px-6 font-bold uppercase tracking-wider text-xs">Department</TableHead>
+                    <TableHead className="py-4 px-6 font-bold uppercase tracking-wider text-xs">Faculty</TableHead>
+                    <TableHead className="py-4 px-6 font-bold uppercase tracking-wider text-xs">Type</TableHead>
+                    <TableHead className="text-right py-4 px-6 font-bold uppercase tracking-wider text-xs">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {isLoading ? (
+                    <TableRow><TableCell colSpan={8} className="text-center py-20"><Loader2 className="w-8 h-8 animate-spin text-indigo-500 mx-auto" /></TableCell></TableRow>
+                  ) : filteredAndSortedSubjects.length === 0 ? (
+                    <TableRow><TableCell colSpan={8} className="text-center py-20 text-slate-400 font-medium">No subjects found matching your search.</TableCell></TableRow>
+                  ) : (
+                    filteredAndSortedSubjects.map((subject, idx) => (
+                      <motion.tr 
+                        key={subject.id}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: idx * 0.05 }}
+                        className="group hover:bg-slate-50/50 transition-colors border-b border-slate-50 last:border-0"
+                      >
+                        <TableCell className="py-4 pl-6">
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold transition-all group-hover:scale-110 shadow-sm ${subject.type === 'lab' ? 'bg-amber-50 text-amber-600' : 'bg-indigo-50 text-indigo-600'}`}>
+                                {subject.type === 'lab' ? <FlaskConical className="w-5 h-5" /> : <BookOpen className="w-5 h-5" />}
+                            </div>
+                        </TableCell>
+                        <TableCell className="py-4 px-6 font-mono text-sm font-bold text-slate-500 uppercase">{subject.code}</TableCell>
+                        <TableCell className="py-4 px-6">
+                            <div className="flex flex-col">
+                                <p className="font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">{subject.name}</p>
+                                <span className="text-xs text-slate-400 font-medium">{sections?.find(s => s.id === subject.sectionId)?.name || 'Generic'}</span>
+                            </div>
+                        </TableCell>
+                        <TableCell className="py-4 px-6">
+                          <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 w-fit">
+                            <Clock className="w-3 h-3 text-slate-500" />
+                            <span className="text-xs font-bold text-slate-600">{subject.weeklyHours}h</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-4 px-6">
+                            <span className="text-sm font-medium text-slate-600">{departments?.find(d => d.id === subject.departmentId)?.name || "N/A"}</span>
+                        </TableCell>
+                        <TableCell className="py-4 px-6">
+                            <span className="text-sm font-medium text-slate-700">{faculty?.find(f => f.id === subject.facultyId)?.name || <span className="text-slate-300 italic">Unassigned</span>}</span>
+                        </TableCell>
+                        <TableCell className="py-4 px-6">
+                          <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${subject.type === 'lab' ? 'bg-amber-100 text-amber-700' : 'bg-indigo-100 text-indigo-700'}`}>
+                            {subject.type || 'lecture'}
+                          </span>
+                        </TableCell>
+                        <TableCell className="py-4 px-6 text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="w-10 h-10 rounded-xl text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-all"
+                              onClick={() => handleEdit(subject)}
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="w-10 h-10 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-all"
+                              onClick={() => handleDelete(subject.id)}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </motion.tr>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </motion.div>
         </div>
       </main>
     </div>

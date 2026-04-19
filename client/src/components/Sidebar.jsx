@@ -13,7 +13,9 @@ import {
   Menu,
   X,
   School,
-  Settings as SettingsIcon
+  Settings as SettingsIcon,
+  ChevronLeft,
+  ChevronRight
 } from "lucide-react";
 import { useLogout, useUser } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
@@ -21,6 +23,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@shared/routes";
 import { apiUrl } from "@/lib/api-base";
+import { motion, AnimatePresence } from "framer-motion";
 
 const navItems = [
   { label: "Dashboard", href: "/", icon: LayoutDashboard },
@@ -41,7 +44,11 @@ export function Sidebar() {
   const [isOpen, setIsOpen] = useState(!isMobile);
 
   useEffect(() => {
-    setIsOpen(!isMobile);
+    if (isMobile) {
+      setIsOpen(false);
+    } else {
+      setIsOpen(true);
+    }
   }, [isMobile]);
 
   const toggleSidebar = () => setIsOpen(!isOpen);
@@ -63,102 +70,174 @@ export function Sidebar() {
 
   return (
     <>
-      {/* Floating menu button when closed */}
-      {(!isOpen || (isMobile && !isOpen)) && (
-        <div className="fixed top-4 left-4 z-50">
-          <Button variant="outline" size="icon" onClick={toggleSidebar} className="bg-white shadow-md">
-            <Menu className="w-6 h-6 text-slate-800" />
+      {/* Mobile Header */}
+      {isMobile && (
+        <div className="fixed top-0 left-0 right-0 h-16 bg-white/80 backdrop-blur-md border-b border-slate-200 z-50 flex items-center justify-between px-4">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg premium-gradient flex items-center justify-center text-white">
+              <Calendar className="w-5 h-5" />
+            </div>
+            <span className="font-display font-bold text-slate-900">{workspaceName}</span>
+          </div>
+          <Button variant="ghost" size="icon" onClick={() => setIsOpen(true)}>
+            <Menu className="w-6 h-6 text-slate-600" />
           </Button>
         </div>
       )}
 
       {/* Sidebar Container */}
-      <div 
-        className={`h-screen bg-slate-900 text-white flex flex-col transition-all duration-300 z-40 shrink-0
-          ${isMobile ? 'fixed top-0 left-0' : 'sticky top-0'}
-          ${isOpen ? 'w-64 translate-x-0' : 'w-0 -translate-x-full'}
-        `}
-      >
-        <div className="w-64 flex flex-col h-full overflow-hidden">
-          <div className="p-6 border-b border-slate-800 flex items-center justify-between shrink-0">
-            <div className="flex items-center gap-3">
-              <Calendar className="w-8 h-8 text-primary" />
-              <div>
-                <h1 className="font-display font-bold text-lg truncate max-w-[120px]">{workspaceName}</h1>
-                <p className="text-xs text-slate-400">
-                  {isOwner ? "Admin" : "Viewer"} • {user?.name?.split(" ")[0]}
-                </p>
-              </div>
-            </div>
-            <Button variant="ghost" size="icon" onClick={toggleSidebar} className="hover:bg-slate-800 text-slate-400 hover:text-white shrink-0">
-              <X className="w-5 h-5" />
-            </Button>
-          </div>
-
-          <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-            {navItems.map((item) => {
-              const isActive = location === item.href;
-              return (
-                <Link key={item.href} href={item.href} onClick={() => isMobile && setIsOpen(false)}>
-                  <div 
-                    className={`
-                      flex items-center gap-3 px-4 py-3 rounded-lg cursor-pointer transition-all duration-200
-                      ${isActive 
-                        ? 'bg-primary text-white shadow-lg shadow-primary/20 font-medium translate-x-1' 
-                        : 'text-slate-400 hover:text-white hover:bg-slate-800'
-                      }
-                    `}
-                  >
-                    <item.icon className="w-5 h-5" />
-                    <span>{item.label}</span>
-                  </div>
-                </Link>
-              );
-            })}
-
-        <div className="my-4 border-t border-slate-800"></div>
-
-        <Link href="/settings" onClick={() => isMobile && setIsOpen(false)}>
-          <div 
-            className={`
-              flex items-center justify-between px-4 py-3 rounded-lg cursor-pointer transition-all duration-200
-              ${location === '/settings' 
-                ? 'bg-primary text-white shadow-lg shadow-primary/20 font-medium translate-x-1' 
-                : 'text-slate-400 hover:text-white hover:bg-slate-800'
-              }
+      <AnimatePresence mode="wait">
+        {(isOpen || !isMobile) && (
+          <motion.div 
+            initial={isMobile ? { x: -300 } : false}
+            animate={{ x: 0, width: isOpen ? 280 : 80 }}
+            exit={isMobile ? { x: -300 } : false}
+            transition={{ type: "spring", damping: 20, stiffness: 100 }}
+            className={`h-screen bg-slate-900 text-white flex flex-col z-40 shrink-0 shadow-2xl
+              ${isMobile ? 'fixed top-0 left-0' : 'sticky top-0'}
+              ${!isOpen && !isMobile ? 'w-20' : 'w-[280px]'}
             `}
           >
-            <div className="flex items-center gap-3">
-              <SettingsIcon className="w-5 h-5" />
-              <span>Settings</span>
+            {/* Logo Section */}
+            <div className="p-6 border-b border-slate-800 flex items-center justify-between shrink-0 h-24">
+              <div className="flex items-center gap-3 overflow-hidden">
+                <div className="w-10 h-10 rounded-xl premium-gradient flex items-center justify-center text-white shrink-0 shadow-lg shadow-indigo-500/20">
+                  <Calendar className="w-6 h-6" />
+                </div>
+                {isOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    className="overflow-hidden"
+                  >
+                    <h1 className="font-display font-bold text-lg truncate w-32">{workspaceName}</h1>
+                    <p className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">
+                      {isOwner ? "Administrator" : "Viewer"}
+                    </p>
+                  </motion.div>
+                )}
+              </div>
+              {!isMobile && (
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  onClick={toggleSidebar} 
+                  className="hover:bg-slate-800 text-slate-500 hover:text-white shrink-0"
+                >
+                  {isOpen ? <ChevronLeft className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
+                </Button>
+              )}
+              {isMobile && (
+                <Button variant="ghost" size="icon" onClick={() => setIsOpen(false)} className="text-slate-400">
+                  <X className="w-6 h-6" />
+                </Button>
+              )}
             </div>
-            {isOwner && pendingCount > 0 && (
-              <span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full shadow-md shadow-red-500/50">
-                {pendingCount > 9 ? '9+' : pendingCount}
-              </span>
-            )}
-          </div>
-        </Link>
-          </nav>
 
-          <div className="p-4 border-t border-slate-800 shrink-0">
-            <Button 
-              variant="ghost" 
-              className="w-full justify-start text-red-400 hover:text-red-300 hover:bg-red-950/30 gap-3"
-              onClick={() => logoutMutation.mutate()}
-            >
-              <LogOut className="w-5 h-5" />
-              Logout
-            </Button>
-          </div>
-        </div>
-      </div>
+            {/* Navigation Section */}
+            <nav className="flex-1 p-4 space-y-2 overflow-y-auto custom-scrollbar">
+              {navItems.map((item) => {
+                const isActive = location === item.href;
+                return (
+                  <Link key={item.href} href={item.href} onClick={() => isMobile && setIsOpen(false)}>
+                    <div 
+                      className={`
+                        group flex items-center gap-3 px-3 py-3 rounded-xl cursor-pointer transition-all duration-300 relative
+                        ${isActive 
+                          ? 'bg-indigo-600/10 text-white font-medium' 
+                          : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                        }
+                      `}
+                    >
+                      {isActive && (
+                        <motion.div 
+                          layoutId="active-nav"
+                          className="absolute inset-0 bg-indigo-600 rounded-xl -z-10 shadow-lg shadow-indigo-600/20"
+                        />
+                      )}
+                      <item.icon className={`w-5 h-5 shrink-0 transition-transform ${isActive ? 'scale-110' : 'group-hover:scale-110'}`} />
+                      {isOpen && (
+                        <motion.span
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          className="truncate"
+                        >
+                          {item.label}
+                        </motion.span>
+                      )}
+                      {!isOpen && !isMobile && (
+                        <div className="absolute left-16 bg-slate-800 text-white px-2 py-1 rounded text-xs opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-50">
+                          {item.label}
+                        </div>
+                      )}
+                    </div>
+                  </Link>
+                );
+              })}
+
+              <div className="my-6 border-t border-slate-800/50"></div>
+
+              <Link href="/settings" onClick={() => isMobile && setIsOpen(false)}>
+                <div 
+                  className={`
+                    group flex items-center justify-between px-3 py-3 rounded-xl cursor-pointer transition-all duration-300 relative
+                    ${location === '/settings' 
+                      ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20 font-medium' 
+                      : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                    }
+                  `}
+                >
+                  <div className="flex items-center gap-3">
+                    <SettingsIcon className={`w-5 h-5 shrink-0 ${location === '/settings' ? 'scale-110' : 'group-hover:scale-110'}`} />
+                    {isOpen && (
+                      <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                        Settings
+                      </motion.span>
+                    )}
+                  </div>
+                  {isOwner && pendingCount > 0 && (
+                    <span className="bg-rose-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-lg shadow-rose-500/50">
+                      {pendingCount > 9 ? '9+' : pendingCount}
+                    </span>
+                  )}
+                </div>
+              </Link>
+            </nav>
+
+            {/* Footer Section */}
+            <div className="p-4 border-t border-slate-800/50 shrink-0 bg-slate-900/50 backdrop-blur-sm">
+              <div className={`flex items-center gap-3 mb-4 ${!isOpen && 'justify-center'}`}>
+                <div className="w-10 h-10 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-300 font-bold">
+                  {user?.name?.charAt(0) || "U"}
+                </div>
+                {isOpen && (
+                  <div className="overflow-hidden">
+                    <p className="text-sm font-semibold truncate">{user?.name}</p>
+                    <p className="text-xs text-slate-500 truncate">{user?.email}</p>
+                  </div>
+                )}
+              </div>
+              <Button 
+                variant="ghost" 
+                className={`w-full hover:bg-rose-950/30 text-slate-400 hover:text-rose-400 gap-3 justify-start rounded-xl px-3 transition-colors ${!isOpen && 'justify-center px-0'}`}
+                onClick={() => logoutMutation.mutate()}
+              >
+                <LogOut className="w-5 h-5 shrink-0" />
+                {isOpen && <span>Sign Out</span>}
+              </Button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Mobile backdrop */}
       {isMobile && isOpen && (
-        <div 
-          className="fixed inset-0 bg-black/50 z-30" 
-          onClick={toggleSidebar}
+        <motion.div 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-30" 
+          onClick={() => setIsOpen(false)}
         />
       )}
     </>

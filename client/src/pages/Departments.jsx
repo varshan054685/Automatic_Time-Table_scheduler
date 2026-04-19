@@ -7,12 +7,13 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Trash2, Search, ArrowUpDown, Pencil, Upload, Loader2, Download } from "lucide-react";
+import { Plus, Trash2, Search, ArrowUpDown, Pencil, Upload, Loader2, Download, Building2, Fingerprint, FileSpreadsheet } from "lucide-react";
 import { useDepartments, useCreateDepartment, useUpdateDepartment, useDeleteDepartment } from "@/hooks/use-master-data";
 import { useToast } from "@/hooks/use-toast";
 import { api } from "@shared/routes";
 import * as XLSX from "xlsx";
 import { ExportHint } from "@/components/ExportHint";
+import { motion } from "framer-motion";
 
 function DepartmentImport({ departments, onImportComplete }) {
   const [isImporting, setIsImporting] = useState(false);
@@ -107,7 +108,7 @@ function DepartmentImport({ departments, onImportComplete }) {
         onChange={handleImport}
         disabled={isImporting}
       />
-      <Button variant="outline" className="gap-2" asChild disabled={isImporting}>
+      <Button variant="outline" className="gap-2 h-11 px-5 border-slate-200 hover:border-indigo-200 hover:bg-indigo-50 transition-all rounded-xl" asChild disabled={isImporting}>
         <label htmlFor="import-excel" className="cursor-pointer">
           {isImporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
           {isImporting ? "Importing..." : "Import Excel"}
@@ -221,41 +222,50 @@ export default function Departments() {
   }, [departments, searchTerm, sortConfig]);
 
   return (
-    <div className="flex min-h-screen bg-slate-50/50">
+    <div className="flex min-h-screen bg-[#f8fafc]">
       <Sidebar />
-      <main className="flex-1  p-4 lg:p-8">
-        <div className="max-w-5xl mx-auto space-y-6 pt-12 lg:pt-0">
-          <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-3xl font-display font-bold text-slate-900">Departments</h1>
-              <p className="text-slate-500 mt-1">Manage academic departments.</p>
-            </div>
+      <main className="flex-1 p-4 lg:p-8 overflow-y-auto">
+        <div className="max-w-6xl mx-auto space-y-8 pt-12 lg:pt-0">
+          
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
+              <h1 className="text-4xl font-display font-bold text-slate-900 tracking-tight flex items-center gap-3">
+                <Building2 className="w-10 h-10 text-indigo-600" />
+                Departments
+              </h1>
+              <p className="text-slate-500 mt-2 font-medium">Manage academic units and their distinct identities.</p>
+            </motion.div>
             
-            <div className="flex gap-2">
+            <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="flex flex-wrap gap-3">
               <DepartmentImport departments={departments} onImportComplete={refetch} />
-              <Button variant="outline" className="gap-2" onClick={handleExport}>
-                <Upload className="w-4 h-4" /> Export Excel
+              <Button variant="outline" className="gap-2 h-11 px-5 border-slate-200 hover:border-indigo-200 hover:bg-indigo-50 transition-all rounded-xl" onClick={handleExport}>
+                <FileSpreadsheet className="w-4 h-4" /> Export
               </Button>
 
               <Dialog open={open} onOpenChange={(v) => { setOpen(v); if(!v) { setEditingId(null); form.reset(); } }}>
                 <DialogTrigger asChild>
-                  <Button className="gap-2 shadow-lg shadow-primary/20">
+                  <Button className="premium-gradient premium-gradient-hover gap-2 h-11 px-6 shadow-xl shadow-indigo-500/20 rounded-xl">
                     <Plus className="w-4 h-4" /> Add Department
                   </Button>
                 </DialogTrigger>
-                <DialogContent>
+                <DialogContent className="sm:max-w-md rounded-2xl">
                   <DialogHeader>
-                    <DialogTitle>{editingId ? "Edit Department" : "Add Department"}</DialogTitle>
+                    <DialogTitle className="text-2xl font-bold">{editingId ? "Edit Department" : "Add New Department"}</DialogTitle>
                   </DialogHeader>
                   <Form {...form}>
-                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5 py-4">
                       <FormField
                         control={form.control}
                         name="name"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Name</FormLabel>
-                            <FormControl><Input placeholder="Computer Science" {...field} data-testid="input-department-name" /></FormControl>
+                            <FormLabel className="text-slate-700 font-semibold">Department Name</FormLabel>
+                            <FormControl>
+                              <div className="relative">
+                                <Building2 className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                                <Input placeholder="Computer Science" className="pl-10 h-11 rounded-xl" {...field} data-testid="input-department-name" />
+                              </div>
+                            </FormControl>
                             <FormMessage />
                           </FormItem>
                         )}
@@ -265,85 +275,108 @@ export default function Departments() {
                         name="code"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Code</FormLabel>
-                            <FormControl><Input placeholder="CSE" {...field} data-testid="input-department-code" /></FormControl>
+                            <FormLabel className="text-slate-700 font-semibold">Department Code</FormLabel>
+                            <FormControl>
+                              <div className="relative">
+                                <Fingerprint className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                                <Input placeholder="CSE" className="pl-10 h-11 rounded-xl uppercase" {...field} data-testid="input-department-code" />
+                              </div>
+                            </FormControl>
                             <FormMessage />
                           </FormItem>
                         )}
                       />
-                      <Button type="submit" className="w-full" disabled={createMutation.isPending || updateMutation.isPending} data-testid="button-submit-department">
-                        {editingId ? (updateMutation.isPending ? "Updating..." : "Update Department") : (createMutation.isPending ? "Creating..." : "Create Department")}
+                      <Button type="submit" className="w-full h-12 premium-gradient premium-gradient-hover rounded-xl text-base font-bold shadow-lg shadow-indigo-500/20" disabled={createMutation.isPending || updateMutation.isPending} data-testid="button-submit-department">
+                        {editingId ? (updateMutation.isPending ? "Updating..." : "Update Details") : (createMutation.isPending ? "Add Department" : "Create Unit")}
                       </Button>
                     </form>
                   </Form>
                 </DialogContent>
               </Dialog>
-            </div>
+            </motion.div>
           </div>
 
           <ExportHint />
 
-          <div className="flex items-center gap-4 mb-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }} 
+            animate={{ opacity: 1, y: 0 }}
+            className="flex flex-col gap-4"
+          >
+            <div className="relative group">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
               <Input 
-                placeholder="Search departments..." 
-                className="pl-10" 
+                placeholder="Search by department name or code..." 
+                className="pl-12 h-14 bg-white border-slate-100 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 rounded-2xl text-lg transition-all" 
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-          </div>
 
-          <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="cursor-pointer hover:bg-slate-50" onClick={() => handleSort('code')}>
-                    <div className="flex items-center gap-2">Code <ArrowUpDown className="w-3 h-3" /></div>
-                  </TableHead>
-                  <TableHead className="cursor-pointer hover:bg-slate-50" onClick={() => handleSort('name')}>
-                    <div className="flex items-center gap-2">Department Name <ArrowUpDown className="w-3 h-3" /></div>
-                  </TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
-                  <TableRow><TableCell colSpan={3} className="text-center py-8">Loading...</TableCell></TableRow>
-                ) : filteredAndSortedDepartments.length === 0 ? (
-                  <TableRow><TableCell colSpan={3} className="text-center py-8 text-muted-foreground">No departments found</TableCell></TableRow>
-                ) : (
-                  filteredAndSortedDepartments.map((dept) => (
-                    <TableRow key={dept.id}>
-                      <TableCell className="font-mono">{dept.code}</TableCell>
-                      <TableCell className="font-medium">{dept.name}</TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="text-slate-500 hover:text-primary hover:bg-primary/10"
-                            onClick={() => handleEdit(dept)}
-                          >
-                            <Pencil className="w-4 h-4" />
-                          </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                            onClick={() => handleDelete(dept.id)}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
+            <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+              <Table>
+                <TableHeader className="bg-slate-50/50">
+                  <TableRow>
+                    <TableHead className="w-16 h-14"></TableHead>
+                    <TableHead className="cursor-pointer hover:text-indigo-600 transition-colors py-4 px-6" onClick={() => handleSort('code')}>
+                      <div className="flex items-center gap-2 font-bold uppercase tracking-wider text-xs">Code <ArrowUpDown className="w-3 h-3" /></div>
+                    </TableHead>
+                    <TableHead className="cursor-pointer hover:text-indigo-600 transition-colors py-4 px-6" onClick={() => handleSort('name')}>
+                      <div className="flex items-center gap-2 font-bold uppercase tracking-wider text-xs">Department Name <ArrowUpDown className="w-3 h-3" /></div>
+                    </TableHead>
+                    <TableHead className="text-right py-4 px-6 font-bold uppercase tracking-wider text-xs">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {isLoading ? (
+                    <TableRow><TableCell colSpan={4} className="text-center py-20"><Loader2 className="w-8 h-8 animate-spin text-indigo-500 mx-auto" /></TableCell></TableRow>
+                  ) : filteredAndSortedDepartments.length === 0 ? (
+                    <TableRow><TableCell colSpan={4} className="text-center py-20 text-slate-400 font-medium">No units found matching your criteria.</TableCell></TableRow>
+                  ) : (
+                    filteredAndSortedDepartments.map((dept, idx) => (
+                      <motion.tr 
+                        key={dept.id} 
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: idx * 0.05 }}
+                        className="group hover:bg-slate-50/50 transition-colors border-b border-slate-50 last:border-0"
+                      >
+                        <TableCell className="py-4 pl-6">
+                            <div className="w-10 h-10 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-600 font-bold group-hover:bg-indigo-600 group-hover:text-white group-hover:scale-110 transition-all">
+                                {dept.code?.charAt(0) || "D"}
+                            </div>
+                        </TableCell>
+                        <TableCell className="py-4 px-6 font-mono text-sm font-bold text-slate-500 uppercase">{dept.code}</TableCell>
+                        <TableCell className="py-4 px-6">
+                            <p className="font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">{dept.name}</p>
+                        </TableCell>
+                        <TableCell className="py-4 px-6 text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="w-10 h-10 rounded-xl text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-all"
+                              onClick={() => handleEdit(dept)}
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="w-10 h-10 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-all"
+                              onClick={() => handleDelete(dept.id)}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </motion.tr>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </motion.div>
         </div>
       </main>
     </div>
