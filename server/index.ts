@@ -5,6 +5,8 @@ import cors from "cors";
 import helmet from "helmet";
 import "dotenv/config";
 import { apiLimiter } from "./rate-limit";
+import { connection } from "./queue";
+import "./worker";
 
 const app = express();
 const httpServer = createServer(app);

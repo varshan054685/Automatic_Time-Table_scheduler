@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { setupAuth } from "./auth";
 import { api, generateTimetableSchema } from "@shared/routes";
 import { generateWithPython } from "./python-scheduler";
+import { addGenerationJobs } from "./queue";
 import { generationLimiter } from "./rate-limit";
 import { z } from "zod";
 import { log } from "./index";
@@ -458,16 +459,48 @@ export async function registerRoutes(
     };
   };
 
-  // Timetable generation (rate limited)
+  // Timetable generation (now async with queue)
   app.post(api.timetable.generatePython.path, requireWorkspace, requireOwner, generationLimiter, async (req: Request, res: Response) => {
     try {
       const parsed = generateTimetableSchema.safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ message: "Invalid payload" });
-      const count = await generateAndPersistTimetable(parsed.data.departmentId, (req as any).workspaceId, parsed.data.semester);
-      res.json({ message: "Timetable generated successfully", count });
+      
+      const wsId = (req as any).workspaceId;
+      const deptId = parsed.data.departmentId;
+      const semester = parsed.data.semester;
+
+      const allSections = await storage.getSections(wsId);
+      const filteredSections = allSections.filter(
+        (section: any) =>
+          section.departmentId === deptId &&
+          (semester ? section.semester === semester : true),
+      );
+
+      if (filteredSections.length === 0) {
+        return res.status(400).json({ message: "No sections found for this selection" });
+      }
+
+      const jobRecord = await addGenerationJobs(wsId, filteredSections);
+      res.json({ message: "Generation started", jobId: jobRecord.id });
     } catch (error: any) {
-      res.status(500).json({ message: "Failed to generate timetable" });
+      log(`Generation triggering error: ${error.message}`);
+      res.status(500).json({ message: "Failed to start generation" });
     }
+  });
+
+  app.get("/api/timetable/generation-status/:jobId", requireWorkspace, async (req: Request, res: Response) => {
+    const jobId = parseInt(String(req.params.jobId), 10);
+    if (isNaN(jobId)) return res.status(400).json({ message: "Invalid Job ID" });
+    
+    const job = await storage.getJobStatus(jobId);
+    if (!job) return res.status(404).json({ message: "Job not found" });
+    
+    // SECURITY: Ensure job belongs to this workspace
+    if (job.workspaceId !== (req as any).workspaceId) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    res.json(job);
   });
 
   app.post("/api/timetable/regenerate-all", requireWorkspace, requireOwner, generationLimiter, async (req: Request, res: Response) => {

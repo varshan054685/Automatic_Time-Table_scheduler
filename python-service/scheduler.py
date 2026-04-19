@@ -104,6 +104,23 @@ def generate_timetable(data: dict):
     v_by_block = defaultdict(list)
     v_by_block_day = defaultdict(list)
     subj_slot_active = {}
+    
+    occupied = data.get("occupiedSlots", [])
+    occ_fac = set() # (day, period, fac_id)
+    occ_room = set() # (day, period, room_number)
+    for occ in occupied:
+        d_name, p_label = occ.get('day'), occ.get('period')
+        # Find indices
+        did = None
+        for i, d_name_alt in enumerate(days):
+            if d_name_alt == d_name: did = i; break
+        pid = None
+        for i, p_label_alt in enumerate(periods):
+            if p_label_alt == p_label: pid = i; break
+            
+        if did is not None and pid is not None:
+            if occ.get('facultyId'): occ_fac.add((did, pid, occ['facultyId']))
+            if occ.get('room'): occ_room.add((did, pid, occ['room']))
 
     for b_idx, block in enumerate(all_blocks):
         size, f_id, s_id = block['size'], block['faculty_id'], block['section_id']
@@ -120,6 +137,17 @@ def generate_timetable(data: dict):
                             continue # Skip this start_p for lab
 
                     for r_idx in range(num_rooms):
+                        room_name = rooms[r_idx]
+                        
+                        # Conflict Check: Does this block overlap with ANY occupied slot?
+                        conflict = False
+                        for k in range(size):
+                            p_idx = start_p + k
+                            if (d_idx, p_idx, f_id) in occ_fac: conflict = True; break
+                            if (d_idx, p_idx, room_name) in occ_room: conflict = True; break
+                        
+                        if conflict: continue
+                        
                         v = model.NewBoolVar(f'b{b_idx}_d{d_idx}_p{start_p}_r{r_idx}')
                         x[(b_idx, d_idx, start_p, r_idx)] = v
                         v_by_block[b_idx].append(v)

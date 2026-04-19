@@ -114,6 +114,17 @@ export const timetable = pgTable("timetable", {
   timeSlotId: integer("time_slot_id").notNull(),
 });
 
+export const generationJobs = pgTable("generation_jobs", {
+  id: serial("id").primaryKey(),
+  workspaceId: integer("workspace_id").notNull(),
+  totalSections: integer("total_sections").notNull(),
+  completedSections: integer("completed_sections").notNull().default(0),
+  status: text("status").notNull().default("pending"), // 'pending', 'processing', 'completed', 'failed'
+  error: text("error"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // === RELATIONS ===
 export const workspacesRelations = relations(workspaces, ({ one, many }) => ({
   owner: one(users, {
@@ -209,6 +220,13 @@ export const timetableRelations = relations(timetable, ({ one }) => ({
   })
 }));
 
+export const generationJobsRelations = relations(generationJobs, ({ one }) => ({
+  workspace: one(workspaces, {
+    fields: [generationJobs.workspaceId],
+    references: [workspaces.id],
+  })
+}));
+
 export const departmentsRelations = relations(departments, ({ one }) => ({
   workspace: one(workspaces, {
     fields: [departments.workspaceId],
@@ -243,6 +261,7 @@ export const insertFacultySchema = createInsertSchema(faculty).omit({ workspaceI
 export const insertSectionSchema = createInsertSchema(sections).omit({ workspaceId: true });
 export const insertTimeSlotSchema = createInsertSchema(timeSlots).omit({ workspaceId: true });
 export const insertTimetableSchema = createInsertSchema(timetable).omit({ workspaceId: true });
+export const insertGenerationJobSchema = createInsertSchema(generationJobs);
 
 // === TYPES ===
 export type User = typeof users.$inferSelect;
@@ -256,3 +275,4 @@ export type Faculty = typeof faculty.$inferSelect;
 export type Section = typeof sections.$inferSelect;
 export type TimeSlot = typeof timeSlots.$inferSelect;
 export type TimetableEntry = typeof timetable.$inferSelect;
+export type GenerationJob = typeof generationJobs.$inferSelect;

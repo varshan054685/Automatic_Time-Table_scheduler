@@ -21,6 +21,12 @@ type SchedulerInput = {
     endTime: string;
   }>;
   days: string[];
+  occupiedSlots?: Array<{
+    day: string;
+    period: string;
+    facultyId?: number;
+    room?: string;
+  }>;
 };
 
 type SchedulerOutput = {

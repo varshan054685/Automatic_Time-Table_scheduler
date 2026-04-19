@@ -1,9 +1,10 @@
 import { db } from "./db";
 import { 
   users, departments, classrooms, subjects, faculty, sections, timeSlots, timetable,
-  workspaces, workspaceMembers, changeRequests,
+  workspaces, workspaceMembers, changeRequests, generationJobs,
   type User, type Workspace, type WorkspaceMember, type ChangeRequest,
-  type Department, type Classroom, type Subject, type Faculty, type Section, type TimeSlot, type TimetableEntry
+  type Department, type Classroom, type Subject, type Faculty, type Section, type TimeSlot, type TimetableEntry,
+  type GenerationJob
 } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
 import crypto from "crypto";
@@ -399,6 +400,34 @@ export class DatabaseStorage {
 
   async clearAllTimetable(workspaceId: number): Promise<void> {
     await db.delete(timetable).where(eq(timetable.workspaceId, workspaceId));
+  }
+
+  // ─── Generation Jobs ───
+  async createGenerationJob(workspaceId: number, totalSections: number): Promise<GenerationJob> {
+    const [job] = await db.insert(generationJobs).values({
+      workspaceId,
+      totalSections,
+      completedSections: 0,
+      status: "processing",
+    }).returning();
+    return job;
+  }
+
+  async getJobStatus(jobId: number): Promise<GenerationJob | undefined> {
+    const [job] = await db.select().from(generationJobs).where(eq(generationJobs.id, jobId));
+    return job;
+  }
+
+  async updateJobProgress(jobId: number, completedSections: number): Promise<void> {
+    await db.update(generationJobs)
+      .set({ completedSections, updatedAt: new Date() })
+      .where(eq(generationJobs.id, jobId));
+  }
+
+  async updateJobStatus(jobId: number, status: string, error?: string): Promise<void> {
+    await db.update(generationJobs)
+      .set({ status, error, updatedAt: new Date() })
+      .where(eq(generationJobs.id, jobId));
   }
 }
 
