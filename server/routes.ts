@@ -3,7 +3,6 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth } from "./auth";
 import { api, generateTimetableSchema } from "@shared/routes";
-import { generateWithPython } from "./python-scheduler";
 import { addGenerationJobs } from "./queue";
 import { generationLimiter } from "./rate-limit";
 import { z } from "zod";
@@ -319,122 +318,76 @@ export async function registerRoutes(
     }
   });
 
-  // ─── Helper: workspace-scoped timetable generation ───
-  const generateAndPersistTimetable = async (departmentId: number, workspaceId: number, semester?: number) => {
-    const allSections = await storage.getSections(workspaceId);
-    const filteredSections = allSections.filter(
-      (section: any) =>
-        section.departmentId === departmentId &&
-        (semester ? section.semester === semester : true),
-    );
+  // ─── Timetable generation (async with queue — NEVER blocks HTTP) ───
+  app.post(api.timetable.generatePython.path, requireWorkspace, requireOwner, generationLimiter, async (req: Request, res: Response) => {
+    try {
+      const parsed = generateTimetableSchema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ message: "Invalid payload" });
+      
+      const wsId = (req as any).workspaceId;
+      const deptId = parsed.data.departmentId;
+      const semester = parsed.data.semester;
 
-    if (filteredSections.length === 0) {
-      throw new Error("No sections found for this department/semester");
+      const allSections = await storage.getSections(wsId);
+      const filteredSections = allSections.filter(
+        (section: any) =>
+          section.departmentId === deptId &&
+          (semester ? section.semester === semester : true),
+      );
+
+      if (filteredSections.length === 0) {
+        return res.status(400).json({ message: "No sections found for this selection" });
+      }
+
+      const jobRecord = await addGenerationJobs(wsId, filteredSections);
+      res.json({ message: "Generation started", jobId: jobRecord.id, status: "started" });
+    } catch (error: any) {
+      log(`Generation triggering error: ${error.message}`);
+      res.status(500).json({ message: "Failed to start generation" });
     }
+  });
 
-    const allSubjects = await storage.getSubjects(workspaceId);
-    const subjectsForDept = allSubjects.filter(
-      (subject) => subject.departmentId === departmentId &&
-        (!subject.sectionId || filteredSections.some((section: any) => section.id === subject.sectionId)),
-    );
-    const allClassrooms = await storage.getClassrooms(workspaceId);
-    const allTimeSlots = await storage.getTimeSlots(workspaceId);
-    const allFaculty = await storage.getFaculty(workspaceId);
-    const facultyForDept = allFaculty.filter((f) => f.departmentId === departmentId);
-
-    if (allClassrooms.length === 0) throw new Error("No classrooms found");
-    if (allTimeSlots.length === 0) throw new Error("No time slots found");
+  app.get("/api/timetable/generation-status/:jobId", requireWorkspace, async (req: Request, res: Response) => {
+    const jobId = parseInt(String(req.params.jobId), 10);
+    if (isNaN(jobId)) return res.status(400).json({ message: "Invalid Job ID" });
     
-    if (subjectsForDept.length === 0) {
-      return { received: 0, saved: 0, failed: 0 };
-    }
-    if (facultyForDept.length === 0) {
-      return { received: 0, saved: 0, failed: 0 };
+    const job = await storage.getJobStatus(jobId);
+    if (!job) return res.status(404).json({ message: "Job not found" });
+    
+    // SECURITY: Ensure job belongs to this workspace
+    if (job.workspaceId !== (req as any).workspaceId) {
+      return res.status(403).json({ message: "Forbidden" });
     }
 
-    // Determine days from timeslots
-    const daySet: Set<string> = new Set();
-    allTimeSlots.forEach(s => daySet.add(s.dayOfWeek));
-    const dayOrder = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-    const days = dayOrder.filter(d => daySet.has(d));
-
-    const pythonResult = await generateWithPython({
-      classrooms: allClassrooms.map((classroom) => ({ roomNumber: classroom.roomNumber })),
-      subjects: subjectsForDept.map((subject) => ({
-        id: subject.id, name: subject.name, departmentId: subject.departmentId,
-        sectionId: subject.sectionId, facultyId: subject.facultyId,
-        weeklyHours: subject.weeklyHours, type: subject.type,
-      })),
-      faculty: facultyForDept.map((f) => ({ id: f.id, name: f.name, departmentId: f.departmentId })),
-      sections: filteredSections.map((section: any) => ({
-        id: section.id, name: section.name, departmentId: section.departmentId,
-      })),
-      timeslots: allTimeSlots.map((slot) => ({
-        id: slot.id, dayOfWeek: slot.dayOfWeek, label: slot.label,
-        startTime: slot.startTime, endTime: slot.endTime,
-      })),
-      days,
+    res.json({
+      id: job.id,
+      status: job.status,
+      totalSections: job.totalSections,
+      completedSections: job.completedSections,
+      failedSections: job.failedSections,
+      error: job.error,
+      createdAt: job.createdAt,
+      updatedAt: job.updatedAt,
     });
+  });
 
-    if (!pythonResult || !pythonResult.timetable) {
-      throw new Error(pythonResult?.error || "Solver failed to return a valid timetable");
-    }
+  // Regenerate ALL — non-blocking: queues every section in the workspace
+  app.post("/api/timetable/regenerate-all", requireWorkspace, requireOwner, generationLimiter, async (req: Request, res: Response) => {
+    try {
+      const wsId = (req as any).workspaceId;
+      const allSections = await storage.getSections(wsId);
 
-    // ONLY clear the existing timetable AFTER receiving a valid result from Python
-    for (const section of filteredSections) {
-      await storage.clearTimetable((section as any).id);
-    }
-
-    const sectionById = new Map(filteredSections.map((s: any) => [s.id, s]));
-    const facultyById = new Map(facultyForDept.map((f) => [f.id, f]));
-    const subjectById = new Map(subjectsForDept.map((s) => [s.id, s]));
-    const roomByNumber = new Map(allClassrooms.map((c) => [c.roomNumber.trim(), c]));
-    const slotByKey = new Map(
-      allTimeSlots.map((slot) => [`${slot.dayOfWeek.trim()}__${slot.label.trim()}`, slot] as const),
-    );
-
-    let saved = 0;
-    let failed = 0;
-    for (const row of pythonResult.timetable) {
-      const section = sectionById.get(row.sectionId);
-      const subject = subjectById.get(row.subjectId);
-      const facultyMember = facultyById.get(row.facultyId);
-      const room = roomByNumber.get(row.room.trim());
-      const slot = slotByKey.get(`${row.day.trim()}__${row.period.trim()}`);
-
-      if (!section || !subject || !facultyMember || !room || !slot) {
-        console.error(`Failed to map row: section=${!!section}, subject=${!!subject}, faculty=${!!facultyMember}, room=${!!room}, slot=${!!slot}`);
-        console.error(`Row Payload:`, row);
-        failed += 1;
-        continue;
+      if (allSections.length === 0) {
+        return res.status(400).json({ message: "No sections found in this workspace" });
       }
 
-      await storage.createTimetableEntry({
-        sectionId: (section as any).id,
-        subjectId: subject.id,
-        facultyId: facultyMember.id,
-        classroomId: room.id,
-        timeSlotId: slot.id,
-        workspaceId,
-      });
-      saved += 1;
+      const jobRecord = await addGenerationJobs(wsId, allSections);
+      res.json({ message: "Generation started for all sections", jobId: jobRecord.id, status: "started" });
+    } catch (error: any) {
+      console.error("Regenerate All Error:", error);
+      res.status(500).json({ message: error.message || "Failed to start regeneration" });
     }
-
-    return { received: pythonResult.timetable.length, saved, failed };
-  };
-
-  const triggerRegenForDepartments = (departmentIds: number[], workspaceId: number) => {
-    const unique = Array.from(new Set(departmentIds)).filter(Boolean);
-    if (unique.length === 0) return;
-    Promise.allSettled(unique.map(async (deptId) => {
-      try {
-        const count = await generateAndPersistTimetable(deptId, workspaceId);
-        log(`[Auto-regen] Department ${deptId} → saved ${count.saved} entries`);
-      } catch (err: any) {
-        log(`[Auto-regen] Department ${deptId} → skipped: ${err.message}`);
-      }
-    }));
-  };
+  });
 
   // ─── CRUD Routes (workspace-scoped) ───
   // SECURITY: viewerCheck creates a change request instead of directly modifying
@@ -459,77 +412,6 @@ export async function registerRoutes(
     };
   };
 
-  // Timetable generation (now async with queue)
-  app.post(api.timetable.generatePython.path, requireWorkspace, requireOwner, generationLimiter, async (req: Request, res: Response) => {
-    try {
-      const parsed = generateTimetableSchema.safeParse(req.body);
-      if (!parsed.success) return res.status(400).json({ message: "Invalid payload" });
-      
-      const wsId = (req as any).workspaceId;
-      const deptId = parsed.data.departmentId;
-      const semester = parsed.data.semester;
-
-      const allSections = await storage.getSections(wsId);
-      const filteredSections = allSections.filter(
-        (section: any) =>
-          section.departmentId === deptId &&
-          (semester ? section.semester === semester : true),
-      );
-
-      if (filteredSections.length === 0) {
-        return res.status(400).json({ message: "No sections found for this selection" });
-      }
-
-      const jobRecord = await addGenerationJobs(wsId, filteredSections);
-      res.json({ message: "Generation started", jobId: jobRecord.id });
-    } catch (error: any) {
-      log(`Generation triggering error: ${error.message}`);
-      res.status(500).json({ message: "Failed to start generation" });
-    }
-  });
-
-  app.get("/api/timetable/generation-status/:jobId", requireWorkspace, async (req: Request, res: Response) => {
-    const jobId = parseInt(String(req.params.jobId), 10);
-    if (isNaN(jobId)) return res.status(400).json({ message: "Invalid Job ID" });
-    
-    const job = await storage.getJobStatus(jobId);
-    if (!job) return res.status(404).json({ message: "Job not found" });
-    
-    // SECURITY: Ensure job belongs to this workspace
-    if (job.workspaceId !== (req as any).workspaceId) {
-      return res.status(403).json({ message: "Forbidden" });
-    }
-
-    res.json(job);
-  });
-
-  app.post("/api/timetable/regenerate-all", requireWorkspace, requireOwner, generationLimiter, async (req: Request, res: Response) => {
-    try {
-      const wsId = (req as any).workspaceId;
-      await storage.clearAllTimetable(wsId);
-      const allDepts = await storage.getDepartments(wsId);
-      const results = await Promise.allSettled(
-        allDepts.map(dept => generateAndPersistTimetable(dept.id, wsId))
-      );
-      const summary = results.map((r, i) => ({
-        deptId: allDepts[i].id, deptName: allDepts[i].name, status: r.status,
-        result: r.status === "fulfilled" ? r.value : undefined,
-        error: r.status === "rejected" ? "Generation failed" : undefined,
-      }));
-      const totalSaved = summary.reduce((acc, s) => acc + (s.result?.saved || 0), 0);
-      
-      const failedCount = summary.filter((s) => s.status === "rejected").length;
-      if (failedCount === allDepts.length && allDepts.length > 0) {
-        throw new Error("Failed to generate timetables for all departments (possibly constraint impossible or timeout).");
-      }
-      
-      res.json({ message: `Regenerated for ${allDepts.length} department(s). Total: ${totalSaved}.`, summary, totalSaved });
-    } catch (error: any) {
-      console.error("Regenerate All Error:", error);
-      res.status(500).json({ message: error.message || "Failed to regenerate timetables" });
-    }
-  });
-
   // ─── Departments (IDOR protected) ───
   app.get(api.departments.list.path, requireWorkspace, async (req: Request, res: Response) => {
     const depts = await storage.getDepartments((req as any).workspaceId);
@@ -541,7 +423,6 @@ export async function registerRoutes(
     if (!data) return;
     const dept = await storage.createDepartment({ ...data, workspaceId: (req as any).workspaceId });
     res.status(201).json(dept);
-    triggerRegenForDepartments([dept.id], (req as any).workspaceId);
   });
 
   app.patch(api.departments.update.path, requireWorkspace,
@@ -554,7 +435,6 @@ export async function registerRoutes(
       if (id === null) return;
       const dept = await storage.updateDepartment(id, data);
       res.json(dept);
-      triggerRegenForDepartments([dept.id], (req as any).workspaceId);
     }
   );
 
@@ -770,17 +650,6 @@ export async function registerRoutes(
 
     const entries = await storage.getTimetable(sectionId, facultyId, (req as any).workspaceId);
     res.json(entries);
-  });
-
-  app.post(api.timetable.generate.path, requireWorkspace, requireOwner, generationLimiter, async (req: Request, res: Response) => {
-    try {
-      const parsed = generateTimetableSchema.safeParse(req.body);
-      if (!parsed.success) return res.status(400).json({ message: "Invalid payload" });
-      const count = await generateAndPersistTimetable(parsed.data.departmentId, (req as any).workspaceId, parsed.data.semester);
-      res.json({ message: "Timetable generated successfully", count });
-    } catch (error: any) {
-      res.status(400).json({ message: "Failed to generate timetable" });
-    }
   });
 
   return httpServer;

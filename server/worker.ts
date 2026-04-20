@@ -2,6 +2,11 @@ import { storage } from "./storage";
 import { generateWithPython } from "./python-scheduler";
 import { log } from "./index";
 
+/**
+ * Process a single section's timetable generation.
+ * Writes results to the staging table (generation_results), NOT the live timetable.
+ * The caller (queue) is responsible for the atomic swap after all sections complete.
+ */
 export async function processTimetableJob(job: any) {
   const { workspaceId, sectionId, jobRecordId } = job.data;
   
@@ -13,7 +18,10 @@ export async function processTimetableJob(job: any) {
     if (!section) throw new Error(`Section ${sectionId} not found`);
 
     const allSubjects = await storage.getSubjects(workspaceId);
-    const subjectsForSection = allSubjects.filter(s => s.sectionId === sectionId || s.sectionId === null);
+    // Subjects directly assigned to this section, or unassigned (shared)
+    const subjectsForSection = allSubjects.filter(
+      s => s.departmentId === section.departmentId && (s.sectionId === sectionId || s.sectionId === null)
+    );
     
     const allFaculty = await storage.getFaculty(workspaceId);
     // Faculty related to subjects in this section
@@ -23,17 +31,40 @@ export async function processTimetableJob(job: any) {
     const allClassrooms = await storage.getClassrooms(workspaceId);
     const allTimeSlots = await storage.getTimeSlots(workspaceId);
 
-    // 2. Fetch already scheduled slots (to avoid conflicts)
-    const existingEntries = await storage.getTimetable(undefined, undefined, workspaceId);
-    // Filter out entries for THIS section (if any)
-    const otherEntries = existingEntries.filter(e => e.sectionId !== sectionId);
+    if (subjectsForSection.length === 0) {
+      log(`[Worker] Section ${sectionId}: No subjects assigned, skipping`);
+      return { success: true, saved: 0 };
+    }
+    if (facultyForSection.length === 0) {
+      log(`[Worker] Section ${sectionId}: No faculty assigned, skipping`);
+      return { success: true, saved: 0 };
+    }
+
+    // 2. Build occupiedSlots from TWO sources:
+    //    a) Existing LIVE timetable entries for OTHER sections (not being regenerated in this job)
+    //    b) Already-staged results from earlier sections in THIS job
     
-    const occupiedSlots = otherEntries.map(e => ({
-      day: e.timeSlot.dayOfWeek,
-      period: e.timeSlot.label,
+    // Source A: Live timetable (other sections)
+    const existingEntries = await storage.getTimetable(undefined, undefined, workspaceId);
+    const liveOccupied = existingEntries
+      .filter(e => e.sectionId !== sectionId)
+      .map(e => ({
+        day: e.timeSlot.dayOfWeek,
+        period: e.timeSlot.label,
+        facultyId: e.facultyId,
+        room: e.classroom.roomNumber,
+      }));
+    
+    // Source B: Staged results from this job (earlier sections already solved)
+    const stagedEntries = await storage.getStagedEntriesForConflictCheck(jobRecordId, workspaceId);
+    const stagedOccupied = stagedEntries.map(e => ({
+      day: e.dayOfWeek,
+      period: e.label,
       facultyId: e.facultyId,
-      room: e.classroom.roomNumber,
+      room: e.roomNumber,
     }));
+
+    const occupiedSlots = [...liveOccupied, ...stagedOccupied];
 
     // 3. Prepare days
     const daySet: Set<string> = new Set();
@@ -41,7 +72,7 @@ export async function processTimetableJob(job: any) {
     const dayOrder = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
     const days = dayOrder.filter(d => daySet.has(d));
 
-    // 4. Call Python Solver
+    // 4. Call Python Solver (single section — fast solve)
     const pythonResult = await generateWithPython({
       classrooms: allClassrooms.map(c => ({ roomNumber: c.roomNumber })),
       subjects: subjectsForSection.map(s => ({
@@ -63,42 +94,33 @@ export async function processTimetableJob(job: any) {
       throw new Error(pythonResult.error || "No solution found for this section.");
     }
 
-    // 5. Save results (incremental)
-    await storage.clearTimetable(sectionId);
-    
+    // 5. Write results to STAGING table (NOT live timetable)
     const roomByNumber = new Map(allClassrooms.map(c => [c.roomNumber.trim(), c]));
     const slotByKey = new Map(allTimeSlots.map(s => [`${s.dayOfWeek.trim()}__${s.label.trim()}`, s] as const));
 
+    let saved = 0;
     for (const row of pythonResult.timetable) {
       const room = roomByNumber.get(row.room.trim());
       const slot = slotByKey.get(`${row.day.trim()}__${row.period.trim()}`);
       if (room && slot) {
-        await storage.createTimetableEntry({
+        await storage.createStagedEntry({
+          jobId: jobRecordId,
+          workspaceId,
           sectionId,
           subjectId: row.subjectId,
           facultyId: row.facultyId,
           classroomId: room.id,
           timeSlotId: slot.id,
-          workspaceId,
         });
+        saved++;
       }
     }
 
-    // 6. Update progress
-    const currentJob = await storage.getJobStatus(jobRecordId);
-    if (currentJob) {
-      const completed = currentJob.completedSections + 1;
-      await storage.updateJobProgress(jobRecordId, completed);
-      
-      if (completed >= currentJob.totalSections) {
-        await storage.updateJobStatus(jobRecordId, "completed");
-        log(`[Worker] Job ${jobRecordId} FULLY COMPLETED`);
-      }
-    }
+    log(`[Worker] Section ${sectionId}: staged ${saved} entries`);
+    return { success: true, saved };
 
   } catch (error: any) {
     log(`[Worker] Error in section ${sectionId}: ${error.message}`);
-    await storage.updateJobStatus(jobRecordId, "failed", error.message);
-    throw error;
+    throw error; // Re-throw so the queue can handle it
   }
 }

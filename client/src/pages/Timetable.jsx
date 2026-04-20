@@ -1,10 +1,10 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card } from "@/components/ui/card";
-import { Loader2, Download, RefreshCw, User, Calendar, BookOpen, Clock, Building2, LayoutGrid, GraduationCap, MapPin, Sparkles, Wand2, FileText, Printer } from "lucide-react";
-import { useTimetable, useGenerateTimetable, useRegenerateAll } from "@/hooks/use-timetable";
+import { Loader2, Download, RefreshCw, User, Calendar, BookOpen, Clock, Building2, LayoutGrid, GraduationCap, MapPin, Sparkles, Wand2, FileText, Printer, CheckCircle2, AlertTriangle, XCircle } from "lucide-react";
+import { useTimetable, useGenerateTimetable, useRegenerateAll, useGenerationStatus } from "@/hooks/use-timetable";
 import { useDepartments, useSections, useTimeSlots, useFaculty, useSubjects } from "@/hooks/use-master-data";
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from "@/hooks/use-auth";
@@ -75,19 +75,52 @@ export default function TimetablePage() {
 
   const generateMutation = useGenerateTimetable();
   const regenerateAllMutation = useRegenerateAll();
+  const generationStatus = useGenerationStatus();
+
+  const isGenerating = generationStatus.isPolling || regenerateAllMutation.isPending;
 
   const handleGenerate = () => {
-    if (!confirm("This will clear the current timetable and regenerate it for all departments. Continue?")) return;
+    if (!confirm("This will regenerate timetables for all sections. The current timetable will only be replaced after the new one is fully ready. Continue?")) return;
     
     regenerateAllMutation.mutate(null, {
       onSuccess: (data) => {
-        toast({ title: "Success", description: data.message });
+        // API returned instantly with jobId — start polling
+        generationStatus.startPolling(data.jobId);
       },
       onError: (err) => {
-        toast({ title: "Failed", description: err.message, variant: "destructive" });
+        toast({ title: "Failed to start", description: err.message, variant: "destructive" });
       }
     });
   };
+
+  // React to generation completion/failure
+  useEffect(() => {
+    if (!generationStatus.data) return;
+    const { status, completedSections, totalSections, failedSections, error } = generationStatus.data;
+
+    if (status === "completed") {
+      toast({ 
+        title: "✅ Generation Complete!", 
+        description: `Successfully generated timetables for ${totalSections} section(s).` 
+      });
+      // Reset after a short delay so the user sees the success state
+      setTimeout(() => generationStatus.reset(), 2000);
+    } else if (status === "partial") {
+      toast({ 
+        title: "⚠️ Partial Success", 
+        description: `${completedSections - failedSections} of ${totalSections} sections succeeded. ${failedSections} failed.`,
+        variant: "destructive" 
+      });
+      setTimeout(() => generationStatus.reset(), 3000);
+    } else if (status === "failed") {
+      toast({ 
+        title: "❌ Generation Failed", 
+        description: error || "All sections failed to generate.",
+        variant: "destructive" 
+      });
+      setTimeout(() => generationStatus.reset(), 3000);
+    }
+  }, [generationStatus.data]);
 
   const getEntry = (day, slotId) => {
     if (!slotId) return null;
@@ -158,44 +191,110 @@ export default function TimetablePage() {
   return (
     <div className="flex min-h-screen bg-[#f8fafc]">
       <AnimatePresence>
-        {regenerateAllMutation.isPending && (
+        {(isGenerating || (generationStatus.data && ["completed", "partial", "failed"].includes(generationStatus.data.status))) && (
           <motion.div 
             initial={{ opacity: 0 }} 
             animate={{ opacity: 1 }} 
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-[100] bg-slate-900/80 backdrop-blur-xl flex flex-col items-center justify-center text-white p-6"
           >
-            <div className="relative group">
-                <div className="absolute inset-0 bg-indigo-500/20 blur-3xl rounded-full scale-150 group-hover:scale-175 transition-all duration-1000"></div>
-                <Wand2 className="w-24 h-24 mb-6 text-indigo-400 animate-pulse relative z-10" />
-            </div>
-            <motion.h2 
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="text-4xl font-display font-black tracking-tight text-white text-center"
-            >
-                Orchestrating Your Timetable
-            </motion.h2>
-            <p className="mt-4 text-slate-300 text-xl font-medium text-center max-w-lg">
-                Solving complex constraints and optimizing schedules for your institution...
-            </p>
-            <div className="mt-12 w-64 h-2 bg-slate-800 rounded-full overflow-hidden border border-slate-700">
-                <motion.div 
-                    initial={{ x: "-100%" }}
-                    animate={{ x: "100%" }}
-                    transition={{ repeat: Infinity, duration: 2, ease: "linear" }}
-                    className="w-full h-full bg-indigo-500"
-                />
-            </div>
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 10 }}
-              className="mt-12 bg-indigo-500/10 border border-indigo-500/20 px-6 py-4 rounded-2xl flex items-center gap-4 max-w-md"
-            >
-              <Sparkles className="w-6 h-6 text-indigo-400 shrink-0" />
-              <p className="text-sm text-indigo-200">Processing thousands of potential combinations to ensure zero conflicts.</p>
-            </motion.div>
+            {(() => {
+              const status = generationStatus.data?.status || "processing";
+              const completed = generationStatus.data?.completedSections || 0;
+              const total = generationStatus.data?.totalSections || 0;
+              const failed = generationStatus.data?.failedSections || 0;
+              const progress = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+              if (status === "completed") {
+                return (
+                  <>
+                    <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring" }}>
+                      <CheckCircle2 className="w-24 h-24 text-emerald-400" />
+                    </motion.div>
+                    <h2 className="text-4xl font-display font-black tracking-tight text-white text-center mt-6">All Done!</h2>
+                    <p className="mt-3 text-slate-300 text-xl font-medium">All {total} sections generated successfully.</p>
+                  </>
+                );
+              }
+
+              if (status === "partial") {
+                return (
+                  <>
+                    <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring" }}>
+                      <AlertTriangle className="w-24 h-24 text-amber-400" />
+                    </motion.div>
+                    <h2 className="text-4xl font-display font-black tracking-tight text-white text-center mt-6">Partially Complete</h2>
+                    <p className="mt-3 text-slate-300 text-xl font-medium">{completed - failed} of {total} sections succeeded. {failed} failed.</p>
+                  </>
+                );
+              }
+
+              if (status === "failed") {
+                return (
+                  <>
+                    <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring" }}>
+                      <XCircle className="w-24 h-24 text-rose-400" />
+                    </motion.div>
+                    <h2 className="text-4xl font-display font-black tracking-tight text-white text-center mt-6">Generation Failed</h2>
+                    <p className="mt-3 text-slate-300 text-xl font-medium">{generationStatus.data?.error || "Unable to solve constraints."}</p>
+                  </>
+                );
+              }
+
+              // Processing state with real progress
+              return (
+                <>
+                  <div className="relative group">
+                    <div className="absolute inset-0 bg-indigo-500/20 blur-3xl rounded-full scale-150 group-hover:scale-175 transition-all duration-1000"></div>
+                    <Wand2 className="w-24 h-24 mb-6 text-indigo-400 animate-pulse relative z-10" />
+                  </div>
+                  <motion.h2 
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="text-4xl font-display font-black tracking-tight text-white text-center"
+                  >
+                    Orchestrating Your Timetable
+                  </motion.h2>
+                  <p className="mt-4 text-slate-300 text-xl font-medium text-center max-w-lg">
+                    {total > 0 
+                      ? `Solving section ${Math.min(completed + 1, total)} of ${total}...`
+                      : "Preparing sections..."
+                    }
+                  </p>
+
+                  {/* Real progress bar */}
+                  <div className="mt-8 w-80 space-y-3">
+                    <div className="flex justify-between text-sm font-bold">
+                      <span className="text-indigo-300">{completed} / {total} sections</span>
+                      <span className="text-slate-400">{progress}%</span>
+                    </div>
+                    <div className="w-full h-3 bg-slate-800 rounded-full overflow-hidden border border-slate-700">
+                      <motion.div 
+                        initial={{ width: 0 }}
+                        animate={{ width: `${progress}%` }}
+                        transition={{ duration: 0.5, ease: "easeOut" }}
+                        className="h-full bg-gradient-to-r from-indigo-500 to-violet-500 rounded-full"
+                      />
+                    </div>
+                    {failed > 0 && (
+                      <p className="text-amber-400 text-xs font-medium flex items-center gap-1">
+                        <AlertTriangle className="w-3 h-3" /> {failed} section(s) had issues
+                      </p>
+                    )}
+                  </div>
+
+                  <motion.div 
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 5 }}
+                    className="mt-10 bg-indigo-500/10 border border-indigo-500/20 px-6 py-4 rounded-2xl flex items-center gap-4 max-w-md"
+                  >
+                    <Sparkles className="w-6 h-6 text-indigo-400 shrink-0" />
+                    <p className="text-sm text-indigo-200">Each section is solved independently to avoid conflicts and ensure fast results.</p>
+                  </motion.div>
+                </>
+              );
+            })()}
           </motion.div>
         )}
       </AnimatePresence>
@@ -356,10 +455,10 @@ export default function TimetablePage() {
                 {isOwner && (
                     <Button 
                         onClick={handleGenerate} 
-                        disabled={regenerateAllMutation.isPending}
+                        disabled={isGenerating}
                         className="premium-gradient premium-gradient-hover gap-2 h-12 px-8 shadow-xl shadow-indigo-500/20 rounded-xl font-black transition-all hover:scale-105 active:scale-95"
                     >
-                        {regenerateAllMutation.isPending ? (
+                        {isGenerating ? (
                             <><Loader2 className="w-5 h-5 animate-spin" /> Orchestrating...</>
                         ) : (
                             <><RefreshCw className="w-5 h-5" /> Regenerate All</>

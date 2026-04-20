@@ -119,10 +119,23 @@ export const generationJobs = pgTable("generation_jobs", {
   workspaceId: integer("workspace_id").notNull(),
   totalSections: integer("total_sections").notNull(),
   completedSections: integer("completed_sections").notNull().default(0),
-  status: text("status").notNull().default("pending"), // 'pending', 'processing', 'completed', 'failed'
+  failedSections: integer("failed_sections").notNull().default(0),
+  status: text("status").notNull().default("pending"), // 'pending', 'processing', 'completed', 'failed', 'partial'
   error: text("error"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Staging table: holds per-section solver results before atomic swap into live timetable
+export const generationResults = pgTable("generation_results", {
+  id: serial("id").primaryKey(),
+  jobId: integer("job_id").notNull(),
+  workspaceId: integer("workspace_id").notNull(),
+  sectionId: integer("section_id").notNull(),
+  subjectId: integer("subject_id").notNull(),
+  facultyId: integer("faculty_id").notNull(),
+  classroomId: integer("classroom_id").notNull(),
+  timeSlotId: integer("time_slot_id").notNull(),
 });
 
 // === RELATIONS ===
@@ -220,11 +233,23 @@ export const timetableRelations = relations(timetable, ({ one }) => ({
   })
 }));
 
-export const generationJobsRelations = relations(generationJobs, ({ one }) => ({
+export const generationJobsRelations = relations(generationJobs, ({ one, many }) => ({
   workspace: one(workspaces, {
     fields: [generationJobs.workspaceId],
     references: [workspaces.id],
-  })
+  }),
+  results: many(generationResults),
+}));
+
+export const generationResultsRelations = relations(generationResults, ({ one }) => ({
+  job: one(generationJobs, {
+    fields: [generationResults.jobId],
+    references: [generationJobs.id],
+  }),
+  workspace: one(workspaces, {
+    fields: [generationResults.workspaceId],
+    references: [workspaces.id],
+  }),
 }));
 
 export const departmentsRelations = relations(departments, ({ one }) => ({
@@ -262,6 +287,7 @@ export const insertSectionSchema = createInsertSchema(sections).omit({ workspace
 export const insertTimeSlotSchema = createInsertSchema(timeSlots).omit({ workspaceId: true });
 export const insertTimetableSchema = createInsertSchema(timetable).omit({ workspaceId: true });
 export const insertGenerationJobSchema = createInsertSchema(generationJobs);
+export const insertGenerationResultSchema = createInsertSchema(generationResults);
 
 // === TYPES ===
 export type User = typeof users.$inferSelect;
@@ -276,3 +302,4 @@ export type Section = typeof sections.$inferSelect;
 export type TimeSlot = typeof timeSlots.$inferSelect;
 export type TimetableEntry = typeof timetable.$inferSelect;
 export type GenerationJob = typeof generationJobs.$inferSelect;
+export type GenerationResult = typeof generationResults.$inferSelect;

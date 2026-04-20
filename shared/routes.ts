@@ -290,7 +290,7 @@ export const api = {
       path: '/api/timetable/generate' as const,
       input: generateTimetableSchema,
       responses: {
-        200: z.object({ message: z.string(), count: z.number() }),
+        200: z.object({ message: z.string(), jobId: z.number(), status: z.string() }),
         400: errorSchemas.conflict,
       },
     },
@@ -299,8 +299,32 @@ export const api = {
       path: '/api/generate-timetable' as const,
       input: generateTimetableSchema,
       responses: {
-        200: z.object({ message: z.string(), count: z.number() }),
+        200: z.object({ message: z.string(), jobId: z.number(), status: z.string() }),
         500: z.object({ message: z.string() }),
+      },
+    },
+    regenerateAll: {
+      method: 'POST' as const,
+      path: '/api/timetable/regenerate-all' as const,
+      responses: {
+        200: z.object({ message: z.string(), jobId: z.number(), status: z.string() }),
+        500: z.object({ message: z.string() }),
+      },
+    },
+    generationStatus: {
+      method: 'GET' as const,
+      path: '/api/timetable/generation-status/:jobId' as const,
+      responses: {
+        200: z.object({
+          id: z.number(),
+          status: z.string(),
+          totalSections: z.number(),
+          completedSections: z.number(),
+          failedSections: z.number(),
+          error: z.string().nullable(),
+          createdAt: z.string().nullable(),
+          updatedAt: z.string().nullable(),
+        }),
       },
     },
   },

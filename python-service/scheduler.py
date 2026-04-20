@@ -292,7 +292,7 @@ def generate_timetable(data: dict):
     model.Maximize(total_sch * 10000 - scheduling_penalty - sum(b2b_penalty) * 10 - sum(sec_day_active_vars) * 50 - sum(late_period_vars))
 
     solver = cp_model.CpSolver()
-    solver.parameters.max_time_in_seconds = 60.0 # Increased for better search on Render
+    solver.parameters.max_time_in_seconds = 20.0  # Fast per-section solves
     solver.parameters.num_search_workers = 8     # Enable parallel search
     solver.parameters.random_seed = 42           # Deterministic behavior
     status = solver.Solve(model)

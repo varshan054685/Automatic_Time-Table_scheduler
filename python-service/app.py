@@ -43,6 +43,12 @@ class TimeslotItem(BaseModel):
     startTime: str
     endTime: str
 
+class OccupiedSlotItem(BaseModel):
+    day: str
+    period: str
+    facultyId: Optional[int] = None
+    room: Optional[str] = None
+
 class GenerateRequest(BaseModel):
     classrooms: List[ClassroomItem]
     subjects: List[SubjectItem]
@@ -50,6 +56,7 @@ class GenerateRequest(BaseModel):
     sections: List[SectionItem]
     timeslots: List[TimeslotItem]
     days: List[str]
+    occupiedSlots: Optional[List[OccupiedSlotItem]] = None
 
 @app.post("/generate-timetable")
 def generate(payload: GenerateRequest):

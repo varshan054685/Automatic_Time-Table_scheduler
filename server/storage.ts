@@ -1,10 +1,10 @@
 import { db } from "./db";
 import { 
   users, departments, classrooms, subjects, faculty, sections, timeSlots, timetable,
-  workspaces, workspaceMembers, changeRequests, generationJobs,
+  workspaces, workspaceMembers, changeRequests, generationJobs, generationResults,
   type User, type Workspace, type WorkspaceMember, type ChangeRequest,
   type Department, type Classroom, type Subject, type Faculty, type Section, type TimeSlot, type TimetableEntry,
-  type GenerationJob
+  type GenerationJob, type GenerationResult
 } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
 import crypto from "crypto";
@@ -408,6 +408,7 @@ export class DatabaseStorage {
       workspaceId,
       totalSections,
       completedSections: 0,
+      failedSections: 0,
       status: "processing",
     }).returning();
     return job;
@@ -418,9 +419,11 @@ export class DatabaseStorage {
     return job;
   }
 
-  async updateJobProgress(jobId: number, completedSections: number): Promise<void> {
+  async updateJobProgress(jobId: number, completedSections: number, failedSections?: number): Promise<void> {
+    const updates: any = { completedSections, updatedAt: new Date() };
+    if (failedSections !== undefined) updates.failedSections = failedSections;
     await db.update(generationJobs)
-      .set({ completedSections, updatedAt: new Date() })
+      .set(updates)
       .where(eq(generationJobs.id, jobId));
   }
 
@@ -428,6 +431,73 @@ export class DatabaseStorage {
     await db.update(generationJobs)
       .set({ status, error, updatedAt: new Date() })
       .where(eq(generationJobs.id, jobId));
+  }
+
+  // ─── Staging (generation_results) ───
+  async createStagedEntry(entry: {
+    jobId: number; workspaceId: number; sectionId: number;
+    subjectId: number; facultyId: number; classroomId: number; timeSlotId: number;
+  }): Promise<GenerationResult> {
+    const [r] = await db.insert(generationResults).values(entry).returning();
+    return r;
+  }
+
+  async getStagedEntries(jobId: number): Promise<GenerationResult[]> {
+    return await db.select().from(generationResults).where(eq(generationResults.jobId, jobId));
+  }
+
+  async getStagedEntriesForConflictCheck(jobId: number, workspaceId: number): Promise<any[]> {
+    // Join with timeSlots and classrooms to get day/period/room/faculty info for occupiedSlots
+    return await db.select({
+      sectionId: generationResults.sectionId,
+      facultyId: generationResults.facultyId,
+      classroomId: generationResults.classroomId,
+      timeSlotId: generationResults.timeSlotId,
+      dayOfWeek: timeSlots.dayOfWeek,
+      label: timeSlots.label,
+      roomNumber: classrooms.roomNumber,
+    }).from(generationResults)
+      .innerJoin(timeSlots, eq(generationResults.timeSlotId, timeSlots.id))
+      .innerJoin(classrooms, eq(generationResults.classroomId, classrooms.id))
+      .where(and(eq(generationResults.jobId, jobId), eq(generationResults.workspaceId, workspaceId)));
+  }
+
+  /** Atomic swap: move staged results into live timetable, replacing old entries for the given sections */
+  async promoteStagedEntries(jobId: number, workspaceId: number, sectionIds: number[]): Promise<number> {
+    // 1. Fetch all staged entries for this job
+    const staged = await this.getStagedEntries(jobId);
+    if (staged.length === 0) return 0;
+
+    // 2. Delete old timetable entries for these sections
+    for (const secId of sectionIds) {
+      await db.delete(timetable).where(
+        and(eq(timetable.sectionId, secId), eq(timetable.workspaceId, workspaceId))
+      );
+    }
+
+    // 3. Insert staged results into live timetable
+    const entries = staged.map(s => ({
+      workspaceId: s.workspaceId,
+      sectionId: s.sectionId,
+      subjectId: s.subjectId,
+      facultyId: s.facultyId,
+      classroomId: s.classroomId,
+      timeSlotId: s.timeSlotId,
+    }));
+    
+    // Batch insert
+    for (const entry of entries) {
+      await db.insert(timetable).values(entry);
+    }
+
+    // 4. Clean up staging
+    await this.cleanupStagedEntries(jobId);
+
+    return entries.length;
+  }
+
+  async cleanupStagedEntries(jobId: number): Promise<void> {
+    await db.delete(generationResults).where(eq(generationResults.jobId, jobId));
   }
 }
 
