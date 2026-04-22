@@ -403,7 +403,7 @@ export default function TimeSlots() {
                 <p className="text-slate-500 font-medium">Orchestrate and manage academic intervals and period synchronization.</p>
               </motion.div>
               
-              <div className="flex flex-wrap gap-3">
+              <div className="flex items-center gap-3 overflow-x-auto md:overflow-visible pb-2 md:pb-0">
                 <TimeSlotImport timeSlots={timeSlots} onImportComplete={refetch} />
 
                 <Button variant="outline" className="gap-2 h-11 px-6 rounded-xl border-2 border-slate-200 font-bold hover:bg-slate-50 hover:border-slate-300 transition-all" onClick={handleExport}>

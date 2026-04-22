@@ -116,10 +116,10 @@ function FacultyImport({ departments, faculty, onImportComplete }) {
   return (
     <div className="relative">
       <Input type="file" accept=".xlsx, .xls" className="hidden" id="import-excel" ref={fileInputRef} onChange={handleImport} disabled={isImporting} />
-      <Button variant="outline" className="gap-2 h-11 px-5 border-slate-200 hover:border-indigo-200 hover:bg-indigo-50 transition-all rounded-xl" asChild disabled={isImporting}>
+      <Button variant="outline" className="gap-2 h-11 px-6 rounded-xl border-2 border-slate-200 font-bold hover:bg-slate-50 hover:border-slate-300 transition-all" asChild disabled={isImporting}>
         <label htmlFor="import-excel" className="cursor-pointer">
-          {isImporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-          {isImporting ? "Importing..." : "Import Excel"}
+          {isImporting ? <Loader2 className="w-4 h-4 animate-spin text-indigo-600" /> : <FileSpreadsheet className="w-4 h-4" />}
+          {isImporting ? "Injecting Data..." : "Import Dataset"}
         </label>
       </Button>
     </div>
@@ -247,23 +247,25 @@ export default function Faculty() {
           
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
             <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
-              <h1 className="text-4xl font-display font-bold text-slate-900 tracking-tight flex items-center gap-3">
-                <GraduationCap className="w-10 h-10 text-indigo-600" />
-                Faculty
-              </h1>
-              <p className="text-slate-500 mt-2 font-medium">Manage and organize your teaching staff effectively.</p>
+              <div className="flex items-center gap-4 mb-2">
+                <div className="p-3 bg-white rounded-2xl shadow-sm border border-slate-100">
+                  <GraduationCap className="w-8 h-8 text-indigo-600" />
+                </div>
+                <h1 className="text-4xl font-display font-black text-slate-900 tracking-tight">Faculty</h1>
+              </div>
+              <p className="text-slate-500 font-medium">Manage and organize your teaching staff effectively.</p>
             </motion.div>
             
-            <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="flex flex-wrap gap-3">
+            <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="flex items-center gap-3 overflow-x-auto md:overflow-visible pb-2 md:pb-0">
               <FacultyImport departments={departments} faculty={faculty} onImportComplete={refetch} />
-              <Button variant="outline" className="gap-2 h-11 px-5 border-slate-200 hover:border-indigo-200 hover:bg-indigo-50 transition-all rounded-xl" onClick={handleExport}>
-                <FileSpreadsheet className="w-4 h-4" /> Export
+              <Button variant="outline" className="gap-2 h-11 px-6 rounded-xl border-2 border-slate-200 font-bold hover:bg-slate-50 hover:border-slate-300 transition-all" onClick={handleExport}>
+                <Upload className="w-4 h-4" /> Export Dataset
               </Button>
 
               <Dialog open={open} onOpenChange={(v) => { setOpen(v); if(!v) { setEditingId(null); form.reset(); } }}>
                 <DialogTrigger asChild>
-                  <Button className="premium-gradient premium-gradient-hover gap-2 h-11 px-6 shadow-xl shadow-indigo-500/20 rounded-xl">
-                    <Plus className="w-4 h-4" /> Add Faculty
+                  <Button className="premium-gradient premium-gradient-hover gap-2 h-11 px-8 shadow-xl shadow-indigo-500/20 text-white font-black rounded-xl transition-all hover:scale-105 active:scale-95">
+                    <Plus className="w-5 h-5" /> Add Faculty
                   </Button>
                 </DialogTrigger>
                 <DialogContent className="sm:max-w-md rounded-2xl">
