@@ -42,17 +42,28 @@ export function Sidebar() {
   const logoutMutation = useLogout();
   const { user } = useUser();
   const isMobile = useIsMobile();
-  const [isOpen, setIsOpen] = useState(!isMobile);
+  const [isOpen, setIsOpen] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('sidebarOpen');
+      if (stored !== null) return stored === 'true';
+    }
+    // Default to collapsed unless previously saved as open
+    return false; 
+  });
 
   useEffect(() => {
     if (isMobile) {
       setIsOpen(false);
-    } else {
-      setIsOpen(true);
     }
   }, [isMobile]);
 
-  const toggleSidebar = () => setIsOpen(!isOpen);
+  const toggleSidebar = () => {
+    const newState = !isOpen;
+    setIsOpen(newState);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('sidebarOpen', newState);
+    }
+  };
   const isOwner = user?.workspace?.role === "owner";
   const workspaceName = user?.workspace?.workspaceName || "Workspace";
 
@@ -91,16 +102,16 @@ export function Sidebar() {
         {(isOpen || !isMobile) && (
           <motion.div 
             initial={isMobile ? { x: -300 } : false}
-            animate={{ x: 0, width: isOpen ? 280 : 80 }}
+            animate={{ x: 0, width: isOpen ? 280 : 72 }}
             exit={isMobile ? { x: -300 } : false}
             transition={{ type: "spring", damping: 20, stiffness: 100 }}
             className={`h-screen bg-slate-900 text-white flex flex-col z-40 shrink-0 shadow-2xl
               ${isMobile ? 'fixed top-0 left-0' : 'sticky top-0'}
-              ${!isOpen && !isMobile ? 'w-20' : 'w-[280px]'}
+              ${!isOpen && !isMobile ? 'w-[72px]' : 'w-[280px]'}
             `}
           >
             {/* Logo Section */}
-            <div className="p-6 border-b border-slate-800 flex items-center justify-between shrink-0 h-24">
+            <div className="px-4 py-6 border-b border-slate-800 flex items-center justify-between shrink-0 h-24">
               <div className="flex items-center gap-3 overflow-hidden">
                 <div className="w-10 h-10 rounded-xl premium-gradient flex items-center justify-center text-white shrink-0 shadow-lg shadow-indigo-500/20">
                   <Calendar className="w-6 h-6" />

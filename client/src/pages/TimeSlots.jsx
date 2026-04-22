@@ -332,185 +332,6 @@ function TimeSlotImport({ timeSlots, onImportComplete, variant = "outline" }) {
   );
 }
 
-function FirstTimeSetup({ onComplete, timeSlots }) {
-  const [selectedDays, setSelectedDays] = useState(["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]);
-  const [periods, setPeriods] = useState("6");
-  const [startTime, setStartTime] = useState("09:00");
-  const [duration, setDuration] = useState("60");
-  const [isGenerating, setIsGenerating] = useState(false);
-  const { toast } = useToast();
-  const createMutation = useCreateTimeSlot();
-
-  const handleGenerate = async () => {
-    if (selectedDays.length === 0) {
-      toast({ title: "Scope Incomplete", description: "Please designate active academic days.", variant: "destructive" });
-      return;
-    }
-    
-    setIsGenerating(true);
-    const numPeriods = parseInt(periods);
-    const durMins = parseInt(duration);
-    const [startH, startM] = startTime.split(':').map(Number);
-    
-    const slotsToCreate = [];
-    
-    for (let d = 0; d < selectedDays.length; d++) {
-      for (let p = 0; p < numPeriods; p++) {
-        const periodStartMin = startH * 60 + startM + p * durMins;
-        const periodEndMin = periodStartMin + durMins;
-        
-        const sh = Math.floor(periodStartMin / 60).toString().padStart(2, '0');
-        const sm = (periodStartMin % 60).toString().padStart(2, '0');
-        const eh = Math.floor(periodEndMin / 60).toString().padStart(2, '0');
-        const em = (periodEndMin % 60).toString().padStart(2, '0');
-        
-        slotsToCreate.push({
-          dayOfWeek: selectedDays[d],
-          label: `Period ${p + 1}`,
-          startTime: `${sh}:${sm}`,
-          endTime: `${eh}:${em}`
-        });
-      }
-    }
-    
-    try {
-      for (const slot of slotsToCreate) {
-        await createMutation.mutateAsync(slot);
-      }
-      toast({ title: "Architecture Deployed", description: "Your weekly period structure has been successfully initialized." });
-      onComplete();
-    } catch (error) {
-      toast({ title: "Deployment Error", description: error.message || "Failed to generate structure.", variant: "destructive" });
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
-  return (
-    <motion.div 
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="max-w-4xl mx-auto"
-    >
-        <Card className="border-0 shadow-2xl shadow-indigo-500/10 rounded-[3rem] overflow-hidden bg-white">
-        <div className="h-2 premium-gradient" />
-        <CardHeader className="text-center pb-12 pt-16 px-12">
-            <motion.div 
-                initial={{ y: -20 }}
-                animate={{ y: 0 }}
-                className="mx-auto w-24 h-24 bg-indigo-50 text-indigo-600 rounded-[2.5rem] flex items-center justify-center mb-10 shadow-xl shadow-indigo-100/50"
-            >
-            <CalendarDays className="w-12 h-12" />
-            </motion.div>
-            <CardTitle className="text-4xl font-display font-black tracking-tight text-slate-900 leading-tight">
-                Architect Your Weekly <br /><span className="text-indigo-600">Period Structure</span>
-            </CardTitle>
-            <CardDescription className="text-lg font-medium mt-6 text-slate-500 max-w-xl mx-auto leading-relaxed">
-                Initialize your institution's academic cadence. Utilize our automation wizard or synchronize existing datasets from Excel.
-            </CardDescription>
-            
-            <div className="flex justify-center mt-10">
-            <TimeSlotImport timeSlots={timeSlots} onImportComplete={onComplete} variant="secondary" />
-            </div>
-        </CardHeader>
-
-        <CardContent className="space-y-12 px-16 pb-16">
-            <div className="relative">
-                <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-slate-100" /></div>
-                <div className="relative flex justify-center text-[10px] font-black uppercase tracking-[0.3em]"><span className="bg-white px-6 text-slate-400">Manual Configuration</span></div>
-            </div>
-
-            <div className="grid gap-12">
-            <div className="space-y-6">
-                <Label className="text-sm font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                    <Calendar className="w-4 h-4 text-indigo-500" /> Active Academic Horizons
-                </Label>
-                <div className="flex flex-wrap gap-4">
-                {DAYS.map(day => {
-                    const isSelected = selectedDays.includes(day);
-                    return (
-                    <motion.button
-                        key={day}
-                        whileHover={{ y: -2 }}
-                        whileTap={{ scale: 0.95 }}
-                        onClick={() => {
-                        if (isSelected) {
-                            setSelectedDays(selectedDays.filter(d => d !== day));
-                        } else {
-                            setSelectedDays([...selectedDays, day]);
-                        }
-                        }}
-                        className={`px-6 py-4 rounded-[1.2rem] text-sm font-black transition-all border-2 ${
-                        isSelected 
-                            ? 'bg-indigo-600 text-white border-indigo-600 shadow-xl shadow-indigo-500/30' 
-                            : 'bg-slate-50 text-slate-400 border-transparent hover:border-slate-200'
-                        }`}
-                    >
-                        {day}
-                    </motion.button>
-                    )
-                })}
-                </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
-                <div className="space-y-4">
-                <Label className="text-sm font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                    <Activity className="w-4 h-4 text-indigo-500" /> Daily Periods
-                </Label>
-                <Input 
-                    type="number" 
-                    min="1" 
-                    max="15" 
-                    value={periods} 
-                    onChange={e => setPeriods(e.target.value)}
-                    className="h-14 rounded-2xl bg-slate-50 border-transparent focus:border-indigo-500 font-black text-lg text-slate-900"
-                />
-                </div>
-                <div className="space-y-4">
-                <Label className="text-sm font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                    <Clock className="w-4 h-4 text-indigo-500" /> Start Epoch
-                </Label>
-                <div className="bg-slate-50 rounded-2xl p-2 border border-slate-100">
-                    <TimePicker value={startTime} onChange={setStartTime} />
-                </div>
-                </div>
-                <div className="space-y-4">
-                <Label className="text-sm font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                    <MousePointer2 className="w-4 h-4 text-indigo-500" /> Unit Duration
-                </Label>
-                <div className="relative">
-                    <Input 
-                    type="number" 
-                    min="15" 
-                    step="5"
-                    value={duration} 
-                    onChange={e => setDuration(e.target.value)}
-                    className="h-14 rounded-2xl bg-slate-50 border-transparent focus:border-indigo-500 font-black text-lg text-slate-900 pr-14"
-                    />
-                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 font-black text-[10px] uppercase">min</span>
-                </div>
-                </div>
-            </div>
-            </div>
-
-            <Button 
-                size="lg" 
-                className="w-full h-16 text-lg font-black tracking-tight gap-3 premium-gradient shadow-[0_20px_40px_-15px_rgba(79,70,229,0.3)] rounded-3xl transition-all hover:scale-[1.02] active:scale-[0.98]" 
-                onClick={handleGenerate}
-                disabled={isGenerating}
-            >
-            {isGenerating ? (
-                <><Loader2 className="w-6 h-6 animate-spin" /> Finalizing Architecture...</>
-            ) : (
-                <><Sparkles className="w-6 h-6" /> Deploy Period Structure</>
-            )}
-            </Button>
-        </CardContent>
-        </Card>
-    </motion.div>
-  );
-}
 
 export default function TimeSlots() {
   const [bulkOpen, setBulkOpen] = useState(false);
@@ -563,26 +384,14 @@ export default function TimeSlots() {
     return `${h12}:${m} ${ampm}`;
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex min-h-screen bg-[#f8fafc] items-center justify-center">
-        <Sidebar className="hidden lg:block z-0" />
-        <Loader2 className="w-12 h-12 animate-spin text-indigo-600" />
-      </div>
-    );
-  }
+
 
   return (
     <div className="flex min-h-screen bg-[#f8fafc]">
       <Sidebar />
       <main className="flex-1 p-4 lg:p-8 overflow-y-auto">
         
-        {timeSlots.length === 0 ? (
-          <div className="pt-12 lg:pt-8 min-h-[calc(100vh-4rem)] flex flex-col justify-center">
-            <FirstTimeSetup onComplete={refetch} timeSlots={timeSlots} />
-          </div>
-        ) : (
-          <div className="max-w-6xl mx-auto space-y-10 pt-12 lg:pt-0">
+        <div className="max-w-6xl mx-auto space-y-10 pt-12 lg:pt-0">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
               <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
                 <div className="flex items-center gap-4 mb-2">
@@ -645,10 +454,15 @@ export default function TimeSlots() {
                     <TableHead className="py-6 px-8 font-black text-slate-400 uppercase tracking-widest text-[10px]">Reference Label</TableHead>
                     <TableHead className="py-6 px-6 font-black text-slate-400 uppercase tracking-widest text-[10px]">Temporal Scope</TableHead>
                     <TableHead className="py-6 px-6 font-black text-slate-400 uppercase tracking-widest text-[10px]">Active Synchronicity</TableHead>
-                    <TableHead className="py-6 px-8 text-right font-black text-slate-400 uppercase tracking-widest text-[10px]">Operations</TableHead>
+                    <TableHead className="py-6 px-8 text-right font-black text-slate-400 uppercase tracking-widest text-[10px]">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
+                  {isLoading ? (
+                    <TableRow><TableCell colSpan={4} className="text-center py-20"><Loader2 className="w-8 h-8 animate-spin text-indigo-500 mx-auto" /></TableCell></TableRow>
+                  ) : uniquePeriods.length === 0 ? (
+                    <TableRow><TableCell colSpan={4} className="text-center py-20 text-slate-400 font-medium">No time slots found. Create or import some to get started.</TableCell></TableRow>
+                  ) : (
                   <AnimatePresence mode="popLayout">
                     {uniquePeriods.map((slot, idx) => {
                         const activeDaysGroup = timeSlots
@@ -688,7 +502,7 @@ export default function TimeSlots() {
                                 </div>
                             </TableCell>
                             <TableCell className="py-6 px-8 text-right">
-                                <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-all transform translate-x-2 group-hover:translate-x-0">
+                                <div className="flex justify-end gap-2">
                                     <Button 
                                         variant="ghost" 
                                         size="icon" 
@@ -717,11 +531,11 @@ export default function TimeSlots() {
                         );
                     })}
                   </AnimatePresence>
+                  )}
                 </TableBody>
               </Table>
             </motion.div>
           </div>
-        )}
       </main>
     </div>
   );

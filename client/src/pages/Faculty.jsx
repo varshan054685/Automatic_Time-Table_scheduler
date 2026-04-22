@@ -427,7 +427,7 @@ export default function Faculty() {
                             <Button 
                               variant="ghost" 
                               size="icon" 
-                              className="w-10 h-10 rounded-xl text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-all"
+                              className="w-10 h-10 rounded-xl text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 transition-all shadow-sm bg-white border border-slate-100"
                               onClick={() => handleEdit(f)}
                             >
                               <Pencil className="w-4 h-4" />
@@ -435,7 +435,7 @@ export default function Faculty() {
                             <Button 
                               variant="ghost" 
                               size="icon" 
-                              className="w-10 h-10 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-all"
+                              className="w-10 h-10 rounded-xl text-rose-500 hover:text-rose-600 hover:bg-rose-50 transition-all shadow-sm bg-white border border-slate-100"
                               onClick={() => handleDelete(f.id)}
                             >
                               <Trash2 className="w-4 h-4" />
