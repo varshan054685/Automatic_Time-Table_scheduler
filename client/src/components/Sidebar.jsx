@@ -24,6 +24,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "@shared/routes";
 import { apiUrl } from "@/lib/api-base";
 import { motion, AnimatePresence } from "framer-motion";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 const navItems = [
   { label: "Dashboard", href: "/", icon: LayoutDashboard },
@@ -139,69 +140,82 @@ export function Sidebar() {
               {navItems.map((item) => {
                 const isActive = location === item.href;
                 return (
-                  <Link key={item.href} href={item.href} onClick={() => isMobile && setIsOpen(false)}>
-                    <div 
-                      className={`
-                        group flex items-center gap-3 px-3 py-3 rounded-xl cursor-pointer transition-all duration-300 relative
-                        ${isActive 
-                          ? 'bg-indigo-600/10 text-white font-medium' 
-                          : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
-                        }
-                      `}
-                    >
-                      {isActive && (
-                        <motion.div 
-                          layoutId="active-nav"
-                          className="absolute inset-0 bg-indigo-600 rounded-xl -z-10 shadow-lg shadow-indigo-600/20"
-                        />
-                      )}
-                      <item.icon className={`w-5 h-5 shrink-0 transition-transform ${isActive ? 'scale-110' : 'group-hover:scale-110'}`} />
-                      {isOpen && (
-                        <motion.span
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          className="truncate"
+                  <Tooltip key={item.href} delayDuration={0}>
+                    <TooltipTrigger asChild>
+                      <Link href={item.href} onClick={() => isMobile && setIsOpen(false)}>
+                        <div 
+                          className={`
+                            group flex items-center gap-3 px-3 py-3 rounded-xl cursor-pointer transition-all duration-300 relative
+                            ${isActive 
+                              ? 'bg-indigo-600/10 text-white font-medium' 
+                              : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                            }
+                          `}
                         >
-                          {item.label}
-                        </motion.span>
-                      )}
-                      {!isOpen && !isMobile && (
-                        <div className="absolute left-16 bg-slate-800 text-white px-2 py-1 rounded text-xs opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-50">
-                          {item.label}
+                          {isActive && (
+                            <motion.div 
+                              layoutId="active-nav"
+                              className="absolute inset-0 bg-indigo-600 rounded-xl -z-10 shadow-lg shadow-indigo-600/20"
+                            />
+                          )}
+                          <item.icon className={`w-5 h-5 shrink-0 transition-transform ${isActive ? 'scale-110' : 'group-hover:scale-110'}`} />
+                          {isOpen && (
+                            <motion.span
+                              initial={{ opacity: 0 }}
+                              animate={{ opacity: 1 }}
+                              className="truncate"
+                            >
+                              {item.label}
+                            </motion.span>
+                          )}
                         </div>
-                      )}
-                    </div>
-                  </Link>
+                      </Link>
+                    </TooltipTrigger>
+                    {!isOpen && !isMobile && (
+                      <TooltipContent side="right" className="font-semibold text-slate-900" sideOffset={10}>
+                        {item.label}
+                      </TooltipContent>
+                    )}
+                  </Tooltip>
                 );
               })}
 
               <div className="my-6 border-t border-slate-800/50"></div>
 
-              <Link href="/settings" onClick={() => isMobile && setIsOpen(false)}>
-                <div 
-                  className={`
-                    group flex items-center justify-between px-3 py-3 rounded-xl cursor-pointer transition-all duration-300 relative
-                    ${location === '/settings' 
-                      ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20 font-medium' 
-                      : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
-                    }
-                  `}
-                >
-                  <div className="flex items-center gap-3">
-                    <SettingsIcon className={`w-5 h-5 shrink-0 ${location === '/settings' ? 'scale-110' : 'group-hover:scale-110'}`} />
-                    {isOpen && (
-                      <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                        Settings
-                      </motion.span>
-                    )}
-                  </div>
-                  {isOwner && pendingCount > 0 && (
-                    <span className="bg-rose-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-lg shadow-rose-500/50">
-                      {pendingCount > 9 ? '9+' : pendingCount}
-                    </span>
-                  )}
-                </div>
-              </Link>
+              <Tooltip delayDuration={0}>
+                <TooltipTrigger asChild>
+                  <Link href="/settings" onClick={() => isMobile && setIsOpen(false)}>
+                    <div 
+                      className={`
+                        group flex items-center justify-between px-3 py-3 rounded-xl cursor-pointer transition-all duration-300 relative
+                        ${location === '/settings' 
+                          ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20 font-medium' 
+                          : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                        }
+                      `}
+                    >
+                      <div className="flex items-center gap-3">
+                        <SettingsIcon className={`w-5 h-5 shrink-0 ${location === '/settings' ? 'scale-110' : 'group-hover:scale-110'}`} />
+                        {isOpen && (
+                          <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                            Settings
+                          </motion.span>
+                        )}
+                      </div>
+                      {isOwner && pendingCount > 0 && (
+                        <span className="bg-rose-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-lg shadow-rose-500/50">
+                          {pendingCount > 9 ? '9+' : pendingCount}
+                        </span>
+                      )}
+                    </div>
+                  </Link>
+                </TooltipTrigger>
+                {!isOpen && !isMobile && (
+                  <TooltipContent side="right" className="font-semibold text-slate-900" sideOffset={10}>
+                    Settings
+                  </TooltipContent>
+                )}
+              </Tooltip>
             </nav>
 
             {/* Footer Section */}
@@ -217,14 +231,23 @@ export function Sidebar() {
                   </div>
                 )}
               </div>
-              <Button 
-                variant="ghost" 
-                className={`w-full hover:bg-rose-950/30 text-slate-400 hover:text-rose-400 gap-3 justify-start rounded-xl px-3 transition-colors ${!isOpen && 'justify-center px-0'}`}
-                onClick={() => logoutMutation.mutate()}
-              >
-                <LogOut className="w-5 h-5 shrink-0" />
-                {isOpen && <span>Sign Out</span>}
-              </Button>
+              <Tooltip delayDuration={0}>
+                <TooltipTrigger asChild>
+                  <Button 
+                    variant="ghost" 
+                    className={`w-full hover:bg-rose-950/30 text-slate-400 hover:text-rose-400 gap-3 justify-start rounded-xl px-3 transition-colors ${!isOpen && 'justify-center px-0'}`}
+                    onClick={() => logoutMutation.mutate()}
+                  >
+                    <LogOut className="w-5 h-5 shrink-0" />
+                    {isOpen && <span>Sign Out</span>}
+                  </Button>
+                </TooltipTrigger>
+                {!isOpen && !isMobile && (
+                  <TooltipContent side="right" className="font-semibold text-slate-900" sideOffset={10}>
+                    Sign Out
+                  </TooltipContent>
+                )}
+              </Tooltip>
             </div>
           </motion.div>
         )}

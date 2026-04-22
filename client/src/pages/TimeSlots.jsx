@@ -33,39 +33,41 @@ function TimePicker({ value, onChange }) {
   };
 
   return (
-    <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl border border-slate-200 shadow-inner">
-      <Select value={displayHours.toString()} onValueChange={(h) => updateTime(h, minutes, isPM)}>
-        <SelectTrigger className="w-[70px] h-10 border-0 bg-white ring-0 focus:ring-0 rounded-lg font-bold">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent className="rounded-xl">
-          {Array.from({ length: 12 }, (_, i) => i + 1).map(h => (
-            <SelectItem key={h} value={h.toString()} className="font-bold">{h}</SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      <span className="text-slate-400 font-bold">:</span>
-      <Select value={minutes} onValueChange={(m) => updateTime(displayHours, m, isPM)}>
-        <SelectTrigger className="w-[70px] h-10 border-0 bg-white ring-0 focus:ring-0 rounded-lg font-bold">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent className="rounded-xl">
-          {["00", "05", "10", "15", "20", "25", "30", "35", "40", "45", "50", "55"].map(m => (
-            <SelectItem key={m} value={m} className="font-bold">{m}</SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      <div className="flex bg-white/50 p-1 rounded-lg gap-1 border border-slate-200">
+    <div className="flex items-center gap-1.5 p-1 bg-slate-50 rounded-xl border border-slate-200/60 shadow-sm w-fit max-w-full overflow-hidden">
+      <div className="flex items-center gap-0.5 bg-white p-0.5 rounded-lg border border-slate-100 shadow-sm">
+        <Select value={displayHours.toString()} onValueChange={(h) => updateTime(h, minutes, isPM)}>
+          <SelectTrigger className="w-[58px] h-9 border-0 bg-transparent ring-0 focus:ring-0 rounded-md font-black text-slate-900 text-sm">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent className="rounded-xl border-slate-100">
+            {Array.from({ length: 12 }, (_, i) => i + 1).map(h => (
+              <SelectItem key={h} value={h.toString()} className="font-bold">{h}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <span className="text-slate-300 font-black px-0.5 text-[10px]">:</span>
+        <Select value={minutes} onValueChange={(m) => updateTime(displayHours, m, isPM)}>
+          <SelectTrigger className="w-[58px] h-9 border-0 bg-transparent ring-0 focus:ring-0 rounded-md font-black text-slate-900 text-sm">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent className="rounded-xl border-slate-100">
+            {["00", "05", "10", "15", "20", "25", "30", "35", "40", "45", "50", "55"].map(m => (
+              <SelectItem key={m} value={m} className="font-bold">{m}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="flex bg-slate-200/40 p-0.5 rounded-lg gap-0.5 border border-slate-200/30">
         <button
           type="button"
-          className={`px-3 py-1 text-[10px] font-black rounded-md transition-all ${!isPM ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-200'}`}
+          className={`px-2.5 py-1.5 text-[9px] font-black rounded-md transition-all duration-300 ${!isPM ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/20' : 'text-slate-500 hover:text-slate-700'}`}
           onClick={() => updateTime(displayHours, minutes, false)}
         >
           AM
         </button>
         <button
           type="button"
-          className={`px-3 py-1 text-[10px] font-black rounded-md transition-all ${isPM ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-200'}`}
+          className={`px-2.5 py-1.5 text-[9px] font-black rounded-md transition-all duration-300 ${isPM ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/20' : 'text-slate-500 hover:text-slate-700'}`}
           onClick={() => updateTime(displayHours, minutes, true)}
         >
           PM
@@ -154,13 +156,15 @@ function BulkTimeSlotDialog({ onSuccess, editingGroup = null, onClose }) {
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
         <FormField
           control={form.control}
           name="days"
           render={() => (
             <FormItem>
-              <FormLabel className="font-bold text-slate-700">Scope of Application (Days)</FormLabel>
+              <FormLabel className="text-sm font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                <CalendarDays className="w-4 h-4 text-indigo-500" /> Scope of Application (Days)
+              </FormLabel>
               <div className="flex flex-wrap gap-2 pt-2">
                 {DAYS.map((day) => (
                   <FormField
@@ -176,10 +180,10 @@ function BulkTimeSlotDialog({ onSuccess, editingGroup = null, onClose }) {
                                     ? field.onChange(field.value?.filter((value) => value !== day))
                                     : field.onChange([...field.value, day])
                             }}
-                            className={`px-4 py-2 rounded-xl text-xs font-black transition-all ${
+                            className={`px-4 py-2 rounded-xl text-[10px] font-black transition-all border-2 ${
                                 field.value?.includes(day)
-                                    ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/20 scale-105'
-                                    : 'bg-slate-50 text-slate-400 hover:bg-indigo-50 hover:text-indigo-500'
+                                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-xl shadow-indigo-500/25 scale-105'
+                                    : 'bg-white text-slate-500 border-slate-100 hover:border-slate-200 hover:text-slate-700'
                             }`}
                         >
                             {day.slice(0, 3).toUpperCase()}
@@ -197,23 +201,25 @@ function BulkTimeSlotDialog({ onSuccess, editingGroup = null, onClose }) {
           name="label"
           render={({ field }) => (
             <FormItem>
-              <FormLabel className="font-bold text-slate-700">Academic Period Label</FormLabel>
+              <FormLabel className="text-sm font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                <Clock className="w-4 h-4 text-indigo-500" /> Academic Period Label
+              </FormLabel>
               <FormControl>
                 <div className="relative">
-                    <Clock className="absolute left-3 top-3.5 h-4 w-4 text-slate-400" />
-                    <Input className="h-12 pl-10 rounded-xl bg-slate-50/50 border-slate-200 border-2 font-bold focus:border-indigo-600 transition-all" placeholder="e.g. Period 1 or Lunch Break" {...field} />
+                    <Clock className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
+                    <Input className="h-14 pl-12 rounded-2xl bg-slate-50/50 border-slate-100 border-2 font-black text-slate-900 focus:border-indigo-500 focus:bg-white transition-all" placeholder="e.g. Period 1 or Lunch Break" {...field} />
                 </div>
               </FormControl>
             </FormItem>
           )}
         />
-        <div className="grid grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50/50 p-5 rounded-[2.5rem] border border-slate-100">
           <FormField
             control={form.control}
             name="startTime"
             render={({ field }) => (
-              <FormItem>
-                <FormLabel className="font-bold text-slate-700">Interval Start</FormLabel>
+              <FormItem className="space-y-3">
+                <FormLabel className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Interval Start</FormLabel>
                 <FormControl>
                   <TimePicker value={field.value} onChange={field.onChange} />
                 </FormControl>
@@ -224,8 +230,8 @@ function BulkTimeSlotDialog({ onSuccess, editingGroup = null, onClose }) {
             control={form.control}
             name="endTime"
             render={({ field }) => (
-              <FormItem>
-                <FormLabel className="font-bold text-slate-700">Interval End</FormLabel>
+              <FormItem className="space-y-3">
+                <FormLabel className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Interval End</FormLabel>
                 <FormControl>
                   <TimePicker value={field.value} onChange={field.onChange} />
                 </FormControl>
@@ -233,7 +239,7 @@ function BulkTimeSlotDialog({ onSuccess, editingGroup = null, onClose }) {
             )}
           />
         </div>
-        <Button type="submit" className="w-full h-12 premium-gradient shadow-xl shadow-indigo-500/20 text-base font-black rounded-xl transition-all hover:scale-[1.02]" disabled={createMutation.isPending || updateMutation.isPending || deleteMutation.isPending}>
+        <Button type="submit" className="w-full h-14 premium-gradient shadow-2xl shadow-indigo-500/20 text-lg font-black rounded-2xl transition-all hover:scale-[1.02] active:scale-[0.98]" disabled={createMutation.isPending || updateMutation.isPending || deleteMutation.isPending}>
           {editingGroup ? "Synchronize Updates" : "Create Active Periods"}
         </Button>
       </form>
@@ -264,8 +270,17 @@ function TimeSlotImport({ timeSlots, onImportComplete, variant = "outline" }) {
         const data = XLSX.utils.sheet_to_json(ws);
 
         let successCount = 0;
-        let updateCount = 0;
         let errorCount = 0;
+
+        // Erase all existing data to prevent duplication
+        if (timeSlots && timeSlots.length > 0) {
+          try {
+            await Promise.all(timeSlots.map(s => deleteMutation.mutateAsync(s.id)));
+          } catch (err) {
+            console.error("Failed to delete existing time slots:", err);
+            // Continue anyway to try importing the new ones
+          }
+        }
 
         for (const item of data) {
           const dayOfWeek = item.Day || item.dayOfWeek;
@@ -274,31 +289,14 @@ function TimeSlotImport({ timeSlots, onImportComplete, variant = "outline" }) {
           const endTime = item["End Time"] || item.endTime;
 
           if (dayOfWeek && label && startTime && endTime) {
-            const existing = timeSlots?.find(s => 
-              s.dayOfWeek === dayOfWeek && 
-              s.startTime === startTime && 
-              s.endTime === endTime
-            );
-
             try {
-              if (existing) {
-                await updateMutation.mutateAsync({
-                  id: existing.id,
-                  dayOfWeek,
-                  label,
-                  startTime,
-                  endTime
-                });
-                updateCount++;
-              } else {
-                await createMutation.mutateAsync({
-                  dayOfWeek,
-                  label,
-                  startTime,
-                  endTime
-                });
-                successCount++;
-              }
+              await createMutation.mutateAsync({
+                dayOfWeek,
+                label,
+                startTime,
+                endTime
+              });
+              successCount++;
             } catch (err) {
               errorCount++;
             }
@@ -307,7 +305,7 @@ function TimeSlotImport({ timeSlots, onImportComplete, variant = "outline" }) {
 
         toast({ 
           title: "Import Chain Resolved", 
-          description: `Ingested ${successCount} entries, synchronized ${updateCount}. ${errorCount > 0 ? `${errorCount} failures observed.` : ""}`,
+          description: `Ingested ${successCount} entries. ${errorCount > 0 ? `${errorCount} failures observed.` : ""}`,
         });
         
         if (onImportComplete) onImportComplete();
@@ -609,7 +607,7 @@ export default function TimeSlots() {
                       <Plus className="w-5 h-5" /> Add New Period
                     </Button>
                   </DialogTrigger>
-                  <DialogContent className="sm:max-w-md rounded-[2.5rem] border-0 p-8 shadow-2xl">
+                  <DialogContent className="sm:max-w-xl rounded-[3rem] border-0 p-10 shadow-2xl bg-white/95 backdrop-blur-2xl">
                     <DialogHeader className="mb-6">
                       <DialogTitle className="text-2xl font-black text-slate-900">Define Custom Interval</DialogTitle>
                     </DialogHeader>
@@ -622,7 +620,7 @@ export default function TimeSlots() {
             <ExportHint />
 
             <Dialog open={!!editGroup} onOpenChange={(v) => !v && setEditGroup(null)}>
-              <DialogContent className="sm:max-w-md rounded-[2.5rem] border-0 p-8 shadow-2xl">
+              <DialogContent className="sm:max-w-xl rounded-[3rem] border-0 p-10 shadow-2xl bg-white/95 backdrop-blur-2xl">
                 <DialogHeader className="mb-6">
                   <DialogTitle className="text-2xl font-black text-slate-900">Modify Period Chain</DialogTitle>
                 </DialogHeader>
