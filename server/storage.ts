@@ -240,6 +240,7 @@ export class DatabaseStorage {
   }
 
   async deleteClassroom(id: number): Promise<void> {
+    await db.delete(timetable).where(eq(timetable.classroomId, id));
     await db.delete(classrooms).where(eq(classrooms.id, id));
   }
 
@@ -274,6 +275,7 @@ export class DatabaseStorage {
   }
 
   async deleteSubject(id: number): Promise<void> {
+    await db.delete(timetable).where(eq(timetable.subjectId, id));
     await db.delete(subjects).where(eq(subjects.id, id));
   }
 
@@ -304,6 +306,7 @@ export class DatabaseStorage {
   }
 
   async deleteFaculty(id: number): Promise<void> {
+    await db.delete(timetable).where(eq(timetable.facultyId, id));
     await db.delete(faculty).where(eq(faculty.id, id));
   }
 
@@ -367,6 +370,7 @@ export class DatabaseStorage {
   }
 
   async deleteTimeSlot(id: number): Promise<void> {
+    await db.delete(timetable).where(eq(timetable.timeSlotId, id));
     await db.delete(timeSlots).where(eq(timeSlots.id, id));
   }
 

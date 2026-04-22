@@ -47,12 +47,12 @@ export async function processTimetableJob(job: any) {
     // Source A: Live timetable (other sections)
     const existingEntries = await storage.getTimetable(undefined, undefined, workspaceId);
     const liveOccupied = existingEntries
-      .filter(e => e.sectionId !== sectionId)
+      .filter(e => e.sectionId !== sectionId && e.timeSlot && e.classroom)
       .map(e => ({
-        day: e.timeSlot.dayOfWeek,
-        period: e.timeSlot.label,
+        day: e.timeSlot!.dayOfWeek,
+        period: e.timeSlot!.label,
         facultyId: e.facultyId,
-        room: e.classroom.roomNumber,
+        room: e.classroom!.roomNumber,
       }));
     
     // Source B: Staged results from this job (earlier sections already solved)

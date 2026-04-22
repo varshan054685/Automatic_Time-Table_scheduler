@@ -57,7 +57,7 @@ export default function Login() {
 
       <div className="w-full max-w-md relative z-10">
         {/* Logo & Header */}
-        <div className="text-center mb-8">
+        <div className="text-center mb-8 select-none cursor-default">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white mb-4 shadow-lg shadow-indigo-500/25">
             <Calendar className="w-8 h-8" />
           </div>
@@ -70,7 +70,7 @@ export default function Login() {
         </div>
 
         <Card className="border-0 shadow-2xl shadow-black/20 bg-white/5 backdrop-blur-xl border border-white/10">
-          <CardHeader>
+          <CardHeader className="select-none cursor-default">
             <CardTitle className="text-white">
               {isRegister ? "Register" : "Login"}
             </CardTitle>
@@ -86,7 +86,7 @@ export default function Login() {
                   name="email"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-slate-300">Email</FormLabel>
+                      <FormLabel className="text-slate-300 select-none cursor-default">Email</FormLabel>
                       <FormControl>
                         <div className="relative">
                           <Mail className="absolute left-3 top-3 h-4 w-4 text-slate-500" />
@@ -106,7 +106,7 @@ export default function Login() {
                   name="password"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-slate-300">Password</FormLabel>
+                      <FormLabel className="text-slate-300 select-none cursor-default">Password</FormLabel>
                       <FormControl>
                         <div className="relative">
                           <Lock className="absolute left-3 top-3 h-4 w-4 text-slate-500" />
