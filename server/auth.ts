@@ -10,6 +10,8 @@ import bcrypt from "bcrypt";
 import crypto from "crypto";
 import { log } from "./index";
 import { authLimiter } from "./rate-limit";
+import nodemailer from "nodemailer";
+import sgMail from "@sendgrid/mail";
 
 // Bcrypt cost factor
 const BCRYPT_ROUNDS = 10;
@@ -160,11 +162,143 @@ export function setupAuth(app: Express) {
     return Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit OTP
   }
 
+  // Common email domains for validation
+  const VALID_EMAIL_DOMAINS = new Set([
+    "gmail.com", "yahoo.com", "hotmail.com", "outlook.com", "icloud.com",
+    "protonmail.com", "aol.com", "mail.com", "yandex.com", "zoho.com",
+    "live.com", "msn.com", "qq.com", "163.com", "126.com",
+    "foxmail.com", "yeah.net", "gmx.com", "mail.ru", "bk.ru",
+    "inbox.ru", "list.ru", "rediffmail.com", "hotmail.co.uk",
+    "yahoo.co.uk", "yahoo.co.in", "outlook.co.uk", "live.co.uk"
+  ]);
+
+  // Common typos in email domains
+  const DOMAIN_TYPOS: Record<string, string> = {
+    "gmial.com": "gmail.com",
+    "gmal.com": "gmail.com",
+    "gmail.co": "gmail.com",
+    "gamil.com": "gmail.com",
+    "gnail.com": "gmail.com",
+    "gmaill.com": "gmail.com",
+    "yahooo.com": "yahoo.com",
+    "yaho.com": "yahoo.com",
+    "yahoo.co": "yahoo.com",
+    "yahoomail.com": "yahoo.com",
+    "hotmial.com": "hotmail.com",
+    "hotmal.com": "hotmail.com",
+    "hotmail.co": "hotmail.com",
+    "outlok.com": "outlook.com",
+    "outlook.co": "outlook.com",
+    "icloud.co": "icloud.com",
+    "icould.com": "icloud.com",
+  };
+
+  async function validateEmailDomain(email: string): Promise<{ valid: boolean; error?: string; suggestion?: string }> {
+    const parts = email.toLowerCase().split("@");
+    if (parts.length !== 2) {
+      return { valid: false, error: "Invalid email format" };
+    }
+
+    const domain = parts[1];
+
+    // Check for common typos
+    if (DOMAIN_TYPOS[domain]) {
+      return {
+        valid: false,
+        error: `Did you mean ${parts[0]}@${DOMAIN_TYPOS[domain]}?`,
+        suggestion: `${parts[0]}@${DOMAIN_TYPOS[domain]}`
+      };
+    }
+
+    // Check if domain is in valid list (basic check)
+    if (!VALID_EMAIL_DOMAINS.has(domain)) {
+      // For custom domains, we'll accept them but log a warning
+      // In production, you might want to do DNS MX record validation here
+      console.log(`[WARN] Uncommon email domain: ${domain}`);
+    }
+
+    return { valid: true };
+  }
+
+  // Email transporter (configured if SMTP settings are provided)
+  const emailTransporter = (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS)
+    ? nodemailer.createTransport({
+        host: process.env.SMTP_HOST,
+        port: parseInt(process.env.SMTP_PORT || "587"),
+        secure: process.env.SMTP_SECURE === "true",
+        auth: {
+          user: process.env.SMTP_USER,
+          pass: process.env.SMTP_PASS,
+        },
+      })
+    : null;
+
   async function sendEmailOtp(email: string, otp: string): Promise<void> {
-    // In production, integrate with email service (SendGrid, AWS SES, etc.)
-    // For now, just log the OTP
+    // Validate email domain first
+    const validation = await validateEmailDomain(email);
+    if (!validation.valid) {
+      throw new Error(validation.error || "Invalid email domain");
+    }
+
+    // Log OTP for debugging (always)
     log(`OTP_EMAIL to=${email} otp=${otp}`, "security");
-    console.log(`[DEBUG] Email OTP for ${email}: ${otp}`);
+    console.log(`[DEBUG] Email OTP for ${email}: ${otp} (expires in ${OTP_EXPIRY_MINUTES} minutes)`);
+
+    // Send via SendGrid if API key is configured
+    if (process.env.SENDGRID_API_KEY && process.env.SENDGRID_API_KEY.startsWith("SG.")) {
+      try {
+        sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+        await sgMail.send({
+          from: process.env.SENDGRID_FROM || "Time Table Scheduler <noreply@timetable.app>",
+          to: email,
+          subject: "Your Verification Code",
+          text: `Your OTP for Time Table Scheduler registration is: ${otp}\n\nThis code will expire in ${OTP_EXPIRY_MINUTES} minutes.\n\nIf you didn't request this code, please ignore this email.`,
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+              <h2 style="color: #333;">Time Table Scheduler - Verification Code</h2>
+              <p>Your OTP for registration is:</p>
+              <div style="background: #f5f5f5; padding: 20px; text-align: center; font-size: 32px; font-weight: bold; letter-spacing: 8px; border-radius: 8px; margin: 20px 0;">
+                ${otp}
+              </div>
+              <p>This code will expire in <strong>${OTP_EXPIRY_MINUTES} minutes</strong>.</p>
+              <p style="color: #666; font-size: 12px;">If you didn't request this code, please ignore this email.</p>
+            </div>
+          `,
+        });
+        console.log(`[SENDGRID] OTP sent to ${email}`);
+        return; // Exit after successful SendGrid send
+      } catch (err: any) {
+        console.error(`[SENDGRID_FAILED] Failed to send OTP to ${email}:`, err.message);
+        // Fall through to SMTP as backup
+      }
+    }
+
+    // Send actual email if SMTP is configured (fallback)
+    if (emailTransporter) {
+      try {
+        await emailTransporter.sendMail({
+          from: process.env.SMTP_FROM || `"Time Table Scheduler" <${process.env.SMTP_USER}>`,
+          to: email,
+          subject: "Your Verification Code",
+          text: `Your OTP for Time Table Scheduler registration is: ${otp}\n\nThis code will expire in ${OTP_EXPIRY_MINUTES} minutes.\n\nIf you didn't request this code, please ignore this email.`,
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+              <h2 style="color: #333;">Time Table Scheduler - Verification Code</h2>
+              <p>Your OTP for registration is:</p>
+              <div style="background: #f5f5f5; padding: 20px; text-align: center; font-size: 32px; font-weight: bold; letter-spacing: 8px; border-radius: 8px; margin: 20px 0;">
+                ${otp}
+              </div>
+              <p>This code will expire in <strong>${OTP_EXPIRY_MINUTES} minutes</strong>.</p>
+              <p style="color: #666; font-size: 12px;">If you didn't request this code, please ignore this email.</p>
+            </div>
+          `,
+        });
+        console.log(`[EMAIL_SENT] OTP sent to ${email}`);
+      } catch (err: any) {
+        console.error(`[EMAIL_FAILED] Failed to send OTP to ${email}:`, err.message);
+        // Don't throw - user can still see OTP in terminal for development
+      }
+    }
   }
 
   async function sendPhoneOtp(phoneNumber: string, otp: string): Promise<void> {
@@ -244,7 +378,8 @@ export function setupAuth(app: Express) {
       res.json({ message: "OTP sent successfully", expiresIn: OTP_EXPIRY_MINUTES * 60 });
     } catch (err: any) {
       console.error("OTP request error:", err.message);
-      res.status(500).json({ message: "Failed to send OTP" });
+      // Show specific error message to user (e.g., email domain validation)
+      res.status(400).json({ message: err.message || "Failed to send OTP" });
     }
   });
 
@@ -282,16 +417,36 @@ export function setupAuth(app: Express) {
       }
 
       // Check if OTP has expired
-      if (new Date() > new Date(storedOtp.expiresAt)) {
-        return res.status(400).json({ message: "OTP has expired. Please request a new one." });
+      const now = new Date();
+      const expiryTime = new Date(storedOtp.expiresAt);
+      if (now > expiryTime) {
+        const expiredMinutes = Math.floor((now.getTime() - expiryTime.getTime()) / 60000);
+        return res.status(400).json({
+          message: `OTP has expired (expired ${expiredMinutes} minute(s) ago). Please request a new one.`,
+          expired: true,
+          expiredAt: storedOtp.expiresAt
+        });
       }
+
+      // Calculate remaining time for debugging
+      const remainingMs = expiryTime.getTime() - now.getTime();
+      const remainingMinutes = Math.floor(remainingMs / 60000);
+      const remainingSeconds = Math.floor((remainingMs % 60000) / 1000);
+      console.log(`[DEBUG] OTP verification: ${remainingMinutes}m ${remainingSeconds}s remaining`);
 
       // Verify OTP
       if (storedOtp.otp !== otp) {
-        return res.status(400).json({ message: "Invalid OTP" });
+        return res.status(400).json({ message: "Invalid OTP. Please check and try again." });
       }
 
-      res.json({ verified: true, message: "OTP verified successfully" });
+      // Don't delete OTP here - registration will verify it again and then delete it
+      // This allows the user to complete registration after verification
+
+      res.json({
+        verified: true,
+        message: "OTP verified successfully",
+        expiresIn: remainingMinutes * 60 + remainingSeconds
+      });
     } catch (err: any) {
       console.error("OTP verification error:", err.message);
       res.status(500).json({ message: "OTP verification failed" });
@@ -337,16 +492,18 @@ export function setupAuth(app: Express) {
       }
 
       // Verify OTPs for registration
+      let storedEmailOtpRecord, storedPhoneOtpRecord;
+
       if (email && emailOtp) {
-        const storedEmailOtp = await storage.getLatestOtpForEmail(email.toLowerCase());
-        if (!storedEmailOtp || storedEmailOtp.otp !== emailOtp || new Date() > new Date(storedEmailOtp.expiresAt)) {
+        storedEmailOtpRecord = await storage.getLatestOtpForEmail(email.toLowerCase());
+        if (!storedEmailOtpRecord || storedEmailOtpRecord.otp !== emailOtp || new Date() > new Date(storedEmailOtpRecord.expiresAt)) {
           return res.status(400).json({ message: "Invalid or expired email OTP" });
         }
       }
 
       if (phoneNumber && phoneOtp) {
-        const storedPhoneOtp = await storage.getLatestOtpForPhone(phoneNumber.trim());
-        if (!storedPhoneOtp || storedPhoneOtp.otp !== phoneOtp || new Date() > new Date(storedPhoneOtp.expiresAt)) {
+        storedPhoneOtpRecord = await storage.getLatestOtpForPhone(phoneNumber.trim());
+        if (!storedPhoneOtpRecord || storedPhoneOtpRecord.otp !== phoneOtp || new Date() > new Date(storedPhoneOtpRecord.expiresAt)) {
           return res.status(400).json({ message: "Invalid or expired phone OTP" });
         }
       }
@@ -363,6 +520,14 @@ export function setupAuth(app: Express) {
 
       log(`REGISTER_SUCCESS userId=${user.id} IP=${req.ip}`, "security");
 
+      // Delete OTPs after successful registration to prevent reuse
+      if (storedEmailOtpRecord?.id) {
+        await storage.deleteOtpById(storedEmailOtpRecord.id);
+      }
+      if (storedPhoneOtpRecord?.id) {
+        await storage.deleteOtpById(storedPhoneOtpRecord.id);
+      }
+
       req.login(user, async (err) => {
         if (err) return next(err);
         const membership = await storage.getUserWorkspaceMembership(user.id);
@@ -375,6 +540,131 @@ export function setupAuth(app: Express) {
     }
   });
 
+  // ─── Forgot Password ───
+  const forgotPasswordSchema = z.object({
+    identifier: z.string().min(1), // email or phone number
+  });
+
+  app.post("/api/auth/forgot-password", authLimiter, async (req, res) => {
+    try {
+      const parsed = forgotPasswordSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid input" });
+      }
+
+      const { identifier } = parsed.data;
+
+      // Determine if identifier is email or phone
+      const isEmail = identifier.includes("@");
+      let user;
+
+      if (isEmail) {
+        user = await storage.getUserByEmail(identifier.toLowerCase());
+      } else {
+        user = await storage.getUserByPhoneNumber(identifier.trim());
+      }
+
+      if (!user) {
+        // Don't reveal if user exists or not (security best practice)
+        return res.json({ message: "If an account exists, a reset code has been sent." });
+      }
+
+      // Generate OTP for password reset
+      const otp = generateOtp();
+      const expiresAt = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000);
+
+      await storage.createOtpVerification({
+        email: isEmail ? identifier.toLowerCase() : undefined,
+        phoneNumber: !isEmail ? identifier.trim() : undefined,
+        otp,
+        type: isEmail ? "password_reset_email" : "password_reset_phone",
+        expiresAt,
+      });
+
+      // Send OTP
+      if (isEmail) {
+        await sendEmailOtp(identifier, otp);
+      } else {
+        await sendPhoneOtp(identifier, otp);
+      }
+
+      res.json({ message: "If an account exists, a reset code has been sent." });
+    } catch (err: any) {
+      console.error("Forgot password error:", err.message);
+      res.status(500).json({ message: "Failed to process request" });
+    }
+  });
+
+  // ─── Reset Password ───
+  const resetPasswordSchema = z.object({
+    identifier: z.string().min(1),
+    otp: z.string().length(6),
+    newPassword: z.string().min(6).max(128),
+  });
+
+  app.post("/api/auth/reset-password", authLimiter, async (req, res) => {
+    try {
+      const parsed = resetPasswordSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid input: " + parsed.error.issues.map(i => i.message).join(", ") });
+      }
+
+      const { identifier, otp, newPassword } = parsed.data;
+
+      // Determine if identifier is email or phone
+      const isEmail = identifier.includes("@");
+
+      // Get latest OTP
+      let storedOtp;
+      if (isEmail) {
+        storedOtp = await storage.getLatestOtpForEmail(identifier.toLowerCase());
+      } else {
+        storedOtp = await storage.getLatestOtpForPhone(identifier.trim());
+      }
+
+      if (!storedOtp) {
+        return res.status(400).json({ message: "No reset code found. Please request a new one." });
+      }
+
+      // Check if OTP has expired
+      if (new Date() > new Date(storedOtp.expiresAt)) {
+        return res.status(400).json({ message: "Reset code has expired. Please request a new one." });
+      }
+
+      // Verify OTP
+      if (storedOtp.otp !== otp) {
+        return res.status(400).json({ message: "Invalid reset code" });
+      }
+
+      // Find user
+      let user;
+      if (isEmail) {
+        user = await storage.getUserByEmail(identifier.toLowerCase());
+      } else {
+        user = await storage.getUserByPhoneNumber(identifier.trim());
+      }
+
+      if (!user) {
+        return res.status(400).json({ message: "User not found" });
+      }
+
+      // Update password
+      const hashedPassword = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
+      await storage.updateUser(user.id, { password: hashedPassword });
+
+      // Delete the used OTP
+      if (storedOtp.id) {
+        await storage.deleteOtpById(storedOtp.id);
+      }
+
+      log(`PASSWORD_RESET userId=${user.id} IP=${req.ip}`, "security");
+      res.json({ message: "Password reset successfully. You can now log in with your new password." });
+    } catch (err: any) {
+      console.error("Reset password error:", err.message);
+      res.status(500).json({ message: "Failed to reset password" });
+    }
+  });
+
   // ─── Google OAuth Routes ───
   app.get("/api/auth/google", passport.authenticate("google", { scope: ["profile", "email"] }));
 
@@ -384,8 +674,14 @@ export function setupAuth(app: Express) {
       const user = req.user as any;
       log(`GOOGLE_LOGIN_SUCCESS userId=${user?.id} IP=${req.ip}`, "security");
       const membership = await storage.getUserWorkspaceMembership(user.id);
-      // Set user data in session and redirect to app
-      res.redirect("/");
+      // In development, redirect to the Vite dev server origin.
+      // In production, the frontend is served from the same origin, so "/" works.
+      const callbackUrl = process.env.GOOGLE_CALLBACK_URL || "";
+      const frontendOrigin = callbackUrl ? new URL(callbackUrl).origin : "";
+      const redirectUrl = process.env.NODE_ENV === "development" && frontendOrigin
+        ? frontendOrigin + "/"
+        : "/";
+      res.redirect(redirectUrl);
     }
   );
 

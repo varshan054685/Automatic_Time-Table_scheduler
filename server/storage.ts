@@ -6,7 +6,7 @@ import {
   type Department, type Classroom, type Subject, type Faculty, type Section, type TimeSlot, type TimetableEntry,
   type GenerationJob, type GenerationResult, type OtpVerification
 } from "@shared/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, lt, desc } from "drizzle-orm";
 import crypto from "crypto";
 
 function generateReferralCode(): string {
@@ -524,7 +524,7 @@ export class DatabaseStorage {
     const [otp] = await db.select()
       .from(otpVerifications)
       .where(and(eq(otpVerifications.email, email), eq(otpVerifications.type, 'email')))
-      .orderBy(otpVerifications.createdAt)
+      .orderBy(desc(otpVerifications.createdAt))
       .limit(1);
     return otp;
   }
@@ -533,7 +533,7 @@ export class DatabaseStorage {
     const [otp] = await db.select()
       .from(otpVerifications)
       .where(and(eq(otpVerifications.phoneNumber, phoneNumber), eq(otpVerifications.type, 'phone')))
-      .orderBy(otpVerifications.createdAt)
+      .orderBy(desc(otpVerifications.createdAt))
       .limit(1);
     return otp;
   }
@@ -541,6 +541,10 @@ export class DatabaseStorage {
   async deleteExpiredOtps(): Promise<void> {
     const now = new Date();
     await db.delete(otpVerifications).where(lt(otpVerifications.expiresAt, now));
+  }
+
+  async deleteOtpById(id: number): Promise<void> {
+    await db.delete(otpVerifications).where(eq(otpVerifications.id, id));
   }
 }
 
