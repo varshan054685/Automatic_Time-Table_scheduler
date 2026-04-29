@@ -80,3 +80,56 @@ export function useLogout() {
   });
 }
 
+export function useRequestOtp() {
+  return useMutation({
+    mutationFn: async (data) => {
+      const res = await fetch(apiUrl(api.auth.requestOtp.path), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Failed to send OTP");
+      }
+      return await res.json();
+    },
+  });
+}
+
+export function useVerifyOtp() {
+  return useMutation({
+    mutationFn: async (data) => {
+      const res = await fetch(apiUrl(api.auth.verifyOtp.path), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "OTP verification failed");
+      }
+      return await res.json();
+    },
+  });
+}
+
+export function useGoogleLogin() {
+  return () => {
+    window.location.href = apiUrl(api.auth.googleLogin.path);
+  };
+}
+
+export function useAuthConfig() {
+  const { data, isLoading } = useQuery({
+    queryKey: ["/api/auth/config"],
+    queryFn: async () => {
+      const res = await fetch(apiUrl("/api/auth/config"));
+      if (!res.ok) throw new Error("Failed to fetch auth config");
+      return await res.json();
+    },
+    retry: false,
+  });
+  return { config: data, isLoading };
+}
+

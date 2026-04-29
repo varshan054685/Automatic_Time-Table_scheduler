@@ -33,7 +33,14 @@ export const api = {
     register: {
       method: 'POST' as const,
       path: '/api/auth/register' as const,
-      input: z.object({ email: z.string().email(), password: z.string().min(6), name: z.string().optional() }),
+      input: z.object({
+        email: z.string().email().optional(),
+        phoneNumber: z.string().min(10).max(15).optional(),
+        password: z.string().min(6),
+        name: z.string().optional(),
+        emailOtp: z.string().length(6).optional(),
+        phoneOtp: z.string().length(6).optional(),
+      }),
       responses: {
         201: z.any(),
         400: errorSchemas.validation,
@@ -42,10 +49,51 @@ export const api = {
     login: {
       method: 'POST' as const,
       path: '/api/auth/login' as const,
-      input: z.object({ email: z.string(), password: z.string() }),
+      input: z.object({ identifier: z.string(), password: z.string() }),
       responses: {
         200: z.any(),
         401: z.object({ message: z.string() }),
+      },
+    },
+    googleLogin: {
+      method: 'GET' as const,
+      path: '/api/auth/google' as const,
+      responses: {
+        302: z.void(),
+      },
+    },
+    googleCallback: {
+      method: 'GET' as const,
+      path: '/api/auth/google/callback' as const,
+      responses: {
+        302: z.void(),
+      },
+    },
+    requestOtp: {
+      method: 'POST' as const,
+      path: '/api/auth/request-otp' as const,
+      input: z.object({
+        email: z.string().email().optional(),
+        phoneNumber: z.string().min(10).max(15).optional(),
+        type: z.enum(['email', 'phone']),
+      }),
+      responses: {
+        200: z.object({ message: z.string(), expiresIn: z.number() }),
+        400: errorSchemas.validation,
+      },
+    },
+    verifyOtp: {
+      method: 'POST' as const,
+      path: '/api/auth/verify-otp' as const,
+      input: z.object({
+        email: z.string().email().optional(),
+        phoneNumber: z.string().min(10).max(15).optional(),
+        type: z.enum(['email', 'phone']),
+        otp: z.string().length(6),
+      }),
+      responses: {
+        200: z.object({ verified: z.boolean(), message: z.string() }),
+        400: errorSchemas.validation,
       },
     },
     logout: {

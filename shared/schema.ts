@@ -6,10 +6,24 @@ import { relations } from "drizzle-orm";
 // === USER & AUTH ===
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
-  email: text("email").notNull().unique(),
+  email: text("email").unique(),
+  phoneNumber: text("phone_number").unique(),
   password: text("password").notNull(),
   role: text("role").notNull().default("staff"), // 'admin' or 'staff'
   name: text("name"),
+  googleId: text("google_id").unique(),
+  isVerified: boolean("is_verified").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// === OTP VERIFICATION ===
+export const otpVerifications = pgTable("otp_verifications", {
+  id: serial("id").primaryKey(),
+  email: text("email"),
+  phoneNumber: text("phone_number"),
+  otp: text("otp").notNull(),
+  type: text("type").notNull(), // 'email' or 'phone'
+  expiresAt: timestamp("expires_at").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -288,6 +302,7 @@ export const insertTimeSlotSchema = createInsertSchema(timeSlots).omit({ workspa
 export const insertTimetableSchema = createInsertSchema(timetable).omit({ workspaceId: true });
 export const insertGenerationJobSchema = createInsertSchema(generationJobs);
 export const insertGenerationResultSchema = createInsertSchema(generationResults);
+export const insertOtpVerificationSchema = createInsertSchema(otpVerifications);
 
 // === TYPES ===
 export type User = typeof users.$inferSelect;
@@ -303,3 +318,4 @@ export type TimeSlot = typeof timeSlots.$inferSelect;
 export type TimetableEntry = typeof timetable.$inferSelect;
 export type GenerationJob = typeof generationJobs.$inferSelect;
 export type GenerationResult = typeof generationResults.$inferSelect;
+export type OtpVerification = typeof otpVerifications.$inferSelect;

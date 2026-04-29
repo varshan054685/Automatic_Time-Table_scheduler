@@ -1,10 +1,10 @@
 import { db } from "./db";
 import { 
   users, departments, classrooms, subjects, faculty, sections, timeSlots, timetable,
-  workspaces, workspaceMembers, changeRequests, generationJobs, generationResults,
+  workspaces, workspaceMembers, changeRequests, generationJobs, generationResults, otpVerifications,
   type User, type Workspace, type WorkspaceMember, type ChangeRequest,
   type Department, type Classroom, type Subject, type Faculty, type Section, type TimeSlot, type TimetableEntry,
-  type GenerationJob, type GenerationResult
+  type GenerationJob, type GenerationResult, type OtpVerification
 } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
 import crypto from "crypto";
@@ -22,6 +22,16 @@ export class DatabaseStorage {
 
   async getUserByEmail(email: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.email, email.trim().toLowerCase()));
+    return user;
+  }
+
+  async getUserByPhoneNumber(phoneNumber: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.phoneNumber, phoneNumber.trim()));
+    return user;
+  }
+
+  async getUserByGoogleId(googleId: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.googleId, googleId));
     return user;
   }
 
@@ -502,6 +512,35 @@ export class DatabaseStorage {
 
   async cleanupStagedEntries(jobId: number): Promise<void> {
     await db.delete(generationResults).where(eq(generationResults.jobId, jobId));
+  }
+
+  // ─── OTP Verifications ───
+  async createOtpVerification(data: { email?: string; phoneNumber?: string; otp: string; type: string; expiresAt: Date }): Promise<OtpVerification> {
+    const [otp] = await db.insert(otpVerifications).values(data).returning();
+    return otp;
+  }
+
+  async getLatestOtpForEmail(email: string): Promise<OtpVerification | undefined> {
+    const [otp] = await db.select()
+      .from(otpVerifications)
+      .where(and(eq(otpVerifications.email, email), eq(otpVerifications.type, 'email')))
+      .orderBy(otpVerifications.createdAt)
+      .limit(1);
+    return otp;
+  }
+
+  async getLatestOtpForPhone(phoneNumber: string): Promise<OtpVerification | undefined> {
+    const [otp] = await db.select()
+      .from(otpVerifications)
+      .where(and(eq(otpVerifications.phoneNumber, phoneNumber), eq(otpVerifications.type, 'phone')))
+      .orderBy(otpVerifications.createdAt)
+      .limit(1);
+    return otp;
+  }
+
+  async deleteExpiredOtps(): Promise<void> {
+    const now = new Date();
+    await db.delete(otpVerifications).where(lt(otpVerifications.expiresAt, now));
   }
 }
 
