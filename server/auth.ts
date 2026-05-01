@@ -247,9 +247,13 @@ export function setupAuth(app: Express) {
     // Send via SendGrid if API key is configured
     if (process.env.SENDGRID_API_KEY && process.env.SENDGRID_API_KEY.startsWith("SG.")) {
       try {
+        const fromEmail = process.env.SENDGRID_FROM || "varshanrio05@gmail.com";
+        console.log(`[SENDGRID_DEBUG] Attempting to send OTP to ${email} from ${fromEmail}`);
+        console.log(`[SENDGRID_DEBUG] API Key configured: ${process.env.SENDGRID_API_KEY?.substring(0, 10)}...`);
+
         sgMail.setApiKey(process.env.SENDGRID_API_KEY);
-        await sgMail.send({
-          from: process.env.SENDGRID_FROM || "Time Table Scheduler <noreply@timetable.app>",
+        const [response] = await sgMail.send({
+          from: `Time Table Scheduler <${fromEmail}>`,
           to: email,
           subject: "Your Verification Code",
           text: `Your OTP for Time Table Scheduler registration is: ${otp}\n\nThis code will expire in ${OTP_EXPIRY_MINUTES} minutes.\n\nIf you didn't request this code, please ignore this email.`,
@@ -265,12 +269,18 @@ export function setupAuth(app: Express) {
             </div>
           `,
         });
-        console.log(`[SENDGRID] OTP sent to ${email}`);
+        console.log(`[SENDGRID_SUCCESS] OTP sent to ${email}. Status: ${response?.statusCode}`);
         return; // Exit after successful SendGrid send
       } catch (err: any) {
         console.error(`[SENDGRID_FAILED] Failed to send OTP to ${email}:`, err.message);
-        // Fall through to SMTP as backup
+        if (err.response) {
+          console.error(`[SENDGRID_ERROR] Response body:`, err.response.body);
+        }
+        // Throw error so user knows email failed
+        throw new Error(`Failed to send email: ${err.message}`);
       }
+    } else {
+      console.log(`[SENDGRID_DEBUG] SendGrid not configured. API Key present: ${!!process.env.SENDGRID_API_KEY}`);
     }
 
     // Send actual email if SMTP is configured (fallback)
@@ -496,6 +506,14 @@ export function setupAuth(app: Express) {
 
       if (email && emailOtp) {
         storedEmailOtpRecord = await storage.getLatestOtpForEmail(email.toLowerCase());
+        console.log(`[REG_DEBUG] Email OTP lookup for ${email}:`, {
+          found: !!storedEmailOtpRecord,
+          storedOtp: storedEmailOtpRecord?.otp,
+          providedOtp: emailOtp,
+          match: storedEmailOtpRecord?.otp === emailOtp,
+          expired: storedEmailOtpRecord ? new Date() > new Date(storedEmailOtpRecord.expiresAt) : null,
+          expiresAt: storedEmailOtpRecord?.expiresAt
+        });
         if (!storedEmailOtpRecord || storedEmailOtpRecord.otp !== emailOtp || new Date() > new Date(storedEmailOtpRecord.expiresAt)) {
           return res.status(400).json({ message: "Invalid or expired email OTP" });
         }
@@ -503,6 +521,13 @@ export function setupAuth(app: Express) {
 
       if (phoneNumber && phoneOtp) {
         storedPhoneOtpRecord = await storage.getLatestOtpForPhone(phoneNumber.trim());
+        console.log(`[REG_DEBUG] Phone OTP lookup for ${phoneNumber}:`, {
+          found: !!storedPhoneOtpRecord,
+          storedOtp: storedPhoneOtpRecord?.otp,
+          providedOtp: phoneOtp,
+          match: storedPhoneOtpRecord?.otp === phoneOtp,
+          expired: storedPhoneOtpRecord ? new Date() > new Date(storedPhoneOtpRecord.expiresAt) : null
+        });
         if (!storedPhoneOtpRecord || storedPhoneOtpRecord.otp !== phoneOtp || new Date() > new Date(storedPhoneOtpRecord.expiresAt)) {
           return res.status(400).json({ message: "Invalid or expired phone OTP" });
         }
@@ -577,7 +602,7 @@ export function setupAuth(app: Express) {
         email: isEmail ? identifier.toLowerCase() : undefined,
         phoneNumber: !isEmail ? identifier.trim() : undefined,
         otp,
-        type: isEmail ? "password_reset_email" : "password_reset_phone",
+        type: isEmail ? "email" : "phone",
         expiresAt,
       });
 
@@ -650,7 +675,7 @@ export function setupAuth(app: Express) {
 
       // Update password
       const hashedPassword = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
-      await storage.updateUser(user.id, { password: hashedPassword });
+      await storage.updateUserPassword(user.id, hashedPassword);
 
       // Delete the used OTP
       if (storedOtp.id) {

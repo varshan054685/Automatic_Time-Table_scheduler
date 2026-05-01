@@ -47,6 +47,11 @@ export class DatabaseStorage {
     return u;
   }
 
+  async updateUserPassword(id: number, hashedPassword: string): Promise<User> {
+    const [u] = await db.update(users).set({ password: hashedPassword }).where(eq(users.id, id)).returning();
+    return u;
+  }
+
   // ─── Workspaces ───
   async createWorkspace(name: string, ownerId: number): Promise<Workspace> {
     const referralCode = generateReferralCode();

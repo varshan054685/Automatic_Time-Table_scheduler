@@ -44,11 +44,13 @@ export default function Login() {
       email: "",
       phoneNumber: "",
       password: "",
+      confirmPassword: "",
       name: "",
       otp: "",
       resetIdentifier: "",
       resetOtp: "",
       newPassword: "",
+      confirmNewPassword: "",
     },
   });
 
@@ -144,6 +146,11 @@ export default function Login() {
 
   function onSubmit(values) {
     if (isForgotPassword && fpOtpVerified) {
+      // Validate passwords match
+      if (values.newPassword !== values.confirmNewPassword) {
+        form.setError("confirmNewPassword", { message: "Passwords do not match" });
+        return;
+      }
       // Reset password
       resetPasswordMutation.mutate({
         identifier: values.resetIdentifier,
@@ -151,12 +158,19 @@ export default function Login() {
         newPassword: values.newPassword,
       }, {
         onSuccess: () => {
-          setIsForgotPassword(false);
-          form.reset();
-          setLocation("/");
+          // Auto-login with the new password
+          loginMutation.mutate(
+            { identifier: values.resetIdentifier, password: values.newPassword },
+            { onSuccess: () => setLocation("/") }
+          );
         },
       });
     } else if (isRegister) {
+      // Validate passwords match
+      if (values.password !== values.confirmPassword) {
+        form.setError("confirmPassword", { message: "Passwords do not match" });
+        return;
+      }
       const registrationData = {
         password: values.password,
         name: values.name,
@@ -210,9 +224,10 @@ export default function Login() {
     setFpError(null);
 
     try {
+      const isEmail = identifier.includes("@");
       await verifyOtpMutation.mutateAsync({
-        identifier: identifier,
-        type: identifier.includes("@") ? "email" : "phone",
+        ...(isEmail ? { email: identifier } : { phoneNumber: identifier }),
+        type: isEmail ? "email" : "phone",
         otp: otpValue,
       });
       setFpOtpVerified(true);
@@ -224,8 +239,8 @@ export default function Login() {
   const isPending = loginMutation.isPending || registerMutation.isPending || requestOtpMutation.isPending || verifyOtpMutation.isPending || forgotPasswordMutation.isPending || resetPasswordMutation.isPending;
   const error = loginMutation.error || registerMutation.error || requestOtpMutation.error || verifyOtpMutation.error;
 
-  // Show Google OAuth button when config hasn't explicitly disabled it (fixes first-load issue)
-  const showGoogleButton = !isRegister && authConfig?.googleOAuthEnabled !== false;
+  // Show Google OAuth button when config hasn't explicitly disabled it and not in forgot password mode
+  const showGoogleButton = !isRegister && !isForgotPassword && authConfig?.googleOAuthEnabled !== false;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 flex items-center justify-center p-4">
@@ -273,10 +288,10 @@ export default function Login() {
         <Card className="border-0 shadow-2xl shadow-black/20 bg-white/5 backdrop-blur-xl border border-white/10">
           <CardHeader className="select-none cursor-default pb-4">
             <CardTitle className="text-white text-lg">
-              {isRegister ? "Register" : "Login"}
+              {isForgotPassword ? "Reset Password" : isRegister ? "Register" : "Login"}
             </CardTitle>
             <CardDescription className="text-slate-400">
-              {isRegister ? "Fill in your details to get started" : "Enter your credentials to continue"}
+              {isForgotPassword ? "Enter your email to receive a reset code" : isRegister ? "Fill in your details to get started" : "Enter your credentials to continue"}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -348,60 +363,105 @@ export default function Login() {
                               )}
                             />
 
-                            {/* OTP Section */}
+                            {/* OTP Section - Enhanced */}
                             {fpOtpSent && (
-                              <div className="space-y-2">
-                                <FormLabel className="text-slate-300 text-sm">Enter Reset Code</FormLabel>
-                                <div className="flex items-center gap-2">
+                              <motion.div 
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className="space-y-3"
+                              >
+                                <div className="flex items-center justify-between">
+                                  <FormLabel className="text-slate-200 text-sm font-medium flex items-center gap-2">
+                                    <Shield className="w-4 h-4 text-indigo-400" />
+                                    Enter Verification Code
+                                  </FormLabel>
+                                  <span className="text-xs text-slate-400">
+                                    {fpOtpVerified ? (
+                                      <span className="text-green-400 flex items-center gap-1">
+                                        <CheckCircle className="w-3 h-3" /> Verified
+                                      </span>
+                                    ) : (
+                                      "6 digits"
+                                    )}
+                                  </span>
+                                </div>
+                                
+                                <div className="flex items-center gap-3">
                                   <FormField
                                     control={form.control}
                                     name="resetOtp"
                                     render={({ field }) => (
                                       <FormItem className="flex-1">
                                         <FormControl>
-                                          <InputOTP maxLength={6} {...field}>
-                                            <InputOTPGroup>
-                                              <InputOTPSlot index={0} />
-                                              <InputOTPSlot index={1} />
-                                              <InputOTPSlot index={2} />
-                                              <InputOTPSlot index={3} />
-                                              <InputOTPSlot index={4} />
-                                              <InputOTPSlot index={5} />
+                                          <InputOTP 
+                                            maxLength={6} 
+                                            {...field}
+                                            className="gap-2"
+                                            disabled={fpOtpVerified}
+                                          >
+                                            <InputOTPGroup className="gap-2">
+                                              {[0, 1, 2, 3, 4, 5].map((index) => (
+                                                <InputOTPSlot 
+                                                  key={index}
+                                                  index={index}
+                                                  className="w-12 h-14 text-xl font-bold bg-white/10 border-white/20 text-white rounded-xl focus:bg-white/20 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/50 transition-all duration-200 data-[active=true]:bg-white/20 data-[active=true]:border-indigo-500 data-[active=true]:scale-105"
+                                                />
+                                              ))}
                                             </InputOTPGroup>
                                           </InputOTP>
                                         </FormControl>
-                                        <FormMessage />
+                                        <FormMessage className="text-red-400 text-xs mt-1" />
                                       </FormItem>
                                     )}
                                   />
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={handleForgotPasswordVerify}
-                                    disabled={isPending}
-                                    className="h-10 px-3 bg-white/5 border-white/10 text-white hover:bg-white/10"
-                                  >
-                                    {verifyOtpMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Verify"}
-                                  </Button>
+                                  {!fpOtpVerified && (
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={handleForgotPasswordVerify}
+                                      disabled={isPending || form.getValues("resetOtp")?.length !== 6}
+                                      className="h-14 px-4 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 border-indigo-500/50 text-white hover:from-indigo-500/30 hover:to-purple-500/30 hover:border-indigo-400 transition-all duration-200 rounded-xl"
+                                    >
+                                      {verifyOtpMutation.isPending ? (
+                                        <Loader2 className="h-5 w-5 animate-spin" />
+                                      ) : (
+                                        <>
+                                          <CheckCircle2 className="h-4 w-4 mr-1" />
+                                          Verify
+                                        </>
+                                      )}
+                                    </Button>
+                                  )}
                                 </div>
-                              </div>
+                                
+                                {fpCountdown > 0 && !fpOtpVerified && (
+                                  <p className="text-xs text-slate-400 text-center">
+                                    Resend available in <span className="text-indigo-400 font-medium">{fpCountdown}s</span>
+                                  </p>
+                                )}
+                              </motion.div>
                             )}
 
                             {fpError && (
-                              <p className="text-xs text-red-400">{fpError}</p>
+                              <motion.div 
+                                initial={{ opacity: 0, scale: 0.95 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/30 rounded-xl"
+                              >
+                                <Shield className="w-4 h-4 text-red-400 flex-shrink-0" />
+                                <p className="text-xs text-red-300">{fpError}</p>
+                              </motion.div>
                             )}
 
                             <Button
                               type="button"
-                              onClick={fpOtpSent ? handleForgotPasswordVerify : handleForgotPasswordRequest}
+                              onClick={handleForgotPasswordRequest}
                               disabled={fpCountdown > 0 || isPending}
                               className="w-full h-11 text-base font-semibold bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 border-0"
                             >
-                              {forgotPasswordMutation.isPending || verifyOtpMutation.isPending ? (
+                              {forgotPasswordMutation.isPending ? (
                                 <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : fpOtpSent ? (
-                                "Verify Reset Code"
                               ) : fpCountdown > 0 ? (
                                 `Resend in ${fpCountdown}s`
                               ) : (
@@ -448,19 +508,35 @@ export default function Login() {
                               )}
                             />
 
-                            <Button
-                              type="submit"
-                              disabled={resetPasswordMutation.isPending}
-                              className="w-full h-11 text-base font-semibold bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 border-0"
-                            >
-                              {resetPasswordMutation.isPending ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                <span className="flex items-center gap-2">
-                                  Reset Password <ArrowRight className="w-4 h-4" />
-                                </span>
+                            <FormField
+                              control={form.control}
+                              name="confirmNewPassword"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-slate-300 select-none cursor-default text-sm font-medium">Confirm New Password</FormLabel>
+                                  <FormControl>
+                                    <div className="relative">
+                                      <Lock className="absolute left-3 top-3.5 h-4 w-4 text-slate-500" />
+                                      <Input
+                                        type={showPassword ? "text" : "password"}
+                                        placeholder="Re-enter new password"
+                                        {...field}
+                                        className="h-12 pl-10 pr-10 bg-white/5 border-white/10 text-white placeholder:text-slate-500 focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 rounded-xl transition-all"
+                                      />
+                                      <button
+                                        type="button"
+                                        onClick={() => setShowPassword(!showPassword)}
+                                        className="absolute right-3 top-3.5 text-slate-500 hover:text-slate-300 focus:outline-none"
+                                      >
+                                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                      </button>
+                                    </div>
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
                               )}
-                            </Button>
+                            />
+
                           </>
                         )}
                       </>
@@ -602,52 +678,69 @@ export default function Login() {
                           )}
                         </AnimatePresence>
 
-                        {/* OTP Verification Section */}
+                        {/* OTP Verification Section - Enhanced */}
                         {!otpVerified ? (
-                          <div className="space-y-3">
+                          <div className="space-y-4">
                             {otpSent && (
                               <motion.div
                                 initial={{ opacity: 0, y: -10 }}
                                 animate={{ opacity: 1, y: 0 }}
-                                className="space-y-3"
+                                className="space-y-4"
                               >
-                                <div className="flex items-center gap-2 text-xs text-indigo-300 bg-indigo-500/10 border border-indigo-500/20 rounded-lg px-3 py-2">
-                                  <Shield className="w-3.5 h-3.5 shrink-0" />
-                                  <span>
-                                    OTP sent to your {verifyMethod === "email" ? "email" : "phone"}. Check and enter below.
-                                  </span>
+                                <div className="flex items-center gap-2 p-3 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 border border-indigo-500/30 rounded-xl">
+                                  <div className="w-10 h-10 rounded-full bg-indigo-500/30 flex items-center justify-center flex-shrink-0">
+                                    <Mail className="w-5 h-5 text-indigo-300" />
+                                  </div>
+                                  <div className="flex-1">
+                                    <p className="text-sm text-white font-medium">OTP Sent!</p>
+                                    <p className="text-xs text-indigo-200">
+                                      Check your {verifyMethod === "email" ? "email inbox" : "SMS messages"}
+                                    </p>
+                                  </div>
                                 </div>
-                                <FormField
-                                  control={form.control}
-                                  name="otp"
-                                  render={({ field }) => (
-                                    <FormItem>
-                                      <FormLabel className="text-slate-300 select-none cursor-default text-sm font-medium">
-                                        Enter OTP
-                                      </FormLabel>
-                                      <FormControl>
-                                        <div className="flex justify-center">
-                                          <InputOTP maxLength={6} {...field}>
-                                            <InputOTPGroup>
-                                              <InputOTPSlot index={0} />
-                                              <InputOTPSlot index={1} />
-                                              <InputOTPSlot index={2} />
-                                              <InputOTPSlot index={3} />
-                                              <InputOTPSlot index={4} />
-                                              <InputOTPSlot index={5} />
+
+                                <div className="space-y-3">
+                                  <div className="flex items-center justify-between">
+                                    <FormLabel className="text-slate-200 text-sm font-medium flex items-center gap-2">
+                                      <Shield className="w-4 h-4 text-emerald-400" />
+                                      Enter Verification Code
+                                    </FormLabel>
+                                    <span className="text-xs text-slate-400">6 digits</span>
+                                  </div>
+                                  
+                                  <FormField
+                                    control={form.control}
+                                    name="otp"
+                                    render={({ field }) => (
+                                      <FormItem>
+                                        <FormControl>
+                                          <InputOTP 
+                                            maxLength={6} 
+                                            {...field}
+                                            className="gap-3 justify-center"
+                                          >
+                                            <InputOTPGroup className="gap-3">
+                                              {[0, 1, 2, 3, 4, 5].map((index) => (
+                                                <InputOTPSlot 
+                                                  key={index}
+                                                  index={index}
+                                                  className="w-14 h-16 text-2xl font-bold bg-white/10 border-2 border-white/20 text-white rounded-2xl focus:bg-white/20 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/30 transition-all duration-200 data-[active=true]:bg-white/20 data-[active=true]:border-emerald-500 data-[active=true]:scale-110 data-[active=true]:shadow-lg data-[active=true]:shadow-emerald-500/20"
+                                                />
+                                              ))}
                                             </InputOTPGroup>
                                           </InputOTP>
-                                        </div>
-                                      </FormControl>
-                                      <FormMessage />
-                                    </FormItem>
-                                  )}
-                                />
+                                        </FormControl>
+                                        <FormMessage className="text-red-400 text-sm mt-2 text-center" />
+                                      </FormItem>
+                                    )}
+                                  />
+                                </div>
+
                                 <Button
                                   type="button"
                                   onClick={handleVerifyOtp}
-                                  disabled={isPending}
-                                  className="w-full h-10 bg-emerald-600 hover:bg-emerald-700 text-white border-0 rounded-xl text-sm font-medium"
+                                  disabled={isPending || form.getValues("otp")?.length !== 6}
+                                  className="w-full h-12 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white border-0 rounded-xl text-base font-semibold transition-all duration-200 disabled:opacity-50"
                                 >
                                   {verifyOtpMutation.isPending ? (
                                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -717,6 +810,73 @@ export default function Login() {
                         {otpError && (
                           <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">{otpError}</p>
                         )}
+
+                        {/* Password Fields - Show after OTP verified for Register */}
+                        {otpVerified && (
+                          <motion.div
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="space-y-4"
+                          >
+                            <FormField
+                              control={form.control}
+                              name="password"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-slate-300 select-none cursor-default text-sm font-medium">Password</FormLabel>
+                                  <FormControl>
+                                    <div className="relative">
+                                      <Lock className="absolute left-3 top-3.5 h-4 w-4 text-slate-500" />
+                                      <Input
+                                        type={showPassword ? "text" : "password"}
+                                        placeholder="Min 6 characters"
+                                        {...field}
+                                        className="h-12 pl-10 pr-10 bg-white/5 border-white/10 text-white placeholder:text-slate-500 focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 rounded-xl transition-all"
+                                      />
+                                      <button
+                                        type="button"
+                                        onClick={() => setShowPassword(!showPassword)}
+                                        className="absolute right-3 top-3.5 text-slate-500 hover:text-slate-300 focus:outline-none"
+                                      >
+                                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                      </button>
+                                    </div>
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+
+                            <FormField
+                              control={form.control}
+                              name="confirmPassword"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-slate-300 select-none cursor-default text-sm font-medium">Confirm Password</FormLabel>
+                                  <FormControl>
+                                    <div className="relative">
+                                      <Lock className="absolute left-3 top-3.5 h-4 w-4 text-slate-500" />
+                                      <Input
+                                        type={showPassword ? "text" : "password"}
+                                        placeholder="Re-enter your password"
+                                        {...field}
+                                        className="h-12 pl-10 pr-10 bg-white/5 border-white/10 text-white placeholder:text-slate-500 focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 rounded-xl transition-all"
+                                      />
+                                      <button
+                                        type="button"
+                                        onClick={() => setShowPassword(!showPassword)}
+                                        className="absolute right-3 top-3.5 text-slate-500 hover:text-slate-300 focus:outline-none"
+                                      >
+                                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                      </button>
+                                    </div>
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </motion.div>
+                        )}
                       </>
                     ) : (
                       <>
@@ -743,58 +903,60 @@ export default function Login() {
                             </FormItem>
                           )}
                         />
+
+                        {/* Password Field - Login Only */}
+                        <FormField
+                          control={form.control}
+                          name="password"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-slate-300 select-none cursor-default text-sm font-medium">Password</FormLabel>
+                              <FormControl>
+                                <div className="relative">
+                                  <Lock className="absolute left-3 top-3.5 h-4 w-4 text-slate-500" />
+                                  <Input
+                                    type={showPassword ? "text" : "password"}
+                                    placeholder="Enter your password"
+                                    {...field}
+                                    className="h-12 px-10 bg-white/5 border-white/10 text-white placeholder:text-slate-500 focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 rounded-xl transition-all"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    className="absolute right-3 top-3.5 text-slate-500 hover:text-slate-300 focus:outline-none transition-colors"
+                                  >
+                                    {showPassword ? (
+                                      <EyeOff className="h-4 w-4" />
+                                    ) : (
+                                      <Eye className="h-4 w-4" />
+                                    )}
+                                  </button>
+                                </div>
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
                       </>
                     )}
 
-                    {/* Password Field (shared) */}
-                    <FormField
-                      control={form.control}
-                      name="password"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-slate-300 select-none cursor-default text-sm font-medium">Password</FormLabel>
-                          <FormControl>
-                            <div className="relative">
-                              <Lock className="absolute left-3 top-3.5 h-4 w-4 text-slate-500" />
-                              <Input
-                                type={showPassword ? "text" : "password"}
-                                placeholder={isRegister ? "Min 6 characters" : "Enter your password"}
-                                {...field}
-                                className="h-12 px-10 bg-white/5 border-white/10 text-white placeholder:text-slate-500 focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 rounded-xl transition-all"
-                              />
-                              <button
-                                type="button"
-                                onClick={() => setShowPassword(!showPassword)}
-                                className="absolute right-3 top-3.5 text-slate-500 hover:text-slate-300 focus:outline-none transition-colors"
-                              >
-                                {showPassword ? (
-                                  <EyeOff className="h-4 w-4" />
-                                ) : (
-                                  <Eye className="h-4 w-4" />
-                                )}
-                              </button>
-                            </div>
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    {/* Submit Button */}
-                    <Button
-                      type="submit"
-                      className="w-full h-12 text-base font-semibold bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 border-0 rounded-xl shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/30 transition-all active:scale-[0.98]"
-                      disabled={isPending || (isRegister && !otpVerified)}
-                    >
-                      {isPending ? (
-                        <Loader2 className="h-5 w-5 animate-spin" />
-                      ) : (
-                        <span className="flex items-center gap-2">
-                          {isRegister ? "Create Account" : "Sign In"}
-                          {isRegister ? <Sparkles className="w-4 h-4" /> : <ArrowRight className="w-4 h-4" />}
-                        </span>
-                      )}
-                    </Button>
+                    {/* Submit Button - Only show for login, register, or forgot password after OTP verified */}
+                    {(!isForgotPassword || (isForgotPassword && fpOtpVerified)) && (
+                      <Button
+                        type="submit"
+                        className="w-full h-12 text-base font-semibold bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 border-0 rounded-xl shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/30 transition-all active:scale-[0.98]"
+                        disabled={isPending || (isRegister && !otpVerified) || (isForgotPassword && !fpOtpVerified)}
+                      >
+                        {isPending ? (
+                          <Loader2 className="h-5 w-5 animate-spin" />
+                        ) : (
+                          <span className="flex items-center gap-2">
+                            {isRegister ? "Create Account" : isForgotPassword ? "Reset Password" : "Sign In"}
+                            {isRegister ? <Sparkles className="w-4 h-4" /> : <ArrowRight className="w-4 h-4" />}
+                          </span>
+                        )}
+                      </Button>
+                    )}
 
                     {error && (
                       <motion.p
