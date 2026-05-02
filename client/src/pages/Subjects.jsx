@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Sidebar } from "@/components/Sidebar";
@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Trash2, Search, ArrowUpDown, Pencil, Upload, Loader2, Download, BookOpen, Fingerprint, Clock, Building2, GraduationCap, LayoutGrid, FileSpreadsheet, FlaskConical } from "lucide-react";
+import { Plus, Trash2, Search, ArrowUpDown, Pencil, Upload, Loader2, Download, BookOpen, Fingerprint, Clock, Building2, GraduationCap, LayoutGrid, FlaskConical } from "lucide-react";
 import { useSubjects, useCreateSubject, useUpdateSubject, useDeleteSubject, useDepartments, useFaculty, useSections } from "@/hooks/use-master-data";
 import { useToast } from "@/hooks/use-toast";
 import { api } from "@shared/routes";
@@ -16,153 +16,7 @@ import * as XLSX from "xlsx";
 import { ExportHint } from "@/components/ExportHint";
 import { motion } from "framer-motion";
 
-function SubjectImport({ departments, subjects, faculty, sections, onImportComplete }) {
-  const [isImporting, setIsImporting] = useState(false);
-  const fileInputRef = useRef(null);
-  const { toast } = useToast();
-  const createMutation = useCreateSubject();
-  const updateMutation = useUpdateSubject();
 
-    const handleImport = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    setIsImporting(true);
-    const reader = new FileReader();
-
-    reader.onload = async (evt) => {
-      try {
-        const buffer = new Uint8Array(evt.target.result);
-        const wb = XLSX.read(buffer, { type: "array" });
-        const wsname = wb.SheetNames[0];
-        const ws = wb.Sheets[wsname];
-        const data = XLSX.utils.sheet_to_json(ws);
-
-        let successCount = 0;
-        let updateCount = 0;
-        let errorCount = 0;
-
-        for (const item of data) {
-          // Robust header matching helper
-          const getValue = (possibleKeys) => {
-            const keys = Object.keys(item);
-            for (const key of possibleKeys) {
-              const matchedKey = keys.find(k => k.toLowerCase().trim() === key.toLowerCase().trim());
-              if (matchedKey) return item[matchedKey];
-            }
-            return null;
-          };
-
-          const name = getValue(["Name", "Subject Name", "Subject", "subject"]);
-          const code = getValue(["Code", "Subject Code", "subject code"]);
-          const hours = getValue(["Weekly Hours", "weeklyHours", "Hours", "hours"]);
-          const deptSearch = getValue(["Department", "department", "departmentCode", "Dept", "dept"]);
-          const facultySearch = getValue(["Default Faculty", "Faculty", "Faculty Name", "Faculty Code", "Staff", "staff", "Professor"]);
-          const sectionSearch = getValue(["Target Section", "Section", "section"]);
-          const typeSearch = getValue(["Subject Type", "Type", "SubjectType", "type"]);
-
-          if (name && code) {
-            let type = "lecture";
-            if (typeSearch) {
-              const lowerType = String(typeSearch).toLowerCase().trim();
-              if (lowerType.includes("lab")) type = "lab";
-              else if (lowerType.includes("lecture") || lowerType.includes("theory")) type = "lecture";
-            }
-            const existing = subjects?.find(s => String(s.code).toLowerCase() === String(code).toLowerCase());
-            
-            const dept = departments?.find(d => 
-              String(d.name).toLowerCase().trim() === String(deptSearch).toLowerCase().trim() || 
-              String(d.code).toLowerCase().trim() === String(deptSearch).toLowerCase().trim()
-            );
-
-            const deptId = dept ? dept.id : (item.departmentId ? Number(item.departmentId) : null);
-
-            if (!deptId && !existing) {
-              console.warn(`Skipping subject ${name}: No valid department ID found.`);
-              errorCount++;
-              continue;
-            }
-
-            // Normalize helper: replace punctuation with spaces so "B.com.(IT)" and "B.Com IT" both become "b com it"
-            const normalize = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]/g, " ").replace(/\s+/g, " ").trim();
-            const looseMatch = (a, b) => {
-              if (!a || !b) return false;
-              const na = normalize(a), nb = normalize(b);
-              // Exact match after normalization is much safer for Roman numerals (I, II, III)
-              // This prevents "II B.Com IT" from matching "I B.Com IT"
-              return na === nb;
-            };
-
-            const fac = faculty?.find(f => 
-              looseMatch(f.name, facultySearch) || 
-              looseMatch(f.code, facultySearch)
-            );
-
-            const sec = (sectionSearch && deptId) ? sections?.find(s => 
-              Number(s.departmentId) === deptId && looseMatch(s.name, sectionSearch)
-            ) : null;
-            
-            try {
-              if (existing) {
-                await updateMutation.mutateAsync({
-                  id: existing.id,
-                  name: String(name),
-                  code: String(code),
-                  weeklyHours: Number(hours || existing.weeklyHours),
-                  departmentId: deptId || existing.departmentId,
-                   facultyId: fac ? fac.id : (item.facultyId ? Number(item.facultyId) : existing.facultyId),
-                  sectionId: sec ? sec.id : (item.sectionId ? Number(item.sectionId) : existing.sectionId),
-                  type: type || existing.type || "lecture"
-                });
-                updateCount++;
-              } else {
-                await createMutation.mutateAsync({ 
-                  name: String(name), 
-                  code: String(code), 
-                  weeklyHours: Number(hours || 0),
-                  departmentId: deptId,
-                  facultyId: fac ? fac.id : (item.facultyId ? Number(item.facultyId) : null),
-                  sectionId: sec ? sec.id : (item.sectionId ? Number(item.sectionId) : null),
-                  type: type || "lecture"
-                });
-                successCount++;
-              }
-            } catch (err) {
-              console.error(`Failed to import/update subject ${name}:`, err);
-              errorCount++;
-            }
-          }
-        }
-
-        toast({ 
-          title: "Import Complete", 
-          description: `Imported ${successCount} new, updated ${updateCount} subjects.${errorCount > 0 ? ` Failed ${errorCount} records.` : ""}`,
-        });
-        
-        if (onImportComplete) onImportComplete();
-      } catch (error) {
-        console.error("Excel import error:", error);
-        toast({ title: "Import Failed", description: error?.message || "Failed to read Excel file", variant: "destructive" });
-      } finally {
-        setIsImporting(false);
-        if (fileInputRef.current) fileInputRef.current.value = "";
-      }
-    };
-    reader.readAsArrayBuffer(file);
-  };
-
-  return (
-    <div className="relative">
-      <Input type="file" accept=".xlsx, .xls" className="hidden" id="import-excel" ref={fileInputRef} onChange={handleImport} disabled={isImporting} />
-      <Button variant="outline" className="gap-2 h-11 px-6 rounded-xl border-2 border-slate-200 font-bold hover:bg-slate-50 hover:border-slate-300 transition-all" asChild disabled={isImporting}>
-        <label htmlFor="import-excel" className="cursor-pointer">
-          {isImporting ? <Loader2 className="w-4 h-4 animate-spin text-indigo-600" /> : <FileSpreadsheet className="w-4 h-4" />}
-          {isImporting ? "Injecting Data..." : "Import Dataset"}
-        </label>
-      </Button>
-    </div>
-  );
-}
 
 export default function Subjects() {
   const [open, setOpen] = useState(false);
@@ -314,7 +168,7 @@ export default function Subjects() {
             </motion.div>
             
             <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="flex items-center gap-3 overflow-x-auto md:overflow-visible pb-2 md:pb-0">
-              <SubjectImport departments={departments} subjects={subjects} faculty={faculty} sections={sections} onImportComplete={refetch} />
+
               <Button variant="outline" className="gap-2 h-11 px-6 rounded-xl border-2 border-slate-200 font-bold hover:bg-slate-50 hover:border-slate-300 transition-all" onClick={handleExport}>
                 <Upload className="w-4 h-4" /> Export Dataset
               </Button>

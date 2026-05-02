@@ -959,13 +959,14 @@ export default function Login() {
                     )}
 
                     {error && (
-                      <motion.p
+                      <motion.div
                         initial={{ opacity: 0, y: -5 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className="text-sm text-red-400 text-center bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2"
+                        className={`text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2 ${error.field ? "border-l-4 border-l-red-400" : "text-center"}`}
                       >
-                        {error.message}
-                      </motion.p>
+                        <p className="font-medium">{error.field && error.field === "identifier" ? "Account not found" : error.field === "password" ? "Incorrect password" : "Error"}</p>
+                        <p className={error.field ? "text-xs mt-1 opacity-90" : ""}>{error.message}</p>
+                      </motion.div>
                     )}
                   </form>
                 </Form>
@@ -978,7 +979,10 @@ export default function Login() {
         <div className="text-center mt-6 space-y-2">
           {!isForgotPassword && (
             <button
-              onClick={() => setIsRegister(!isRegister)}
+              onClick={() => {
+                setIsRegister(!isRegister);
+                loginMutation.reset(); // Clear any login errors
+              }}
               className="text-sm text-slate-400 hover:text-slate-300 transition-colors block w-full"
             >
               {isRegister ? (
@@ -990,7 +994,10 @@ export default function Login() {
           )}
           {!isRegister && !isForgotPassword && (
             <button
-              onClick={() => setIsForgotPassword(true)}
+              onClick={() => {
+                setIsForgotPassword(true);
+                loginMutation.reset(); // Clear any login errors
+              }}
               className="text-sm text-slate-500 hover:text-indigo-400 transition-colors block w-full"
             >
               Forgot your password?
@@ -998,7 +1005,10 @@ export default function Login() {
           )}
           {isForgotPassword && (
             <button
-              onClick={() => setIsForgotPassword(false)}
+              onClick={() => {
+                setIsForgotPassword(false);
+                loginMutation.reset(); // Clear any login errors
+              }}
               className="text-sm text-slate-400 hover:text-slate-300 transition-colors block w-full"
             >
               Remember your password? <span className="font-semibold text-indigo-400 hover:text-indigo-300 underline underline-offset-2">Sign In</span>

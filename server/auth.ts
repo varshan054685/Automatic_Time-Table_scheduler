@@ -62,12 +62,13 @@ export function setupAuth(app: Express) {
   passport.use(
     "local",
     new LocalStrategy(
-      { usernameField: "identifier" },
-      async (identifier, password, done) => {
+      { usernameField: "identifier", passReqToCallback: true },
+      async (req, identifier, password, done) => {
         try {
           let user;
+          const isEmail = identifier.includes("@");
           // Check if identifier is email or phone number
-          if (identifier.includes("@")) {
+          if (isEmail) {
             const normalizedEmail = identifier.trim().toLowerCase();
             user = await storage.getUserByEmail(normalizedEmail);
           } else {
@@ -75,9 +76,27 @@ export function setupAuth(app: Express) {
             user = await storage.getUserByPhoneNumber(identifier.trim());
           }
           
-          if (!user) return done(null, false);
+          if (!user) {
+            // User not found - return specific error info
+            const errorInfo = { 
+              message: isEmail 
+                ? "We couldn't find an account with this email address. Please check your email or sign up."
+                : "We couldn't find an account with this phone number. Please check your number or sign up.",
+              field: "identifier"
+            };
+            return done(null, false, errorInfo);
+          }
+          
           const valid = await bcrypt.compare(password, user.password);
-          if (!valid) return done(null, false);
+          if (!valid) {
+            // Password incorrect - return specific error info
+            const errorInfo = { 
+              message: "The password you entered is incorrect. Please try again or use 'Forgot Password' to reset it.",
+              field: "password"
+            };
+            return done(null, false, errorInfo);
+          }
+          
           return done(null, user);
         } catch (err) {
           return done(err);
@@ -274,10 +293,23 @@ export function setupAuth(app: Express) {
       } catch (err: any) {
         console.error(`[SENDGRID_FAILED] Failed to send OTP to ${email}:`, err.message);
         if (err.response) {
-          console.error(`[SENDGRID_ERROR] Response body:`, err.response.body);
+          console.error(`[SENDGRID_ERROR] Response body:`, JSON.stringify(err.response.body, null, 2));
+          // Check for specific SendGrid errors
+          const errors = err.response.body?.errors;
+          if (errors && errors.length > 0) {
+            for (const error of errors) {
+              console.error(`[SENDGRID_ERROR_DETAIL] ${error.field}: ${error.message}`);
+            }
+          }
+        }
+        // In production, log OTP to console as fallback for testing
+        if (process.env.NODE_ENV === "production") {
+          console.log(`[OTP_FALLBACK] Email: ${email}, OTP: ${otp}`);
+          console.log(`[OTP_FALLBACK] The above OTP would have been sent to ${email}`);
+          console.log(`[OTP_FALLBACK] To fix SendGrid: 1) Verify sender email in SendGrid, 2) Authenticate your domain, or 3) Check API key permissions`);
         }
         // Throw error so user knows email failed
-        throw new Error(`Failed to send email: ${err.message}`);
+        throw new Error(`Failed to send email: ${err.message}. Please check your SendGrid configuration.`);
       }
     } else {
       console.log(`[SENDGRID_DEBUG] SendGrid not configured. API Key present: ${!!process.env.SENDGRID_API_KEY}`);
@@ -722,10 +754,17 @@ export function setupAuth(app: Express) {
       return res.status(400).json({ message: "Invalid input" });
     }
 
-    passport.authenticate("local", (err: any, user: any) => {
+    passport.authenticate("local", (err: any, user: any, info: any) => {
       if (err) return next(err);
       if (!user) {
         log(`LOGIN_FAILED identifier=${req.body?.identifier || "unknown"} IP=${req.ip}`, "security");
+        // Return specific error message if available
+        if (info && info.message) {
+          return res.status(401).json({ 
+            message: info.message,
+            field: info.field 
+          });
+        }
         return res.status(401).json({ message: "Invalid credentials" });
       }
       req.login(user, async (err) => {

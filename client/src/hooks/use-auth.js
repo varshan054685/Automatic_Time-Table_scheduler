@@ -29,7 +29,9 @@ export function useLogin() {
       
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.message || "Login failed");
+        const error = new Error(data.message || "Login failed");
+        error.field = data.field;
+        throw error;
       }
       return await res.json();
     },
