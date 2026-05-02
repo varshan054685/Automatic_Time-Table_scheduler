@@ -91,8 +91,8 @@ export function Sidebar() {
             </div>
             <span className="font-display font-bold text-slate-900">{workspaceName}</span>
           </div>
-          <Button variant="ghost" size="icon" onClick={() => setIsOpen(true)}>
-            <Menu className="w-6 h-6 text-slate-600" />
+          <Button variant="ghost" size="icon" onClick={() => setIsOpen(!isOpen)}>
+            {isOpen ? <X className="w-6 h-6 text-slate-600" /> : <Menu className="w-6 h-6 text-slate-600" />}
           </Button>
         </div>
       )}
@@ -105,7 +105,7 @@ export function Sidebar() {
             animate={{ x: 0, width: isOpen ? 280 : 72 }}
             exit={isMobile ? { x: -300 } : false}
             transition={{ type: "spring", damping: 20, stiffness: 100 }}
-            className={`h-screen bg-slate-900 text-white flex flex-col z-40 shrink-0 shadow-2xl
+            className={`${isMobile ? 'h-[100dvh]' : 'h-screen'} bg-slate-900 text-white flex flex-col z-40 shrink-0 shadow-2xl
               ${isMobile ? 'fixed top-0 left-0' : 'sticky top-0'}
               ${!isOpen && !isMobile ? 'w-[72px]' : 'w-[280px]'}
             `}
@@ -147,7 +147,7 @@ export function Sidebar() {
             </div>
 
             {/* Navigation Section */}
-            <nav className="flex-1 p-4 space-y-2 overflow-y-auto custom-scrollbar">
+            <nav className="flex-1 p-4 space-y-2 overflow-y-auto custom-scrollbar min-h-0">
               {navItems.map((item) => {
                 const isActive = location === item.href;
                 return (
@@ -230,9 +230,9 @@ export function Sidebar() {
             </nav>
 
             {/* Footer Section */}
-            <div className="p-4 border-t border-slate-800/50 shrink-0 bg-slate-900/50 backdrop-blur-sm">
-              <div className={`flex items-center gap-3 mb-4 ${!isOpen && 'justify-center'}`}>
-                <div className="w-10 h-10 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-300 font-bold">
+            <div className="p-4 border-t border-slate-800/50 shrink-0 bg-slate-900/50 backdrop-blur-sm safe-area-pb">
+              <div className={`flex items-center gap-3 mb-3 ${!isOpen && 'justify-center'}`}>
+                <div className="w-9 h-9 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-300 font-bold text-sm">
                   {user?.name?.charAt(0) || "U"}
                 </div>
                 {isOpen && (
@@ -246,8 +246,11 @@ export function Sidebar() {
                 <TooltipTrigger asChild>
                   <Button 
                     variant="ghost" 
-                    className={`w-full hover:bg-rose-950/30 text-slate-400 hover:text-rose-400 gap-3 justify-start rounded-xl px-3 transition-colors ${!isOpen && 'justify-center px-0'}`}
-                    onClick={() => logoutMutation.mutate()}
+                    className={`w-full h-10 hover:bg-rose-950/30 text-slate-400 hover:text-rose-400 gap-3 justify-start rounded-xl px-3 transition-colors ${!isOpen && 'justify-center px-0'}`}
+                    onClick={() => {
+                      logoutMutation.mutate();
+                      if (isMobile) setIsOpen(false);
+                    }}
                   >
                     <LogOut className="w-5 h-5 shrink-0" />
                     {isOpen && <span>Sign Out</span>}
