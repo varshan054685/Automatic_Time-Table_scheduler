@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useLocation } from "wouter";
-import { Calendar, Mail, Lock, ArrowRight, Sparkles, Eye, EyeOff, Phone, User, Loader2, CheckCircle2, Shield, CheckCircle } from "lucide-react";
+import { Calendar, Mail, Lock, ArrowRight, Sparkles, Eye, EyeOff, User, Loader2, CheckCircle2, Shield, CheckCircle } from "lucide-react";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -16,8 +16,6 @@ export default function Login() {
   const [isRegister, setIsRegister] = useState(false);
   const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  // Registration: which verification method is selected
-  const [verifyMethod, setVerifyMethod] = useState("email"); // "email" or "phone"
   const [otpSent, setOtpSent] = useState(false);
   const [otpVerified, setOtpVerified] = useState(false);
   const [countdown, setCountdown] = useState(0);
@@ -42,7 +40,6 @@ export default function Login() {
     defaultValues: {
       identifier: "",
       email: "",
-      phoneNumber: "",
       password: "",
       confirmPassword: "",
       name: "",
@@ -55,7 +52,6 @@ export default function Login() {
   });
 
   const email = form.watch("email");
-  const phoneNumber = form.watch("phoneNumber");
 
   // Reset form and states when switching between login/register
   useEffect(() => {
@@ -64,17 +60,7 @@ export default function Login() {
     setOtpVerified(false);
     setCountdown(0);
     setOtpError(null);
-    setVerifyMethod("email");
   }, [isRegister, form]);
-
-  // Reset OTP state when switching verify method
-  useEffect(() => {
-    setOtpSent(false);
-    setOtpVerified(false);
-    setCountdown(0);
-    setOtpError(null);
-    form.setValue("otp", "");
-  }, [verifyMethod, form]);
 
   // Countdown timer for OTP resend
   useEffect(() => {
@@ -103,17 +89,16 @@ export default function Login() {
   }, [isForgotPassword]);
 
   const handleRequestOtp = async () => {
-    const value = verifyMethod === "email" ? email : phoneNumber;
-    if (!value) {
-      setOtpError(`Please enter ${verifyMethod === "email" ? "an email address" : "a phone number"} first`);
+    if (!email) {
+      setOtpError("Please enter an email address first");
       return;
     }
     setOtpError(null);
 
     try {
       await requestOtpMutation.mutateAsync({
-        [verifyMethod === "email" ? "email" : "phoneNumber"]: value,
-        type: verifyMethod,
+        email: email,
+        type: "email",
       });
       setOtpSent(true);
       setCountdown(60);
@@ -124,18 +109,16 @@ export default function Login() {
 
   const handleVerifyOtp = async () => {
     const otpValue = form.getValues("otp");
-    const value = verifyMethod === "email" ? email : phoneNumber;
 
     if (!otpValue || otpValue.length !== 6) {
       setOtpError("Please enter a valid 6-digit OTP");
       return;
     }
-    setOtpError(null);
 
     try {
       await verifyOtpMutation.mutateAsync({
-        [verifyMethod === "email" ? "email" : "phoneNumber"]: value,
-        type: verifyMethod,
+        email: email,
+        type: "email",
         otp: otpValue,
       });
       setOtpVerified(true);
@@ -171,18 +154,13 @@ export default function Login() {
         form.setError("confirmPassword", { message: "Passwords do not match" });
         return;
       }
+      // Build registration data with email OTP
       const registrationData = {
-        password: values.password,
         name: values.name,
+        email: values.email,
+        password: values.password,
       };
-
-      if (verifyMethod === "email") {
-        registrationData.email = values.email;
-        if (otpVerified) registrationData.emailOtp = values.otp;
-      } else {
-        registrationData.phoneNumber = values.phoneNumber;
-        if (otpVerified) registrationData.phoneOtp = values.otp;
-      }
+      if (otpVerified) registrationData.emailOtp = values.otp;
 
       registerMutation.mutate(registrationData, {
         onSuccess: () => setLocation("/"),
@@ -197,15 +175,15 @@ export default function Login() {
 
   // Forgot password handlers
   const handleForgotPasswordRequest = async () => {
-    const identifier = form.getValues("resetIdentifier");
-    if (!identifier) {
-      setFpError("Please enter your email or phone number");
+    const email = form.getValues("resetIdentifier");
+    if (!email) {
+      setFpError("Please enter your email address");
       return;
     }
     setFpError(null);
 
     try {
-      await forgotPasswordMutation.mutateAsync({ identifier });
+      await forgotPasswordMutation.mutateAsync({ identifier: email });
       setFpOtpSent(true);
       setFpCountdown(60);
     } catch (err) {
@@ -214,7 +192,7 @@ export default function Login() {
   };
 
   const handleForgotPasswordVerify = async () => {
-    const identifier = form.getValues("resetIdentifier");
+    const email = form.getValues("resetIdentifier");
     const otpValue = form.getValues("resetOtp");
 
     if (!otpValue || otpValue.length !== 6) {
@@ -224,10 +202,9 @@ export default function Login() {
     setFpError(null);
 
     try {
-      const isEmail = identifier.includes("@");
       await verifyOtpMutation.mutateAsync({
-        ...(isEmail ? { email: identifier } : { phoneNumber: identifier }),
-        type: isEmail ? "email" : "phone",
+        email: email,
+        type: "email",
         otp: otpValue,
       });
       setFpOtpVerified(true);
@@ -341,18 +318,18 @@ export default function Login() {
 
                         {!fpOtpVerified ? (
                           <>
-                            {/* Step 1: Enter email/phone and send OTP */}
+                            {/* Step 1: Enter email and send OTP */}
                             <FormField
                               control={form.control}
                               name="resetIdentifier"
                               render={({ field }) => (
                                 <FormItem>
-                                  <FormLabel className="text-slate-300 select-none cursor-default text-sm font-medium">Email or Phone Number</FormLabel>
+                                  <FormLabel className="text-slate-300 select-none cursor-default text-sm font-medium">Email Address</FormLabel>
                                   <FormControl>
                                     <div className="relative">
                                       <Mail className="absolute left-3 top-3.5 h-4 w-4 text-slate-500" />
                                       <Input
-                                        placeholder="you@example.com or +1234567890"
+                                        placeholder="you@example.com"
                                         {...field}
                                         className="h-12 pl-10 bg-white/5 border-white/10 text-white placeholder:text-slate-500 focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 rounded-xl transition-all"
                                       />
@@ -468,6 +445,11 @@ export default function Login() {
                                 "Send Reset Code"
                               )}
                             </Button>
+                            {fpOtpSent && !fpOtpVerified && (
+                              <p className="text-xs text-amber-400/80 text-center">
+                                Check your spam/junk folder if you don't see the email
+                              </p>
+                            )}
                           </>
                         ) : (
                           <>
@@ -566,117 +548,34 @@ export default function Login() {
                           )}
                         />
 
-                        {/* Verification Method Selector */}
-                        <div className="space-y-3">
-                          <label className="text-sm font-medium text-slate-300 select-none cursor-default">
-                            Verify with
-                          </label>
-                          <div className="grid grid-cols-2 gap-2 p-1 bg-white/5 rounded-xl border border-white/10">
-                            <button
-                              type="button"
-                              onClick={() => setVerifyMethod("email")}
-                              className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg text-sm font-medium transition-all duration-200 ${
-                                verifyMethod === "email"
-                                  ? "bg-gradient-to-r from-indigo-500 to-indigo-600 text-white shadow-md shadow-indigo-500/25"
-                                  : "text-slate-400 hover:text-slate-300 hover:bg-white/5"
-                              }`}
-                            >
-                              <Mail className="w-4 h-4" />
-                              Email
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setVerifyMethod("phone")}
-                              className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg text-sm font-medium transition-all duration-200 ${
-                                verifyMethod === "phone"
-                                  ? "bg-gradient-to-r from-indigo-500 to-indigo-600 text-white shadow-md shadow-indigo-500/25"
-                                  : "text-slate-400 hover:text-slate-300 hover:bg-white/5"
-                              }`}
-                            >
-                              <Phone className="w-4 h-4" />
-                              Phone
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* Email or Phone Field (based on selection) */}
-                        <AnimatePresence mode="wait">
-                          {verifyMethod === "email" ? (
-                            <motion.div
-                              key="email-field"
-                              initial={{ opacity: 0, height: 0 }}
-                              animate={{ opacity: 1, height: "auto" }}
-                              exit={{ opacity: 0, height: 0 }}
-                              transition={{ duration: 0.2 }}
-                              className="space-y-3"
-                            >
-                              <FormField
-                                control={form.control}
-                                name="email"
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel className="text-slate-300 select-none cursor-default text-sm font-medium">
-                                      Email Address
-                                    </FormLabel>
-                                    <FormControl>
-                                      <div className="relative">
-                                        <Mail className="absolute left-3 top-3.5 h-4 w-4 text-slate-500" />
-                                        <Input
-                                          type="email"
-                                          placeholder="you@example.com"
-                                          {...field}
-                                          disabled={otpVerified}
-                                          className="h-12 pl-10 bg-white/5 border-white/10 text-white placeholder:text-slate-500 focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 rounded-xl disabled:opacity-50 transition-all"
-                                        />
-                                        {otpVerified && (
-                                          <CheckCircle2 className="absolute right-3 top-3.5 h-4 w-4 text-emerald-400" />
-                                        )}
-                                      </div>
-                                    </FormControl>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
-                            </motion.div>
-                          ) : (
-                            <motion.div
-                              key="phone-field"
-                              initial={{ opacity: 0, height: 0 }}
-                              animate={{ opacity: 1, height: "auto" }}
-                              exit={{ opacity: 0, height: 0 }}
-                              transition={{ duration: 0.2 }}
-                              className="space-y-3"
-                            >
-                              <FormField
-                                control={form.control}
-                                name="phoneNumber"
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel className="text-slate-300 select-none cursor-default text-sm font-medium">
-                                      Phone Number
-                                    </FormLabel>
-                                    <FormControl>
-                                      <div className="relative">
-                                        <Phone className="absolute left-3 top-3.5 h-4 w-4 text-slate-500" />
-                                        <Input
-                                          type="tel"
-                                          placeholder="+91 9876543210"
-                                          {...field}
-                                          disabled={otpVerified}
-                                          className="h-12 pl-10 bg-white/5 border-white/10 text-white placeholder:text-slate-500 focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 rounded-xl disabled:opacity-50 transition-all"
-                                        />
-                                        {otpVerified && (
-                                          <CheckCircle2 className="absolute right-3 top-3.5 h-4 w-4 text-emerald-400" />
-                                        )}
-                                      </div>
-                                    </FormControl>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
-                            </motion.div>
+                        {/* Email Field */}
+                        <FormField
+                          control={form.control}
+                          name="email"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-slate-300 select-none cursor-default text-sm font-medium">
+                                Email Address
+                              </FormLabel>
+                              <FormControl>
+                                <div className="relative">
+                                  <Mail className="absolute left-3 top-3.5 h-4 w-4 text-slate-500" />
+                                  <Input
+                                    type="email"
+                                    placeholder="you@example.com"
+                                    {...field}
+                                    disabled={otpVerified}
+                                    className="h-12 pl-10 bg-white/5 border-white/10 text-white placeholder:text-slate-500 focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 rounded-xl disabled:opacity-50 transition-all"
+                                  />
+                                  {otpVerified && (
+                                    <CheckCircle2 className="absolute right-3 top-3.5 h-4 w-4 text-emerald-400" />
+                                  )}
+                                </div>
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
                           )}
-                        </AnimatePresence>
+                        />
 
                         {/* OTP Verification Section - Enhanced */}
                         {!otpVerified ? (
@@ -694,7 +593,7 @@ export default function Login() {
                                   <div className="flex-1">
                                     <p className="text-sm text-white font-medium">OTP Sent!</p>
                                     <p className="text-xs text-indigo-200">
-                                      Check your {verifyMethod === "email" ? "email inbox" : "SMS messages"}
+                                      Check your email inbox
                                     </p>
                                   </div>
                                 </div>
@@ -773,6 +672,12 @@ export default function Login() {
                               </Button>
                             )}
 
+                            {otpSent && (
+                              <p className="text-xs text-amber-400/80 text-center">
+                                Check your spam/junk folder if you don't see the email
+                              </p>
+                            )}
+
                             {otpSent && countdown > 0 && (
                               <p className="text-xs text-slate-500 text-center">
                                 Resend available in {countdown}s
@@ -798,10 +703,10 @@ export default function Login() {
                             <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
                             <div>
                               <p className="text-sm font-medium text-emerald-300">
-                                {verifyMethod === "email" ? "Email" : "Phone"} verified
+                                Email verified
                               </p>
                               <p className="text-xs text-emerald-400/70">
-                                Your {verifyMethod === "email" ? "email address" : "phone number"} has been confirmed
+                                Your email address has been confirmed
                               </p>
                             </div>
                           </motion.div>
@@ -887,13 +792,13 @@ export default function Login() {
                           render={({ field }) => (
                             <FormItem>
                               <FormLabel className="text-slate-300 select-none cursor-default text-sm font-medium">
-                                Email or Phone Number
+                                Email Address
                               </FormLabel>
                               <FormControl>
                                 <div className="relative">
                                   <Mail className="absolute left-3 top-3.5 h-4 w-4 text-slate-500" />
                                   <Input
-                                    placeholder="you@example.com or +91 9876543210"
+                                    placeholder="you@example.com"
                                     {...field}
                                     className="h-12 pl-10 bg-white/5 border-white/10 text-white placeholder:text-slate-500 focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 rounded-xl transition-all"
                                   />
