@@ -740,10 +740,10 @@ export function setupAuth(app: Express) {
       log(`GOOGLE_LOGIN_SUCCESS userId=${user?.id} IP=${req.ip}`, "security");
       const membership = await storage.getUserWorkspaceMembership(user.id);
       // In development, redirect to the Vite dev server (5173).
-      // In production, the frontend is served from the same origin, so "/" works.
+      // In production, use FRONTEND_URL env var to redirect to Vercel frontend
       const frontendUrl = process.env.NODE_ENV === "development"
         ? "http://localhost:5173/"
-        : "/";
+        : (process.env.FRONTEND_URL || "/");
       res.redirect(frontendUrl);
     }
   );
