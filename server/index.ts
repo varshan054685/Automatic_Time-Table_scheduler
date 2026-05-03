@@ -27,8 +27,26 @@ app.use(helmet({
 }));
 
 // ─── CORS configuration ───
+// Support both local development and Vercel production
+const allowedOrigins = [
+  "http://localhost:5173",
+  "http://localhost:5174", 
+  "http://localhost:5175",
+  process.env.CORS_ORIGIN,
+].filter(Boolean); // Remove undefined
+
 app.use(cors({
-  origin: process.env.CORS_ORIGIN,
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, curl, etc.)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.includes(origin) || process.env.NODE_ENV === "development") {
+      callback(null, true);
+    } else {
+      console.warn(`[CORS] Blocked origin: ${origin}`);
+      callback(new Error(`Origin ${origin} not allowed by CORS`));
+    }
+  },
   credentials: true
 }));
 // ─── Security: Body size limit — prevent DoS via oversized payloads ───
