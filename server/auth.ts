@@ -111,7 +111,7 @@ export function setupAuth(app: Express) {
   // In development, use frontend port (5173) so cookie is set on correct origin
   // Vite proxy will forward /api requests to backend (5000)
   const callbackURL = process.env.GOOGLE_CALLBACK_URL || (process.env.NODE_ENV === "production" 
-    ? "https://automatic-time-table-scheduler.onrender.com/api/auth/google/callback"
+    ? "https://automatic-time-table-scheduler-node.onrender.com/api/auth/google/callback"
     : "http://localhost:5173/api/auth/google/callback");
 
   if (googleClientId && googleClientSecret) {
