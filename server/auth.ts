@@ -108,7 +108,11 @@ export function setupAuth(app: Express) {
   // ─── Google OAuth Strategy ───
   const googleClientId = process.env.GOOGLE_CLIENT_ID;
   const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
-  const googleCallbackUrl = process.env.GOOGLE_CALLBACK_URL || "http://localhost:5000/api/auth/google/callback";
+  // In development, use frontend port (5173) so cookie is set on correct origin
+  // Vite proxy will forward /api requests to backend (5000)
+  const callbackURL = process.env.GOOGLE_CALLBACK_URL || (process.env.NODE_ENV === "production" 
+    ? "https://automatic-time-table-scheduler.onrender.com/api/auth/google/callback"
+    : "http://localhost:5173/api/auth/google/callback");
 
   if (googleClientId && googleClientSecret) {
     passport.use(
@@ -117,7 +121,7 @@ export function setupAuth(app: Express) {
         {
           clientID: googleClientId,
           clientSecret: googleClientSecret,
-          callbackURL: googleCallbackUrl,
+          callbackURL: callbackURL,
         },
         async (accessToken: string, refreshToken: string, profile: any, done: any) => {
           try {
@@ -259,8 +263,12 @@ export function setupAuth(app: Express) {
       throw new Error(validation.error || "Invalid email domain");
     }
 
-    // Log OTP for debugging (always)
-    log(`OTP_EMAIL to=${email} otp=${otp}`, "security");
+    // Log what we're sending (MUST be backend URL, not frontend)
+    log(`GOOGLE_OAUTH_CALLBACK URL=${callbackURL}`, "security");
+    console.log(`[GOOGLE_OAUTH] Using callback URL: ${callbackURL}`);
+    if (callbackURL.includes("5173") || callbackURL.includes("5174")) {
+      console.error(`[GOOGLE_OAUTH ERROR] callbackURL contains frontend port! This will fail. URL: ${callbackURL}`);
+    }
     console.log(`[DEBUG] Email OTP for ${email}: ${otp} (expires in ${OTP_EXPIRY_MINUTES} minutes)`);
 
     // Send via SendGrid if API key is configured
@@ -731,14 +739,12 @@ export function setupAuth(app: Express) {
       const user = req.user as any;
       log(`GOOGLE_LOGIN_SUCCESS userId=${user?.id} IP=${req.ip}`, "security");
       const membership = await storage.getUserWorkspaceMembership(user.id);
-      // In development, redirect to the Vite dev server origin.
+      // In development, redirect to the Vite dev server (5173).
       // In production, the frontend is served from the same origin, so "/" works.
-      const callbackUrl = process.env.GOOGLE_CALLBACK_URL || "";
-      const frontendOrigin = callbackUrl ? new URL(callbackUrl).origin : "";
-      const redirectUrl = process.env.NODE_ENV === "development" && frontendOrigin
-        ? frontendOrigin + "/"
+      const frontendUrl = process.env.NODE_ENV === "development"
+        ? "http://localhost:5173/"
         : "/";
-      res.redirect(redirectUrl);
+      res.redirect(frontendUrl);
     }
   );
 

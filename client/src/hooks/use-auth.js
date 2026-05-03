@@ -12,6 +12,8 @@ export function useUser() {
       return await res.json();
     },
     retry: false,
+    staleTime: 0, // Always refetch on mount to catch OAuth login
+    refetchOnMount: true,
   });
   return { user: data, isLoading, error };
 }

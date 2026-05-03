@@ -50,13 +50,33 @@ function ProtectedRoute({ component: Component }) {
   );
 }
 
+// PublicRoute - for pages like login that should redirect if already logged in
+function PublicRoute({ component: Component }) {
+  const { user, isLoading } = useUser();
+  const [, setLocation] = useLocation();
+
+  if (isLoading) {
+    return <div className="h-screen w-full flex items-center justify-center"><Loader2 className="animate-spin text-primary w-8 h-8" /></div>;
+  }
+
+  // If user is logged in, redirect to home
+  if (user) {
+    setLocation("/");
+    return null;
+  }
+
+  return <Component />;
+}
+
 function Router() {
   const [location] = useLocation();
 
   return (
     <AnimatePresence mode="wait">
       <Switch location={location} key={location}>
-        <Route path="/login" component={Login} />
+        <Route path="/login">
+          <PublicRoute component={Login} />
+        </Route>
         
         <Route path="/">
           <ProtectedRoute component={Dashboard} />
