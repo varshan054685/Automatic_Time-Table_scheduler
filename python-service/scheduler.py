@@ -162,7 +162,7 @@ def generate_timetable(data: dict):
 
 
     for b_idx in range(len(all_blocks)):
-        if v_by_block[b_idx]: model.AddAtMostOne(v_by_block[b_idx])
+        if v_by_block[b_idx]: model.AddExactlyOne(v_by_block[b_idx])
     for cov in v_by_slot_room.values(): model.AddAtMostOne(cov)
     for cov in v_by_slot_fac.values(): model.AddAtMostOne(cov)
     for cov in v_by_slot_sec.values(): model.AddAtMostOne(cov)
@@ -285,11 +285,8 @@ def generate_timetable(data: dict):
 
     total_sch = sum(v * all_blocks[k[0]]['size'] for k, v in x.items())
     
-    # Strong penalty for NOT scheduling a block to eliminate "Free" periods
-    scheduling_penalty = sum((1 - sum(v_by_block[b_idx])) * 10000 for b_idx in range(len(all_blocks)) if v_by_block[b_idx])
-
     # Objective: Maximize total scheduled, minimize B2B, minimize active days per section, and minimize late periods
-    model.Maximize(total_sch * 10000 - scheduling_penalty - sum(b2b_penalty) * 10 - sum(sec_day_active_vars) * 50 - sum(late_period_vars))
+    model.Maximize(- sum(b2b_penalty) * 10 - sum(sec_day_active_vars) * 50 - sum(late_period_vars))
 
     solver = cp_model.CpSolver()
     solver.parameters.max_time_in_seconds = 20.0  # Fast per-section solves

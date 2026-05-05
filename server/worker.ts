@@ -18,9 +18,8 @@ export async function processTimetableJob(job: any) {
     if (!section) throw new Error(`Section ${sectionId} not found`);
 
     const allSubjects = await storage.getSubjects(workspaceId);
-    // Subjects directly assigned to this section, or unassigned (shared)
     const subjectsForSection = allSubjects.filter(
-      s => s.departmentId === section.departmentId && (s.sectionId === sectionId || s.sectionId === null)
+      s => s.sectionId === sectionId || (s.sectionId === null && s.departmentId === section.departmentId)
     );
     
     const allFaculty = await storage.getFaculty(workspaceId);

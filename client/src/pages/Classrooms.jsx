@@ -41,8 +41,11 @@ function ClassroomImport({ classrooms, onImportComplete }) {
         let successCount = 0;
         let updateCount = 0;
         let errorCount = 0;
+        const errors = [];
 
-        for (const item of data) {
+        for (let i = 0; i < data.length; i++) {
+          const item = data[i];
+          const rowNum = i + 2;
           const keys = Object.keys(item);
           const getVal = (...possibleKeys) => {
             for (const k of possibleKeys) {
@@ -53,39 +56,46 @@ function ClassroomImport({ classrooms, onImportComplete }) {
           };
 
           const roomNumber = getVal("Room Number", "Room No", "Room No.", "Room", "Classroom", "room number", "room", "RoomNumber", "roomNumber");
-          const capacity = getVal("Capacity", "capacity", "Seats", "seats", "Size", "size");
+          const capacityRaw = getVal("Capacity", "capacity", "Seats", "seats", "Size", "size");
+          const capacity = Math.max(1, parseInt(capacityRaw || 0) || 30); // Default to 30 if missing or invalid
           const typeRaw = getVal("Type", "type", "Room Type", "room type", "Classroom Type");
 
           if (roomNumber) {
-            const existing = classrooms?.find(c => c.roomNumber === String(roomNumber));
+            const existing = classrooms?.find(c => String(c.roomNumber).toLowerCase() === String(roomNumber).toLowerCase());
             
             try {
               if (existing) {
                 await updateMutation.mutateAsync({
                   id: existing.id,
                   roomNumber: String(roomNumber),
-                  capacity: Number(capacity || existing.capacity),
+                  capacity: capacity,
                   type: typeRaw ? (String(typeRaw).toLowerCase().includes("lab") ? "lab" : "lecture") : existing.type
                 });
                 updateCount++;
               } else {
                 await createMutation.mutateAsync({ 
                   roomNumber: String(roomNumber), 
-                  capacity: Number(capacity || 0), 
+                  capacity: capacity, 
                   type: typeRaw ? (String(typeRaw).toLowerCase().includes("lab") ? "lab" : "lecture") : "lecture"
                 });
                 successCount++;
               }
             } catch (err) {
-              console.error(`Failed to import/update classroom ${roomNumber}:`, err);
+              const msg = `Row ${rowNum} (${roomNumber}): ${err.message || 'Validation failed'}`;
+              console.error(msg, err);
+              errors.push(msg);
               errorCount++;
             }
           }
         }
 
+        const summary = `Imported ${successCount} new, updated ${updateCount} classrooms.`;
+        const errorSummary = errorCount > 0 ? ` Failed ${errorCount} records: ${errors.slice(0, 2).join("; ")}${errorCount > 2 ? "..." : ""}` : "";
+
         toast({ 
           title: "Import Complete", 
-          description: `Imported ${successCount} new, updated ${updateCount} classrooms.${errorCount > 0 ? ` Failed ${errorCount} records.` : ""}`,
+          description: summary + errorSummary,
+          variant: errorCount > 0 ? "destructive" : "default"
         });
         
         if (onImportComplete) onImportComplete();

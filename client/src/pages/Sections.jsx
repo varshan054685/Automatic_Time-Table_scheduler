@@ -154,7 +154,7 @@ function SectionImport({ departments, classrooms, sections, onImportComplete }) 
         }
 
         const summary = `Imported ${successCount} new, updated ${updateCount} sections.`;
-        const errorSummary = errorCount > 0 ? ` Failed ${errorCount} records: ${errors.slice(0, 3).join("; ")}${errorCount > 3 ? "..." : ""}` : "";
+        const errorSummary = errorCount > 0 ? ` Failed ${errorCount} records: ${errors.slice(0, 2).join("; ")}${errorCount > 2 ? "..." : ""}` : "";
 
         toast({ 
           title: "Import Complete", 

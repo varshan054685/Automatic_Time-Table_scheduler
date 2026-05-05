@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,8 +23,36 @@ export default function Settings() {
   const [profileData, setProfileData] = useState({
     name: user?.name || "",
     email: user?.email || "",
-    phone: user?.phone || ""
+    phoneNumber: user?.phoneNumber || "",
+    avatar: user?.avatar || ""
   });
+
+  // Sync state when user data is loaded
+  useEffect(() => {
+    if (user) {
+      setProfileData({
+        name: user.name || "",
+        email: user.email || "",
+        phoneNumber: user.phoneNumber || "",
+        avatar: user.avatar || ""
+      });
+    }
+  }, [user]);
+
+  const handlePhotoUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 500000) {
+        toast({ title: "Image too large", description: "Please upload an image smaller than 500KB", variant: "destructive" });
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setProfileData({ ...profileData, avatar: reader.result });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
   const [isEditingWorkspace, setIsEditingWorkspace] = useState(false);
   const [workspaceData, setWorkspaceData] = useState({
     name: user?.workspace?.workspaceName || "",
@@ -179,6 +207,22 @@ export default function Settings() {
                         <CardContent className="p-8 space-y-6">
                         {isEditingProfile ? (
                             <form className="space-y-6 max-w-lg">
+                            <div className="flex flex-col items-center gap-4 mb-6">
+                                <div className="relative group">
+                                    <div className="w-24 h-24 rounded-full bg-slate-100 border-2 border-slate-200 overflow-hidden flex items-center justify-center">
+                                        {profileData.avatar ? (
+                                            <img src={profileData.avatar} alt="Profile" className="w-full h-full object-cover" />
+                                        ) : (
+                                            <User className="w-10 h-10 text-slate-300" />
+                                        )}
+                                    </div>
+                                    <label className="absolute inset-0 flex items-center justify-center bg-black/40 text-white rounded-full opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity">
+                                        <Pencil className="w-5 h-5" />
+                                        <input type="file" className="hidden" accept="image/*" onChange={handlePhotoUpload} />
+                                    </label>
+                                </div>
+                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Profile Photo</p>
+                            </div>
                             <div className="grid gap-2.5">
                                 <label className="text-sm font-bold text-slate-700 ml-1">Full Name</label>
                                 <div className="relative">
@@ -210,8 +254,8 @@ export default function Settings() {
                                     <Phone className="absolute left-3 top-3.5 h-4 w-4 text-slate-400" />
                                     <Input 
                                         className="h-12 pl-10 rounded-xl bg-white border-slate-200 focus:border-indigo-500 transition-all font-medium"
-                                        value={profileData.phone}
-                                        onChange={(e) => setProfileData({...profileData, phone: e.target.value})}
+                                        value={profileData.phoneNumber}
+                                        onChange={(e) => setProfileData({...profileData, phoneNumber: e.target.value})}
                                         placeholder="Enter your phone number"
                                         type="tel"
                                     />
@@ -237,7 +281,7 @@ export default function Settings() {
                                 </div>
                                 <div className="space-y-1">
                                     <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Contact Number</label>
-                                    <p className="text-lg font-bold text-slate-900">{user?.phone || <span className="text-slate-300 italic">Not integrated</span>}</p>
+                                    <p className="text-lg font-bold text-slate-900">{user?.phoneNumber || <span className="text-slate-300 italic">Not integrated</span>}</p>
                                 </div>
                                 <div className="space-y-1">
                                     <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Member Since</label>

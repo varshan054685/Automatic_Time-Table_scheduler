@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Sidebar } from "@/components/Sidebar";
@@ -7,8 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Trash2, Search, ArrowUpDown, Pencil, Upload, Loader2, Download, BookOpen, Fingerprint, Clock, Building2, GraduationCap, LayoutGrid, FlaskConical } from "lucide-react";
-import { useSubjects, useCreateSubject, useUpdateSubject, useDeleteSubject, useDepartments, useFaculty, useSections } from "@/hooks/use-master-data";
+import { Plus, Trash2, Search, ArrowUpDown, Pencil, Upload, Loader2, Download, BookOpen, Fingerprint, Clock, Building2, GraduationCap, LayoutGrid, FlaskConical, FileSpreadsheet } from "lucide-react";
+import { useSubjects, useCreateSubject, useUpdateSubject, useDeleteSubject, useDepartments, useFaculty, useSections, useUpdateFaculty } from "@/hooks/use-master-data";
 import { useToast } from "@/hooks/use-toast";
 import { api } from "@shared/routes";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -16,7 +16,181 @@ import * as XLSX from "xlsx";
 import { ExportHint } from "@/components/ExportHint";
 import { motion } from "framer-motion";
 
+function SubjectImport({ departments, faculty, sections, subjects, onImportComplete }) {
+  const [isImporting, setIsImporting] = useState(false);
+  const fileInputRef = useRef(null);
+  const { toast } = useToast();
+  const createMutation = useCreateSubject();
+  const updateMutation = useUpdateSubject();
+  const updateFacultyMutation = useUpdateFaculty();
 
+  const handleImport = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setIsImporting(true);
+    const reader = new FileReader();
+
+    reader.onload = async (evt) => {
+      try {
+        const buffer = new Uint8Array(evt.target.result);
+        const wb = XLSX.read(buffer, { type: "array" });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json(ws);
+
+        let successCount = 0;
+        let updateCount = 0;
+        let errorCount = 0;
+        const errors = [];
+
+        // Helper to find value with flexible key matching
+        const getVal = (obj, ...keys) => {
+          const objKeys = Object.keys(obj);
+          for (const k of keys) {
+            const foundKey = objKeys.find(ok => ok.toLowerCase().replace(/[^a-z0-9]/g, "") === k.toLowerCase().replace(/[^a-z0-9]/g, ""));
+            if (foundKey) return obj[foundKey];
+          }
+          return null;
+        };
+
+        // Helper for super fuzzy string matching (ignores titles and small suffixes)
+        const fuzzyMatch = (s1, s2) => {
+          if (s1 === undefined || s1 === null || s2 === undefined || s2 === null) return false;
+          const clean = (s) => String(s).toLowerCase()
+            .replace(/^(dr|mr|ms|mrs|prof)\.?\s*/i, "") // Strip titles (space optional)
+            .replace(/[^a-z0-9]/g, "")
+            .trim();
+          const c1 = clean(s1);
+          const c2 = clean(s2);
+          if (!c1 || !c2) return false;
+          // Match if equal, or if one starts with another (e.g. "Ambika" matches "Ambika N")
+          return c1 === c2 || c1.startsWith(c2) || c2.startsWith(c1);
+        };
+
+        for (let i = 0; i < data.length; i++) {
+          const item = data[i];
+          const rowNum = i + 2;
+          const name = getVal(item, "Subject Name", "Name", "Subject", "Title");
+          const codeRaw = getVal(item, "Subject Code", "Code", "ID", "Ref");
+          const code = codeRaw ? String(codeRaw).replace(/\s+/g, "") : null;
+          
+          const weeklyHoursRaw = parseInt(getVal(item, "Weekly Hours", "Hours", "Weekly", "Lec Hours") || 0);
+          const weeklyHours = isNaN(weeklyHoursRaw) || weeklyHoursRaw <= 0 ? 4 : weeklyHoursRaw;
+          
+          const deptSearch = getVal(item, "Department", "Dept", "Major");
+          const facultySearch = getVal(item, "Default Faculty", "Faculty", "Staff", "Teacher", "Staff Name", "Faculty Name");
+          const sectionSearch = getVal(item, "Target Section", "Section", "Class", "Cohort");
+          const typeSearch = getVal(item, "Subject Type", "Type", "Mode");
+          
+          if (name && code) {
+            const dept = departments?.find(d => 
+              fuzzyMatch(d.name, deptSearch) || fuzzyMatch(d.code, deptSearch)
+            );
+            
+            const deptId = dept ? dept.id : (item.departmentId ? Number(item.departmentId) : (departments && departments.length > 0 ? departments[0].id : null));
+
+            if (!deptId) {
+              const msg = `Row ${rowNum}: No department found for "${deptSearch}"`;
+              console.warn(msg);
+              errors.push(msg);
+              errorCount++;
+              continue;
+            }
+
+            const fac = faculty?.find(f => 
+              fuzzyMatch(f.name, facultySearch) || fuzzyMatch(f.code, facultySearch)
+            );
+            
+            let facultyId = fac ? fac.id : null;
+
+            // SPECIAL INSTRUCTION: If name mismatch, override faculty name in system
+            if (fac && String(fac.name).trim() !== String(facultySearch).trim() && facultySearch) {
+              try {
+                await updateFacultyMutation.mutateAsync({
+                  id: fac.id,
+                  name: String(facultySearch).trim()
+                });
+                console.log(`Updated faculty name from "${fac.name}" to "${facultySearch}"`);
+              } catch (err) {
+                console.error("Failed to override faculty name:", err);
+              }
+            }
+
+            const sec = sections?.find(s => fuzzyMatch(s.name, sectionSearch));
+            const sectionId = sec ? sec.id : null;
+            
+            const type = String(typeSearch || "").toLowerCase().trim() === "lab" ? "lab" : "lecture";
+
+            const existing = subjects?.find(s => String(s.code).toLowerCase().replace(/\s+/g, "") === String(code).toLowerCase());
+
+            try {
+              if (existing) {
+                await updateMutation.mutateAsync({
+                  id: existing.id,
+                  name: String(name),
+                  code: String(code),
+                  weeklyHours: weeklyHours,
+                  departmentId: deptId,
+                  facultyId: facultyId || existing.facultyId,
+                  sectionId: sectionId || existing.sectionId,
+                  type: type
+                });
+                updateCount++;
+              } else {
+                await createMutation.mutateAsync({ 
+                  name: String(name), 
+                  code: String(code),
+                  weeklyHours: weeklyHours,
+                  departmentId: deptId,
+                  facultyId: facultyId,
+                  sectionId: sectionId,
+                  type: type
+                });
+                successCount++;
+              }
+            } catch (err) {
+              const msg = `Row ${rowNum} (${name}): ${err.message || 'Validation failed'}`;
+              console.error(msg, err);
+              errors.push(msg);
+              errorCount++;
+            }
+          }
+        }
+
+        const summary = `Imported ${successCount} new, updated ${updateCount} subjects.`;
+        const errorSummary = errorCount > 0 ? ` Failed ${errorCount} records: ${errors.slice(0, 2).join("; ")}${errorCount > 2 ? "..." : ""}` : "";
+
+        toast({ 
+          title: "Import Complete", 
+          description: summary + errorSummary,
+          variant: errorCount > 0 ? "destructive" : "default"
+        });
+        
+        if (onImportComplete) onImportComplete();
+      } catch (error) {
+        console.error("Excel import error:", error);
+        toast({ title: "Import Failed", description: error?.message || "Failed to read Excel file", variant: "destructive" });
+      } finally {
+        setIsImporting(false);
+        if (fileInputRef.current) fileInputRef.current.value = "";
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
+  return (
+    <div className="relative">
+      <Input type="file" accept=".xlsx, .xls" className="hidden" id="import-excel" ref={fileInputRef} onChange={handleImport} disabled={isImporting} />
+      <Button variant="outline" className="gap-2 h-11 px-6 rounded-xl border-2 border-slate-200 font-bold hover:bg-slate-50 hover:border-slate-300 transition-all" asChild disabled={isImporting}>
+        <label htmlFor="import-excel" className="cursor-pointer">
+          {isImporting ? <Loader2 className="w-4 h-4 animate-spin text-indigo-600" /> : <FileSpreadsheet className="w-4 h-4" />}
+          {isImporting ? "Injecting Data..." : "Import Dataset"}
+        </label>
+      </Button>
+    </div>
+  );
+}
 
 export default function Subjects() {
   const [open, setOpen] = useState(false);
@@ -169,6 +343,7 @@ export default function Subjects() {
             
             <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="flex items-center gap-3 overflow-x-auto md:overflow-visible pb-2 md:pb-0">
 
+              <SubjectImport departments={departments} faculty={faculty} sections={sections} subjects={subjects} onImportComplete={refetch} />
               <Button variant="outline" className="gap-2 h-11 px-6 rounded-xl border-2 border-slate-200 font-bold hover:bg-slate-50 hover:border-slate-300 transition-all" onClick={handleExport}>
                 <Upload className="w-4 h-4" /> Export Dataset
               </Button>
@@ -304,9 +479,10 @@ export default function Subjects() {
                                 </FormControl>
                                 <SelectContent className="rounded-xl">
                                     <SelectItem value="0">Unassigned</SelectItem>
-                                    {faculty?.filter(f => Number(f.departmentId) === watchedDeptId).map(f => (
-                                    <SelectItem key={f.id} value={f.id.toString()}>{f.name}</SelectItem>
-                                    ))}
+                                    {faculty?.map(f => {
+                                        const dept = departments?.find(d => d.id === f.departmentId);
+                                        return <SelectItem key={f.id} value={f.id.toString()}>{f.name} ({dept?.code || 'Unknown Dept'})</SelectItem>;
+                                    })}
                                 </SelectContent>
                                 </Select>
                                 <FormMessage />
@@ -330,9 +506,10 @@ export default function Subjects() {
                                 </FormControl>
                                 <SelectContent className="rounded-xl">
                                     <SelectItem value="0">Unassigned</SelectItem>
-                                    {sections?.filter(s => Number(s.departmentId) === watchedDeptId).map(s => (
-                                    <SelectItem key={s.id} value={s.id.toString()}>{s.name} (S{s.semester})</SelectItem>
-                                    ))}
+                                    {sections?.map(s => {
+                                        const dept = departments?.find(d => d.id === s.departmentId);
+                                        return <SelectItem key={s.id} value={s.id.toString()}>{s.name} (S{s.semester}) - {dept?.code || 'Unknown Dept'}</SelectItem>;
+                                    })}
                                 </SelectContent>
                                 </Select>
                                 <FormMessage />

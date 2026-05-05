@@ -9,6 +9,7 @@ import { useDepartments, useSections, useTimeSlots, useFaculty, useSubjects } fr
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from "@/hooks/use-auth";
 import { motion, AnimatePresence } from "framer-motion";
+import { TimetableGrid } from "@/components/TimetableGrid";
 
 export default function TimetablePage() {
   const [selectedDept, setSelectedDept] = useState(() => localStorage.getItem("tt_selectedDept") || "");
@@ -19,8 +20,13 @@ export default function TimetablePage() {
   const isOwner = user?.workspace?.role === "owner";
 
   const updateDept = (val) => {
-    setSelectedDept(val);
-    localStorage.setItem("tt_selectedDept", val);
+    const newVal = val === "none" ? "" : val;
+    setSelectedDept(newVal);
+    if (newVal) {
+      localStorage.setItem("tt_selectedDept", newVal);
+    } else {
+      localStorage.removeItem("tt_selectedDept");
+    }
     setSelectedSection("");
     localStorage.removeItem("tt_selectedSection");
     setSelectedFaculty("");
@@ -41,6 +47,22 @@ export default function TimetablePage() {
     localStorage.removeItem("tt_selectedSection");
   };
   const { toast } = useToast();
+
+  // Handle Escape key to clear selections
+  useEffect(() => {
+    const handleEsc = (e) => {
+      if (e.key === "Escape") {
+        setSelectedDept("");
+        setSelectedSection("");
+        setSelectedFaculty("");
+        localStorage.removeItem("tt_selectedDept");
+        localStorage.removeItem("tt_selectedSection");
+        localStorage.removeItem("tt_selectedFaculty");
+      }
+    };
+    window.addEventListener("keydown", handleEsc);
+    return () => window.removeEventListener("keydown", handleEsc);
+  }, []);
   
   const { data: departments } = useDepartments();
   const { data: sections } = useSections();
@@ -63,9 +85,9 @@ export default function TimetablePage() {
     return faculty?.filter(f => deptFacultyIds.has(f.id));
   }, [faculty, subjects, selectedDept]);
 
-  const normalizedSection = selectedSection && selectedSection !== "none" ? selectedSection : "";
+  const normalizedSection = selectedSection && selectedSection !== "none" && selectedSection !== "all" ? selectedSection : "";
   const normalizedFaculty = selectedFaculty && selectedFaculty !== "none" ? selectedFaculty : "";
-  const isSectionView = Boolean(normalizedSection);
+  const isSectionView = Boolean(normalizedSection) || selectedSection === "all";
   const isFacultyView = Boolean(normalizedFaculty);
 
   const { data: timetable, isLoading: isLoadingTimetable } = useTimetable({
@@ -122,13 +144,7 @@ export default function TimetablePage() {
     }
   }, [generationStatus.data]);
 
-  const getEntry = (day, slotId) => {
-    if (!slotId) return null;
-    return timetable?.find(t =>
-      t.timeSlotId === slotId &&
-      (t.timeSlot ? t.timeSlot.dayOfWeek === day : true)
-    ) ?? null;
-  };
+  // Helper functions moved to TimetableGrid
 
   const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
   
@@ -156,37 +172,13 @@ export default function TimetablePage() {
     timeSlots?.some(slot => slot.dayOfWeek === day)
   );
 
-  const formatTime = (time24) => {
-    if (!time24) return "";
-    const [h, m] = time24.split(":");
-    const hNum = parseInt(h);
-    const ampm = hNum >= 12 ? 'p.m' : 'a.m';
-    const h12 = hNum % 12 || 12;
-    return `${h12}.${m} ${ampm}`;
-  };
+  // formatTime moved to TimetableGrid
 
   const selectedDeptData = departments?.find(d => d.id.toString() === selectedDept);
   const selectedSectionData = sections?.find(s => s.id.toString() === selectedSection);
   const selectedFacultyData = faculty?.find(f => f.id.toString() === selectedFaculty);
 
-  const tableSubjects = useMemo(() => {
-    if (!timetable) return [];
-    const seen = new Set();
-    const list = [];
-    timetable.forEach(entry => {
-      if (entry.subject && !seen.has(entry.subject.id)) {
-        seen.add(entry.subject.id);
-        const subj = subjects?.find(s => s.id === entry.subject.id);
-        const fac = faculty?.find(f => f.id === entry.facultyId);
-        list.push({
-          ...entry.subject,
-          facultyName: fac?.name || entry.faculty?.name || "Unknown Faculty",
-          acronym: entry.subject.name?.split(' ').map(w => w[0]).join('').toUpperCase() || "N/A"
-        });
-      }
-    });
-    return list;
-  }, [timetable, subjects, faculty]);
+  // tableSubjects moved to TimetableGrid
 
   return (
     <div className="flex min-h-screen bg-[#f8fafc]">
@@ -304,140 +296,9 @@ export default function TimetablePage() {
       </div>
 
       <main className="flex-1 p-4 lg:p-8 print:m-0 print:p-0 overflow-y-auto">
-        <div className="hidden print:block w-full text-[10pt] font-sans leading-tight">
-          <div className="flex items-center justify-between border-b-2 border-slate-900 pb-2 mb-4">
-            <div className="w-24 h-24 bg-primary/10 flex items-center justify-center rounded-lg">
-              <img src="/logo.svg" alt="Learn Beyond" className="w-16 h-16 opacity-50" />
-            </div>
-            <div className="text-center flex-1">
-              <h2 className="text-xl font-bold uppercase">{user?.workspace?.workspaceName || 'Your Institution'}</h2>
-              <p className="text-xs italic">(Official Timetable Document)</p>
-              <h3 className="text-lg font-semibold mt-1">Academic Management System</h3>
-              <h4 className="text-md font-bold underline">Class Time Table</h4>
-            </div>
-            <div className="text-right flex flex-col justify-end h-24">
-              <p className="text-sm font-bold">Ref: TT-{new Date().getFullYear()}</p>
-              <p className="text-sm">Date: {new Date().toLocaleDateString()}</p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 border border-slate-900 mb-4 bg-slate-50/50">
-            <div className="grid grid-cols-2 border-r border-slate-900">
-              <div className="border-b border-r border-slate-900 p-1 font-bold">Academic Year</div>
-              <div className="border-b border-slate-900 p-1">{user?.workspace?.academicYear || '2025-2026'}</div>
-              <div className="border-b border-r border-slate-900 p-1 font-bold">Department</div>
-              <div className="border-b border-slate-900 p-1">{selectedDeptData?.name || "N/A"}</div>
-              <div className="border-b border-r border-slate-900 p-1 font-bold">Focus</div>
-              <div className="border-b border-slate-900 p-1">{selectedSectionData ? `Semester ${selectedSectionData.semester}` : "N/A"}</div>
-            </div>
-            <div className="grid grid-cols-2">
-              <div className="border-b border-r border-slate-900 p-1 font-bold">Entity View</div>
-              <div className="border-b border-slate-900 p-1">{isSectionView ? 'Class Schedule' : isFacultyView ? 'Faculty Load' : 'General'}</div>
-              <div className="border-b border-r border-slate-900 p-1 font-bold">Class/Faculty</div>
-              <div className="border-b border-slate-900 p-1">{selectedSectionData?.name || selectedFacultyData?.name || "N/A"}</div>
-            </div>
-          </div>
-
-          <div className="border-y border-x border-slate-900 mb-6">
-            <table className="w-full border-collapse">
-              <thead>
-                <tr className="bg-slate-100/80">
-                  <th className="border border-slate-900 p-1 w-20 text-center uppercase font-bold">Day</th>
-                  {uniqueSlots.map((slot, idx) => {
-                     const isBreak = slot.label.toLowerCase().includes('break') || slot.label.toLowerCase().includes('lunch');
-                     if (isBreak) return <th key={idx} className="border border-slate-900 p-1 w-12 bg-slate-200"></th>;
-                     return (
-                       <th key={idx} className="border border-slate-900 p-2 text-center text-[9pt]">
-                         <div className="font-bold">{formatTime(slot.startTime)}</div>
-                         <div className="text-[7pt] text-slate-500">to</div>
-                         <div className="font-bold">{formatTime(slot.endTime)}</div>
-                       </th>
-                     );
-                  })}
-                </tr>
-              </thead>
-              <tbody>
-                {activeDays.map((day, dIdx) => (
-                    <tr key={day} className="h-16">
-                      <td className="border border-slate-900 text-center font-bold text-sm bg-slate-50">{day.substring(0, 3).toUpperCase()}</td>
-                      {uniqueSlots.map((slot, sIdx) => {
-                        const isBreak = slot.label.toLowerCase().includes('break') || slot.label.toLowerCase().includes('lunch');
-                        const entry = getEntry(day, slot.idsByDay[day]);
-                        
-                        if (isBreak) {
-                          if (dIdx === 0) {
-                            return (
-                              <td key={sIdx} rowSpan={activeDays.length} className="border border-slate-900 p-1 bg-slate-50 text-center text-[7pt] vertical-text">
-                                <div className="font-bold uppercase tracking-widest">{slot.label}</div>
-                              </td>
-                            );
-                          }
-                          return null;
-                        }
-                        
-                        return (
-                          <td key={sIdx} className="border border-slate-900 p-1 text-center font-bold text-[10pt]">
-                            {entry?.subject && (
-                                <div className="flex flex-col gap-0.5">
-                                    <span>{entry.subject.name.split(' ').map(w => w[0]).join('').toUpperCase()}</span>
-                                    <span className="text-[7pt] font-normal italic">
-                                        {isSectionView ? entry.faculty?.name : entry.section?.name}
-                                    </span>
-                                </div>
-                            )}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="border-y border-x border-slate-900 mb-8">
-            <table className="w-full border-collapse text-[9pt]">
-              <thead>
-                <tr className="bg-slate-100/80 font-bold">
-                  <td className="border border-slate-900 p-1 w-12 text-center">S.No</td>
-                  <td className="border border-slate-900 p-1 text-center">COURSE NAME</td>
-                  <td className="border border-slate-900 p-1 w-32 text-center">CODE</td>
-                  <td className="border border-slate-900 p-1 w-48 text-center">{isSectionView ? 'FACULTY' : 'SECTION'}</td>
-                  <td className="border border-slate-900 p-1 w-24 text-center">HOURS</td>
-                </tr>
-              </thead>
-              <tbody>
-                {tableSubjects.map((subject, idx) => (
-                  <tr key={subject.id}>
-                    <td className="border border-slate-900 p-1 text-center font-bold">{idx + 1}</td>
-                    <td className="border border-slate-900 p-1 px-4">{subject.name}</td>
-                    <td className="border border-slate-900 p-1 text-center font-bold">{subject.code}</td>
-                    <td className="border border-slate-900 p-1 text-center">{subject.facultyName}</td>
-                    <td className="border border-slate-900 p-1 text-center font-bold">{subject.weeklyHours}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="flex justify-between items-end mt-16 mb-8 px-12">
-            <div className="text-center font-bold">
-              <div className="h-0.5 w-32 bg-slate-900 mb-2"></div>
-              <p>Prepared By</p>
-            </div>
-            <div className="text-center font-bold">
-               <div className="h-0.5 w-48 bg-slate-900 mb-2"></div>
-               <p>Head of Department</p>
-            </div>
-            <div className="text-center font-bold">
-               <div className="h-0.5 w-48 bg-slate-900 mb-2"></div>
-               <p>Principal</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="max-w-7xl mx-auto space-y-8 pt-12 lg:pt-0 print:hidden">
+        <div className="max-w-7xl mx-auto space-y-8 pt-12 lg:pt-0">
           
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 print:hidden">
             <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
               <div className="flex items-center gap-4 mb-2">
                 <div className="w-12 h-12 rounded-2xl bg-indigo-600 flex items-center justify-center text-white shadow-lg shadow-indigo-500/20">
@@ -468,7 +329,7 @@ export default function TimetablePage() {
             </motion.div>
           </div>
 
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="print:hidden">
             <Card className="p-8 border-0 shadow-sm border border-slate-100 rounded-[2rem] bg-white relative overflow-hidden">
                 <div className="absolute top-[-10%] right-[-5%] w-64 h-64 bg-indigo-50/50 rounded-full blur-3xl opacity-50"></div>
                 
@@ -482,6 +343,7 @@ export default function TimetablePage() {
                                 <SelectValue placeholder="All Departments" />
                             </SelectTrigger>
                             <SelectContent className="rounded-2xl">
+                            <SelectItem value="none" className="rounded-xl font-medium italic">None</SelectItem>
                             {departments?.map(d => (
                                 <SelectItem key={d.id} value={d.id.toString()} className="rounded-xl font-medium">{d.name}</SelectItem>
                             ))}
@@ -499,6 +361,7 @@ export default function TimetablePage() {
                             </SelectTrigger>
                             <SelectContent className="rounded-2xl">
                             <SelectItem value="none" className="rounded-xl font-medium italic">None Selected</SelectItem>
+                            <SelectItem value="all" className="rounded-xl font-medium font-bold text-indigo-600">Whole Department</SelectItem>
                             {filteredSections?.map(s => (
                                 <SelectItem key={s.id} value={s.id.toString()} className="rounded-xl font-medium">{s.name} (S{s.semester})</SelectItem>
                             ))}
@@ -533,7 +396,7 @@ export default function TimetablePage() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="bg-white rounded-[3rem] border border-slate-100 shadow-sm p-32 text-center"
+                className="bg-white rounded-[3rem] border border-slate-100 shadow-sm p-32 text-center print:hidden"
               >
                   <div className="w-24 h-24 bg-indigo-50 text-indigo-400 rounded-full flex items-center justify-center mx-auto mb-8 animate-bounce">
                     <Clock className="w-12 h-12" />
@@ -547,124 +410,85 @@ export default function TimetablePage() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="bg-white rounded-[3rem] border border-slate-100 shadow-sm p-40 flex flex-col items-center justify-center gap-6"
+                className="bg-white rounded-[3rem] border border-slate-100 shadow-sm p-40 flex flex-col items-center justify-center gap-6 print:hidden"
               >
                   <Loader2 className="w-16 h-16 animate-spin text-indigo-600" />
                   <p className="text-xl font-black text-slate-900 animate-pulse tracking-tight">Synthesizing Visual Grid...</p>
               </motion.div>
+            ) : selectedSection === "all" ? (
+              <div key="all-sections" className="space-y-8">
+                {filteredSections?.map(section => (
+                  <TimetableGrid 
+                    key={`sec-${section.id}`}
+                    user={user}
+                    entityData={section}
+                    entityType="section"
+                    departmentData={selectedDeptData}
+                    timetableData={timetable?.filter(t => t.sectionId === section.id)}
+                    uniqueSlots={uniqueSlots}
+                    activeDays={activeDays}
+                    subjects={subjects}
+                    facultyList={faculty}
+                    sectionsList={sections}
+                    isWebVisible={true}
+                  />
+                ))}
+                {filteredFaculty?.map(fac => (
+                  <TimetableGrid 
+                    key={`fac-${fac.id}`}
+                    user={user}
+                    entityData={fac}
+                    entityType="faculty"
+                    departmentData={selectedDeptData}
+                    timetableData={timetable?.filter(t => t.facultyId === fac.id)}
+                    uniqueSlots={uniqueSlots}
+                    activeDays={activeDays}
+                    subjects={subjects}
+                    facultyList={faculty}
+                    sectionsList={sections}
+                    isWebVisible={false}
+                  />
+                ))}
+              </div>
             ) : (
-                <motion.div 
-                    key="table"
-                    initial={{ opacity: 0, y: 30 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden"
-                >
-                    <div className="overflow-x-auto print:hidden">
-                        <table className="w-full border-collapse">
-                            <thead>
-                                <tr className="bg-slate-50/50 border-b border-slate-100">
-                                    <th className="p-6 text-left border-r border-slate-100 bg-slate-100/30 sticky left-0 z-10 w-40">
-                                        <div className="flex flex-col items-start gap-1">
-                                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Time Node</span>
-                                            <span className="text-sm font-bold text-slate-900">Cycle Day</span>
-                                        </div>
-                                    </th>
-                                    {uniqueSlots.map((slot, idx) => (
-                                        <th key={idx} className="p-6 text-center border-r border-slate-100 last:border-0 min-w-[200px]">
-                                            <div className="flex flex-col items-center gap-1.5 px-4 py-2 rounded-2xl bg-white shadow-sm border border-slate-100/50">
-                                                <span className={`text-[10px] font-black uppercase tracking-widest ${slot.label.toLowerCase().includes('break') ? 'text-rose-500' : 'text-indigo-600'}`}>
-                                                    {slot.label}
-                                                </span>
-                                                <div className="flex items-center gap-2 text-xs font-mono font-bold text-slate-500">
-                                                    <Clock className="w-3 h-3" />
-                                                    {formatTime(slot.startTime)} — {formatTime(slot.endTime)}
-                                                </div>
-                                            </div>
-                                        </th>
-                                    ))}
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {activeDays.map((day, dIdx) => (
-                                    <motion.tr 
-                                        key={day}
-                                        initial={{ opacity: 0, x: -20 }}
-                                        animate={{ opacity: 1, x: 0 }}
-                                        transition={{ delay: dIdx * 0.05 }}
-                                        className="group border-b border-slate-50 last:border-0 hover:bg-slate-50/30 transition-all"
-                                    >
-                                        <td className="p-6 bg-slate-50/20 border-r border-slate-100 sticky left-0 z-10 font-black text-slate-900 group-hover:bg-white transition-all">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-1.5 h-8 bg-indigo-500 rounded-full scale-y-50 group-hover:scale-y-100 transition-transform duration-500"></div>
-                                                {day}
-                                            </div>
-                                        </td>
-                                        {uniqueSlots.map((slot, sIdx) => {
-                                            const slotIdForDay = slot.idsByDay[day];
-                                            const entry = slotIdForDay ? getEntry(day, slotIdForDay) : null;
-                                            const isBreak = slot.label.toLowerCase().includes('break') || slot.label.toLowerCase().includes('lunch');
-                                            
-                                            return (
-                                                <td key={sIdx} className={`p-4 border-r border-slate-100 last:border-0 relative h-32 transition-all ${isBreak ? 'bg-slate-50/50' : ''}`}>
-                                                    {isBreak ? (
-                                                        <div className="flex flex-col items-center justify-center h-full opacity-20 group-hover:opacity-40 transition-opacity">
-                                                            <div className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] rotate-0">{slot.label}</div>
-                                                        </div>
-                                                    ) : entry ? (
-                                                        <motion.div 
-                                                            layoutId={`entry-${entry.id}`}
-                                                            className="flex flex-col justify-between h-full bg-white p-4 rounded-2xl shadow-sm border border-slate-100 group-hover:border-indigo-100 hover:shadow-xl hover:shadow-indigo-500/5 transition-all"
-                                                        >
-                                                            <div className="space-y-1">
-                                                                <div className="flex items-center justify-between mb-2">
-                                                                    <span className={`px-2 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-tighter ${entry.subject?.type === 'lab' ? 'bg-amber-100 text-amber-700' : 'bg-indigo-100 text-indigo-700'}`}>
-                                                                        {entry.subject?.type || 'Lecture'}
-                                                                    </span>
-                                                                    <div className="flex items-center gap-1 text-[10px] font-bold text-slate-400">
-                                                                        <MapPin className="w-3 h-3" />
-                                                                        {entry.classroom?.roomNumber || "R??"}
-                                                                    </div>
-                                                                </div>
-                                                                <h4 className="font-bold text-slate-900 text-sm leading-tight line-clamp-2">
-                                                                    {entry.subject?.name}
-                                                                </h4>
-                                                            </div>
-                                                            
-                                                            <div className="pt-3 border-t border-slate-50 flex items-center gap-2">
-                                                                <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-black text-slate-600">
-                                                                    {(isSectionView ? entry.faculty?.name : entry.section?.name)?.charAt(0) || '?'}
-                                                                </div>
-                                                                <span className="text-xs font-bold text-slate-500 truncate">
-                                                                    {isSectionView ? entry.faculty?.name : entry.section?.name}
-                                                                </span>
-                                                            </div>
-                                                        </motion.div>
-                                                    ) : (
-                                                        <div className="flex items-center justify-center h-full opacity-0 group-hover:opacity-5 transition-opacity">
-                                                            <Sparkles className="w-12 h-12 text-slate-600" />
-                                                        </div>
-                                                    )}
-                                                </td>
-                                            );
-                                        })}
-                                    </motion.tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                </motion.div>
+              <TimetableGrid 
+                key="single-grid"
+                user={user}
+                entityData={isSectionView ? selectedSectionData : selectedFacultyData}
+                entityType={isSectionView ? "section" : "faculty"}
+                departmentData={selectedDeptData}
+                timetableData={timetable}
+                uniqueSlots={uniqueSlots}
+                activeDays={activeDays}
+                subjects={subjects}
+                facultyList={faculty}
+                sectionsList={sections}
+                isWebVisible={true}
+              />
             )}
           </AnimatePresence>
         </div>
       </main>
       <style>{`
         @media print {
-          @page { margin: 1cm; size: landscape; }
-          body { background: white !important; -webkit-print-color-adjust: exact; }
+          @page { 
+            margin: 0.5cm; 
+            size: landscape; 
+          }
+          body { 
+            background: white !important; 
+            -webkit-print-color-adjust: exact;
+            zoom: 0.85;
+          }
+          .print\:m-0 { margin: 0 !important; }
+          .print\:p-0 { padding: 0 !important; }
           .vertical-text {
             writing-mode: vertical-rl;
             text-orientation: mixed;
           }
+          table { page-break-inside: avoid; }
+          .course-table { font-size: 8pt !important; }
+          .timetable-cell { height: auto !important; padding: 2px !important; }
         }
       `}</style>
     </div>

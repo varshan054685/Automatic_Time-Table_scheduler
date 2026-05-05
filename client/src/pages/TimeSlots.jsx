@@ -275,10 +275,12 @@ function TimeSlotImport({ timeSlots, onImportComplete, variant = "outline" }) {
         // Erase all existing data to prevent duplication
         if (timeSlots && timeSlots.length > 0) {
           try {
-            await Promise.all(timeSlots.map(s => deleteMutation.mutateAsync(s.id)));
+            // Sequential deletion is safer for large datasets to avoid overloading the socket
+            for (const s of timeSlots) {
+              await deleteMutation.mutateAsync(s.id);
+            }
           } catch (err) {
             console.error("Failed to delete existing time slots:", err);
-            // Continue anyway to try importing the new ones
           }
         }
 
@@ -465,9 +467,10 @@ export default function TimeSlots() {
                   ) : (
                   <AnimatePresence mode="popLayout">
                     {uniquePeriods.map((slot, idx) => {
-                        const activeDaysGroup = timeSlots
+                        const activeDaysGroup = Array.from(new Set(timeSlots
                         .filter(s => s.label === slot.label && s.startTime === slot.startTime)
-                        .map(s => s.dayOfWeek);
+                        .map(s => s.dayOfWeek)))
+                        .sort((a, b) => DAYS.indexOf(a) - DAYS.indexOf(b));
 
                         return (
                         <motion.tr 
@@ -486,9 +489,9 @@ export default function TimeSlots() {
                                 </div>
                             </TableCell>
                             <TableCell className="py-6 px-6">
-                                <div className="flex items-center gap-2 font-mono text-sm font-bold text-slate-500">
+                                <div className="flex items-center gap-3 font-mono text-sm font-bold text-slate-500 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100">
                                     {formatTime(slot.startTime)} 
-                                    <ChevronRight className="w-4 h-4 text-slate-300" />
+                                    <ChevronRight className="w-4 h-4 text-indigo-300" />
                                     {formatTime(slot.endTime)}
                                 </div>
                             </TableCell>

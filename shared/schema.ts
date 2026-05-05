@@ -13,6 +13,7 @@ export const users = pgTable("users", {
   name: text("name"),
   googleId: text("google_id").unique(),
   isVerified: boolean("is_verified").default(false),
+  avatar: text("avatar"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

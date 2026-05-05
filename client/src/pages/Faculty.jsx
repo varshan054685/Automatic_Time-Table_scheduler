@@ -41,26 +41,34 @@ function FacultyImport({ departments, faculty, onImportComplete }) {
         let successCount = 0;
         let updateCount = 0;
         let errorCount = 0;
+        const errors = [];
 
-        for (const item of data) {
+        for (let i = 0; i < data.length; i++) {
+          const item = data[i];
+          const rowNum = i + 2;
           const name = item["Faculty Name"] || item["Name"] || item.name || item.Name || item["Full Name"] || item["fullName"] || item["staff name"] || item["Staff Name"];
-          const email = item["Email"] || item.email || item.Email || item["email"] || item["Mail"] || item["mail"];
+          const emailRaw = item["Email"] || item.email || item.Email || item["email"] || item["Mail"] || item["mail"];
           const code = item["Faculty Code"] || item["Code"] || item.code || item.Code || item["code"] || item["Staff Code"] || item["staff code"];
           const deptSearch = item["Department"] || item.department || item.Department || item["department"] || item.departmentCode || item.DepartmentCode || item["Dept"] || item["dept"];
 
           if (name) {
             const dept = departments?.find(d => 
-              String(d.name).toLowerCase().trim() === String(deptSearch).toLowerCase().trim() || 
-              String(d.code).toLowerCase().trim() === String(deptSearch).toLowerCase().trim()
+              String(d.name).toLowerCase().trim() === String(deptSearch || "").toLowerCase().trim() || 
+              String(d.code).toLowerCase().trim() === String(deptSearch || "").toLowerCase().trim()
             );
             
             const deptId = dept ? dept.id : (item.departmentId ? Number(item.departmentId) : (departments && departments.length > 0 ? departments[0].id : null));
 
             if (!deptId) {
-              console.warn(`Skipping faculty ${name}: No valid department ID found.`);
+              const msg = `Row ${rowNum}: No department found for "${deptSearch}"`;
+              console.warn(msg);
+              errors.push(msg);
               errorCount++;
               continue;
             }
+
+            // Normalize email: use null for empty/invalid strings to pass Zod email validation
+            const email = emailRaw && String(emailRaw).includes("@") ? String(emailRaw).trim() : null;
 
             // Check for existing by code or email
             const existing = faculty?.find(f => 
@@ -74,7 +82,7 @@ function FacultyImport({ departments, faculty, onImportComplete }) {
                   id: existing.id,
                   name: String(name),
                   code: code ? String(code) : existing.code,
-                  email: email ? String(email) : existing.email,
+                  email: email || existing.email,
                   departmentId: deptId || existing.departmentId,
                   availability: existing.availability || []
                 });
@@ -83,22 +91,28 @@ function FacultyImport({ departments, faculty, onImportComplete }) {
                 await createMutation.mutateAsync({ 
                   name: String(name), 
                   code: code ? String(code) : `FAC${Date.now()}${successCount}`,
-                  email: email ? String(email) : "", 
+                  email: email, 
                   departmentId: deptId,
                   availability: []
                 });
                 successCount++;
               }
             } catch (err) {
-              console.error(`Failed to import/update faculty ${name}:`, err);
+              const msg = `Row ${rowNum} (${name}): ${err.message || 'Validation failed'}`;
+              console.error(msg, err);
+              errors.push(msg);
               errorCount++;
             }
           }
         }
 
+        const summary = `Imported ${successCount} new, updated ${updateCount} faculty.`;
+        const errorSummary = errorCount > 0 ? ` Failed ${errorCount} records: ${errors.slice(0, 2).join("; ")}${errorCount > 2 ? "..." : ""}` : "";
+
         toast({ 
           title: "Import Complete", 
-          description: `Imported ${successCount} new, updated ${updateCount} faculty.${errorCount > 0 ? ` Failed ${errorCount} records.` : ""}`,
+          description: summary + errorSummary,
+          variant: errorCount > 0 ? "destructive" : "default"
         });
         
         if (onImportComplete) onImportComplete();

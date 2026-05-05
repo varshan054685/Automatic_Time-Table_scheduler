@@ -231,17 +231,31 @@ export function Sidebar() {
 
             {/* Footer Section */}
             <div className="p-4 border-t border-slate-800/50 shrink-0 bg-slate-900/50 backdrop-blur-sm safe-area-pb">
-              <div className={`flex items-center gap-3 mb-3 ${!isOpen && 'justify-center'}`}>
-                <div className="w-9 h-9 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-300 font-bold text-sm">
-                  {user?.name?.charAt(0) || "U"}
-                </div>
-                {isOpen && (
-                  <div className="overflow-hidden">
-                    <p className="text-sm font-semibold truncate">{user?.name}</p>
-                    <p className="text-xs text-slate-500 truncate">{user?.email}</p>
+              <Tooltip delayDuration={0}>
+                <TooltipTrigger asChild>
+                  <div className={`flex items-center gap-3 mb-3 cursor-pointer ${!isOpen && 'justify-center'}`}>
+                    <div className="w-9 h-9 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-300 font-bold text-sm overflow-hidden">
+                      {user?.avatar ? (
+                        <img src={user.avatar} alt="Profile" className="w-full h-full object-cover" />
+                      ) : (
+                        user?.name?.charAt(0) || "U"
+                      )}
+                    </div>
+                    {isOpen && (
+                      <div className="overflow-hidden">
+                        <p className="text-sm font-semibold truncate">{user?.name}</p>
+                        <p className="text-xs text-slate-500 truncate">{user?.email}</p>
+                      </div>
+                    )}
                   </div>
+                </TooltipTrigger>
+                {!isOpen && !isMobile && (
+                  <TooltipContent side="right" className="font-semibold text-slate-900 flex flex-col gap-0.5" sideOffset={10}>
+                    <p className="text-sm font-bold">{user?.name}</p>
+                    <p className="text-xs text-slate-500 font-normal">{user?.email}</p>
+                  </TooltipContent>
                 )}
-              </div>
+              </Tooltip>
               <Tooltip delayDuration={0}>
                 <TooltipTrigger asChild>
                   <Button 
