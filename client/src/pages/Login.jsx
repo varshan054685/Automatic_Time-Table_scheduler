@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useLocation } from "wouter";
 import { Calendar, Mail, Lock, ArrowRight, Sparkles, Eye, EyeOff, User, Loader2, CheckCircle2, Shield, CheckCircle } from "lucide-react";
+import { Logo } from "@/components/Logo";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -237,12 +238,12 @@ export default function Login() {
         {/* Logo & Header */}
         <div className="text-center mb-8 select-none cursor-default">
           <motion.div
-            className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white mb-4 shadow-lg shadow-indigo-500/25"
+            className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 p-2 mb-4 shadow-lg shadow-indigo-500/25"
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
             transition={{ type: "spring", stiffness: 200, damping: 15, delay: 0.1 }}
           >
-            <Calendar className="w-8 h-8" />
+            <Logo className="w-12 h-12" />
           </motion.div>
           <AnimatePresence mode="wait">
             <motion.div

@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useUser } from "@/hooks/use-auth";
 import { motion, AnimatePresence } from "framer-motion";
 import { TimetableGrid } from "@/components/TimetableGrid";
+import { Logo } from "@/components/Logo";
 
 export default function TimetablePage() {
   const [selectedDept, setSelectedDept] = useState(() => localStorage.getItem("tt_selectedDept") || "");
@@ -295,15 +296,13 @@ export default function TimetablePage() {
         <Sidebar />
       </div>
 
-      <main className="flex-1 p-4 lg:p-8 print:m-0 print:p-0 overflow-y-auto">
-        <div className="max-w-7xl mx-auto space-y-8 pt-12 lg:pt-0">
+      <main className="flex-1 p-3 lg:p-6 print:m-0 print:p-0 overflow-y-auto">
+        <div className="max-w-full mx-auto space-y-4 pt-12 lg:pt-0">
           
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 print:hidden">
             <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
               <div className="flex items-center gap-4 mb-2">
-                <div className="w-12 h-12 rounded-2xl bg-indigo-600 flex items-center justify-center text-white shadow-lg shadow-indigo-500/20">
-                    <Calendar className="w-6 h-6" />
-                </div>
+                <Logo className="w-12 h-12" />
                 <h1 className="text-4xl font-display font-black text-slate-900 tracking-tight">Timetable</h1>
               </div>
               <p className="text-slate-500 font-medium">Synchronize academic operations and manage visual schedules.</p>
@@ -330,10 +329,10 @@ export default function TimetablePage() {
           </div>
 
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="print:hidden">
-            <Card className="p-8 border-0 shadow-sm border border-slate-100 rounded-[2rem] bg-white relative overflow-hidden">
+            <Card className="p-4 lg:p-6 border-0 shadow-sm border border-slate-100 rounded-2xl lg:rounded-[2rem] bg-white relative overflow-hidden">
                 <div className="absolute top-[-10%] right-[-5%] w-64 h-64 bg-indigo-50/50 rounded-full blur-3xl opacity-50"></div>
                 
-                <div className="relative z-10 grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div className="relative z-10 grid grid-cols-1 md:grid-cols-3 gap-4 lg:gap-6">
                     <div className="space-y-3">
                         <label className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
                             <Building2 className="w-3 h-3" /> Core Department
@@ -396,7 +395,7 @@ export default function TimetablePage() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="bg-white rounded-[3rem] border border-slate-100 shadow-sm p-32 text-center print:hidden"
+                className="bg-white rounded-2xl lg:rounded-[3rem] border border-slate-100 shadow-sm p-12 lg:p-20 text-center print:hidden"
               >
                   <div className="w-24 h-24 bg-indigo-50 text-indigo-400 rounded-full flex items-center justify-center mx-auto mb-8 animate-bounce">
                     <Clock className="w-12 h-12" />

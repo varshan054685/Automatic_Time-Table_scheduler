@@ -9,7 +9,6 @@ import {
   CalendarDays, 
   Clock,
   LogOut,
-  Calendar,
   Menu,
   X,
   School,
@@ -25,6 +24,7 @@ import { api } from "@shared/routes";
 import { apiUrl } from "@/lib/api-base";
 import { motion, AnimatePresence } from "framer-motion";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Logo } from "@/components/Logo";
 
 const navItems = [
   { label: "Dashboard", href: "/", icon: LayoutDashboard },
@@ -86,9 +86,7 @@ export function Sidebar() {
       {isMobile && (
         <div className="fixed top-0 left-0 right-0 h-16 bg-white/80 backdrop-blur-md border-b border-slate-200 z-50 flex items-center justify-between px-4">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg premium-gradient flex items-center justify-center text-white">
-              <Calendar className="w-5 h-5" />
-            </div>
+            <Logo className="w-8 h-8" />
             <span className="font-display font-bold text-slate-900">{workspaceName}</span>
           </div>
           <Button variant="ghost" size="icon" onClick={() => setIsOpen(!isOpen)}>
@@ -113,9 +111,7 @@ export function Sidebar() {
             {/* Logo Section */}
             <div className="px-4 py-6 border-b border-slate-800 flex items-center justify-between shrink-0 h-24">
               <div className="flex items-center gap-3 overflow-hidden">
-                <div className="w-10 h-10 rounded-xl premium-gradient flex items-center justify-center text-white shrink-0 shadow-lg shadow-indigo-500/20">
-                  <Calendar className="w-6 h-6" />
-                </div>
+                <Logo className="w-10 h-10 shrink-0" />
                 {isOpen && (
                   <motion.div
                     initial={{ opacity: 0, x: -10 }}
