@@ -70,6 +70,21 @@ export function setupAuth(app: Express) {
           // Check if identifier is email or phone number
           if (isEmail) {
             const normalizedEmail = identifier.trim().toLowerCase();
+            // #region agent log
+            fetch("http://127.0.0.1:7632/ingest/2e18d3d7-f245-49bc-8113-d6d425d4a36d", {
+              method: "POST",
+              headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "174623" },
+              body: JSON.stringify({
+                sessionId: "174623",
+                runId: "pre-fix",
+                hypothesisId: "E",
+                location: "server/auth.ts:local-before-db",
+                message: "login local strategy before getUserByEmail",
+                data: { isEmail: true },
+                timestamp: Date.now(),
+              }),
+            }).catch(() => {});
+            // #endregion
             user = await storage.getUserByEmail(normalizedEmail);
           } else {
             // Assume it's a phone number
