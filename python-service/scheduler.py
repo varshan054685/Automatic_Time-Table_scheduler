@@ -1,7 +1,102 @@
 from ortools.sat.python import cp_model
 from collections import defaultdict
 import random
+import re
 import time
+
+
+def _period_sort_key(label: str) -> int:
+    match = re.search(r"\d+", label or "")
+    return int(match.group()) if match else 0
+
+
+def _to_minutes(time_str: str) -> int:
+    try:
+        clean = (
+            time_str.lower()
+            .replace("a.m", "")
+            .replace("p.m", "")
+            .replace(".", ":")
+            .replace(" ", "")
+            .strip()
+        )
+        if ":" not in clean:
+            h, m = int(clean), 0
+        else:
+            parts = clean.split(":")
+            h = int(parts[0])
+            m = int(parts[1]) if len(parts) > 1 else 0
+        if "p.m" in time_str.lower() and h < 12:
+            h += 12
+        if "a.m" in time_str.lower() and h == 12:
+            h = 0
+        return h * 60 + m
+    except Exception:
+        return 0
+
+
+def _first_period_after_break(periods: list, valid_timeslots: list, timeslots: list):
+    """Index of the first teaching period that starts at or after the mid-morning break."""
+    break_slots = [
+        t
+        for t in timeslots
+        if "break" in t.get("label", "").lower()
+        and "lunch" not in t.get("label", "").lower()
+    ]
+    if not break_slots:
+        return None
+    break_start = min(_to_minutes(t["startTime"]) for t in break_slots)
+    for i, p_label in enumerate(periods):
+        starts = [
+            _to_minutes(t["startTime"])
+            for t in valid_timeslots
+            if t["label"] == p_label
+        ]
+        if starts and min(starts) >= break_start:
+            return i
+    return None
+
+
+def _lab_start_allowed(
+    size: int,
+    start_p: int,
+    day_periods: list,
+    break_before_period_idx,
+) -> bool:
+    """
+    Lab blocks must start at the first period of the day.
+    A 3-period lab uses the two periods before break and one after (e.g. P1, P2, Break, P3).
+    A 2-period lab must not straddle the break.
+    """
+    if size <= 1:
+        return True
+
+    if start_p != day_periods[0]:
+        return False
+
+    if break_before_period_idx is None:
+        return True
+
+    block_end = start_p + size - 1
+    crosses_break = (
+        start_p < break_before_period_idx <= block_end
+    )
+    if size == 2:
+        return not crosses_break
+
+    if size == 3:
+        # Two periods before break, one after (e.g. P1, P2 | Break | P3)
+        periods_before_break = break_before_period_idx
+        return (
+            start_p == 0
+            and periods_before_break == 2
+            and size - periods_before_break == 1
+            and block_end == break_before_period_idx
+        )
+
+    # Larger lab blocks: no break inside the block
+    return not crosses_break
+
 
 def generate_timetable(data: dict):
 
@@ -18,29 +113,19 @@ def generate_timetable(data: dict):
     
     # Sort periods by startTime to ensure indices match
     valid_timeslots.sort(key=lambda t: t['startTime'])
-    periods = list(dict.fromkeys(t['label'] for t in valid_timeslots))
+    periods = sorted(
+        dict.fromkeys(t['label'] for t in valid_timeslots),
+        key=_period_sort_key,
+    )
     slot_lookup = {(t['dayOfWeek'], t['label']): t['id'] for t in valid_timeslots}
 
-    if lunch_ts:
-        def to_min(t_str):
-            try:
-                clean = t_str.lower().replace('a.m', '').replace('p.m', '').replace('.', ':').replace(' ', '').strip()
-                if ':' not in clean: # Handle "9" or "09"
-                    h, m = int(clean), 0
-                else:
-                    parts = clean.split(':')
-                    h = int(parts[0])
-                    m = int(parts[1]) if len(parts) > 1 else 0
-                if 'p.m' in t_str.lower() and h < 12: h += 12
-                # Special case: 12 PM is 12, 12 AM is 0
-                if 'a.m' in t_str.lower() and h == 12: h = 0
-                return h * 60 + m
-            except: return 0
+    break_before_period_idx = _first_period_after_break(periods, valid_timeslots, timeslots)
 
-        lunch_start_min = min(to_min(t['startTime']) for t in lunch_ts)
+    if lunch_ts:
+        lunch_start_min = min(_to_minutes(t['startTime']) for t in lunch_ts)
         for i, p_label in enumerate(periods):
             # Find the average start time for this period label across all days
-            sample_times = [to_min(t['startTime']) for t in valid_timeslots if t['label'] == p_label]
+            sample_times = [_to_minutes(t['startTime']) for t in valid_timeslots if t['label'] == p_label]
             if sample_times:
                 avg_start = sum(sample_times) / len(sample_times)
                 if avg_start < lunch_start_min:
@@ -135,6 +220,10 @@ def generate_timetable(data: dict):
                         block_indices = set(range(start_p, start_p + size))
                         if not block_indices.issubset(morning_p_indices_set) and not block_indices.issubset(afternoon_p_indices_set):
                             continue # Skip this start_p for lab
+                        if not _lab_start_allowed(
+                            size, start_p, day_periods, break_before_period_idx
+                        ):
+                            continue
 
                     for r_idx in range(num_rooms):
                         room_name = rooms[r_idx]
@@ -158,7 +247,7 @@ def generate_timetable(data: dict):
                             v_by_slot_fac[(d_idx, p_idx, f_id)].append(v)
                             v_by_slot_sec[(d_idx, p_idx, s_id)].append(v)
                             # Pre-cache for B2B penalty calculation
-                            subj_slot_active.setdefault((d_idx, p_idx, s_id, sub.get('id')), []).append(v)
+                            subj_slot_active.setdefault((d_idx, p_idx, s_id, block['subject_id']), []).append(v)
 
 
     for b_idx in range(len(all_blocks)):
