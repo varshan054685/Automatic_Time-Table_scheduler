@@ -11,7 +11,8 @@ import { api } from "@shared/routes";
 import { apiUrl } from "@/lib/api-base";
 import { ReferralContent } from "./ReferralPage";
 import { RequestsContent } from "./RequestsPage";
-import { User, Building2, Link2, ClipboardList, Trash2, LogOut, AlertTriangle, Pencil, Phone, Calendar, Mail, Settings2, ShieldAlert } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { User, Building2, Link2, ClipboardList, Trash2, LogOut, AlertTriangle, Pencil, Phone, Calendar, Mail, Settings2, ShieldAlert, Shield, Star, CheckCircle2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 export default function Settings() {
@@ -188,35 +189,115 @@ export default function Settings() {
             
             <AnimatePresence mode="wait">
                 <TabsContent value="profile" className="mt-8">
-                    <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 10 }}>
+                    <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 10 }} className="space-y-5">
+                    
+                    {/* Profile Hero Card */}
+                    {!isEditingProfile && (() => {
+                      const completionFields = [user?.name, user?.email, user?.phoneNumber, user?.avatar];
+                      const filled = completionFields.filter(Boolean).length;
+                      const completionPct = Math.round((filled / completionFields.length) * 100);
+                      const initials = user?.name ? user.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2) : 'U';
+                      const avatarColors = ['from-indigo-500 to-purple-600', 'from-rose-500 to-pink-600', 'from-emerald-500 to-teal-600', 'from-amber-500 to-orange-500'];
+                      const colorIndex = (user?.name?.charCodeAt(0) || 0) % avatarColors.length;
+                      return (
+                        <Card className="border-0 shadow-sm border border-slate-100 rounded-3xl overflow-hidden">
+                          {/* Banner */}
+                          <div className="h-32 premium-gradient relative">
+                            <div className="absolute inset-0 opacity-20" style={{backgroundImage: 'radial-gradient(circle at 20% 50%, white 1px, transparent 1px), radial-gradient(circle at 80% 20%, white 1px, transparent 1px)', backgroundSize: '40px 40px'}} />
+                            <Button
+                              size="sm"
+                              onClick={() => setIsEditingProfile(true)}
+                              className="absolute top-4 right-4 gap-2 h-9 px-4 rounded-xl bg-white/20 hover:bg-white/30 text-white border border-white/30 backdrop-blur-sm font-semibold"
+                            >
+                              <Pencil className="w-3.5 h-3.5" /> Edit Profile
+                            </Button>
+                          </div>
+
+                          <CardContent className="px-8 pb-8">
+                            {/* Avatar overlapping banner */}
+                            <div className="flex items-end justify-between -mt-12 mb-6">
+                              <div className="relative">
+                                <div className={`w-24 h-24 rounded-2xl border-4 border-white shadow-xl overflow-hidden flex items-center justify-center bg-gradient-to-br ${avatarColors[colorIndex]}`}>
+                                  {user?.avatar ? (
+                                    <img src={user.avatar} alt="Profile" className="w-full h-full object-cover" />
+                                  ) : (
+                                    <span className="text-2xl font-black text-white">{initials}</span>
+                                  )}
+                                </div>
+                              </div>
+                              <span className={`mb-2 px-4 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider ${isOwner ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/30' : 'bg-slate-100 text-slate-600'}`}>
+                                {isOwner ? '⭐ Owner' : 'Collaborator'}
+                              </span>
+                            </div>
+
+                            {/* Name & email */}
+                            <div className="mb-6">
+                              <h2 className="text-2xl font-black text-slate-900">{user?.name || 'Unnamed User'}</h2>
+                              <p className="text-slate-500 font-medium mt-0.5">{user?.email}</p>
+                            </div>
+
+                            {/* Stats row */}
+                            <div className="grid grid-cols-3 gap-4 mb-6">
+                              {[
+                                { icon: <Calendar className="w-4 h-4" />, label: 'Joined', value: user?.createdAt ? new Date(user.createdAt).toLocaleDateString('en-US', {month:'short', year:'numeric'}) : 'N/A' },
+                                { icon: <Building2 className="w-4 h-4" />, label: 'Workspace', value: user?.workspace?.workspaceName || 'None' },
+                                { icon: <Phone className="w-4 h-4" />, label: 'Phone', value: user?.phoneNumber || 'Not set' },
+                              ].map((stat) => (
+                                <div key={stat.label} className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
+                                  <div className="flex items-center gap-1.5 text-slate-400 mb-1.5">{stat.icon}<span className="text-[10px] font-bold uppercase tracking-wider">{stat.label}</span></div>
+                                  <p className="text-sm font-bold text-slate-800 truncate">{stat.value}</p>
+                                </div>
+                              ))}
+                            </div>
+
+                            {/* Profile completion */}
+                            <div className="bg-indigo-50/60 rounded-2xl p-4 border border-indigo-100">
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-2">
+                                  <CheckCircle2 className="w-4 h-4 text-indigo-500" />
+                                  <span className="text-sm font-bold text-indigo-700">Profile Completion</span>
+                                </div>
+                                <span className="text-sm font-black text-indigo-600">{completionPct}%</span>
+                              </div>
+                              <Progress value={completionPct} className="h-2 bg-indigo-100 [&>div]:bg-gradient-to-r [&>div]:from-indigo-500 [&>div]:to-purple-500" />
+                              {completionPct < 100 && (
+                                <p className="text-xs text-indigo-500/80 mt-2 font-medium">Add {completionFields.filter(Boolean).length === 3 ? 'a profile photo' : 'phone & photo'} to complete your profile.</p>
+                              )}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })()}
+
+                    {/* Edit Form Card */}
+                    {isEditingProfile && (
                     <Card className="border-0 shadow-sm border border-slate-100 rounded-3xl overflow-hidden">
                         <CardHeader className="flex flex-row items-center justify-between border-b border-slate-50 bg-slate-50/30 p-8">
                         <div>
-                            <CardTitle className="text-2xl font-bold">Account Information</CardTitle>
+                            <CardTitle className="text-2xl font-bold">Edit Profile</CardTitle>
                             <CardDescription className="text-slate-500 mt-1">Update your personal identification and details.</CardDescription>
                         </div>
                         <Button 
-                            variant={isEditingProfile ? "outline" : "default"} 
+                            variant="outline"
                             size="sm" 
-                            onClick={() => setIsEditingProfile(!isEditingProfile)}
-                            className={`gap-2 h-10 px-6 rounded-xl transition-all ${!isEditingProfile ? 'premium-gradient shadow-lg shadow-indigo-500/20' : ''}`}
+                            onClick={() => setIsEditingProfile(false)}
+                            className="gap-2 h-10 px-6 rounded-xl transition-all"
                         >
-                            {isEditingProfile ? "Cancel" : <><Pencil className="w-4 h-4" /> Edit Details</>}
+                            Cancel
                         </Button>
                         </CardHeader>
                         <CardContent className="p-8 space-y-6">
-                        {isEditingProfile ? (
                             <form className="space-y-6 max-w-lg">
                             <div className="flex flex-col items-center gap-4 mb-6">
                                 <div className="relative group">
-                                    <div className="w-24 h-24 rounded-full bg-slate-100 border-2 border-slate-200 overflow-hidden flex items-center justify-center">
+                                    <div className="w-24 h-24 rounded-2xl bg-slate-100 border-2 border-slate-200 overflow-hidden flex items-center justify-center">
                                         {profileData.avatar ? (
                                             <img src={profileData.avatar} alt="Profile" className="w-full h-full object-cover" />
                                         ) : (
                                             <User className="w-10 h-10 text-slate-300" />
                                         )}
                                     </div>
-                                    <label className="absolute inset-0 flex items-center justify-center bg-black/40 text-white rounded-full opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity">
+                                    <label className="absolute inset-0 flex items-center justify-center bg-black/40 text-white rounded-2xl opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity">
                                         <Pencil className="w-5 h-5" />
                                         <input type="file" className="hidden" accept="image/*" onChange={handlePhotoUpload} />
                                     </label>
@@ -269,28 +350,9 @@ export default function Settings() {
                                 {updateProfileMutation.isPending ? "Updating..." : "Update Account"}
                             </Button>
                             </form>
-                        ) : (
-                            <div className="grid md:grid-cols-2 gap-8 max-w-2xl">
-                                <div className="space-y-1">
-                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Full Identity</label>
-                                    <p className="text-lg font-bold text-slate-900">{user?.name || "Unspecified User"}</p>
-                                </div>
-                                <div className="space-y-1">
-                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Email Communication</label>
-                                    <p className="text-lg font-bold text-slate-900 underline decoration-indigo-200 decoration-4 underline-offset-4">{user?.email}</p>
-                                </div>
-                                <div className="space-y-1">
-                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Contact Number</label>
-                                    <p className="text-lg font-bold text-slate-900">{user?.phoneNumber || <span className="text-slate-300 italic">Not integrated</span>}</p>
-                                </div>
-                                <div className="space-y-1">
-                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Member Since</label>
-                                    <p className="text-lg font-bold text-slate-900">{user?.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'}</p>
-                                </div>
-                            </div>
-                        )}
                         </CardContent>
                     </Card>
+                    )}
                     </motion.div>
                 </TabsContent>
 
