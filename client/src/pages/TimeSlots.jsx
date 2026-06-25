@@ -60,14 +60,14 @@ function TimePicker({ value, onChange }) {
       <div className="flex bg-slate-200/40 p-0.5 rounded-lg gap-0.5 border border-slate-200/30">
         <button
           type="button"
-          className={`px-2.5 py-1.5 text-[9px] font-black rounded-md transition-all duration-300 ${!isPM ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/20' : 'text-slate-500 hover:text-slate-700'}`}
+          className={`px-2.5 py-1.5 text-[9px] font-black rounded-md transition-all duration-300 ${!isPM ? 'premium-gradient text-white shadow-md' : 'text-slate-500 hover:text-slate-700'}`}
           onClick={() => updateTime(displayHours, minutes, false)}
         >
           AM
         </button>
         <button
           type="button"
-          className={`px-2.5 py-1.5 text-[9px] font-black rounded-md transition-all duration-300 ${isPM ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/20' : 'text-slate-500 hover:text-slate-700'}`}
+          className={`px-2.5 py-1.5 text-[9px] font-black rounded-md transition-all duration-300 ${isPM ? 'premium-gradient text-white shadow-md' : 'text-slate-500 hover:text-slate-700'}`}
           onClick={() => updateTime(displayHours, minutes, true)}
         >
           PM
@@ -182,7 +182,7 @@ function BulkTimeSlotDialog({ onSuccess, editingGroup = null, onClose }) {
                             }}
                             className={`px-4 py-2 rounded-xl text-[10px] font-black transition-all border-2 ${
                                 field.value?.includes(day)
-                                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-xl shadow-indigo-500/25 scale-105'
+                                    ? 'premium-gradient text-white border-teal-500 shadow-lg shadow-teal-500/20 scale-105'
                                     : 'bg-white text-slate-500 border-slate-100 hover:border-slate-200 hover:text-slate-700'
                             }`}
                         >
@@ -389,157 +389,142 @@ export default function TimeSlots() {
 
 
   return (
-    <div className="flex min-h-screen bg-[#f8fafc]">
+    <div className="flex min-h-screen">
       <Sidebar />
-      <main className="flex-1 p-4 lg:p-8 overflow-y-auto">
-        
-        <div className="max-w-6xl mx-auto space-y-10 pt-12 lg:pt-0">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-              <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
-                <div className="flex items-center gap-4 mb-2">
-                    <div className="p-3 bg-white rounded-2xl shadow-sm border border-slate-100">
-                        <Settings2 className="w-8 h-8 text-indigo-600" />
-                    </div>
-                    <h1 className="text-4xl font-display font-black text-slate-900 tracking-tight">Time Slots</h1>
+      <div className="flex-1 overflow-y-auto min-w-0">
+        <div className="page-hero px-5 lg:px-8 pt-16 lg:pt-7 pb-6">
+          <div className="max-w-6xl mx-auto">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <motion.div initial={{ opacity: 0, x: -16 }} animate={{ opacity: 1, x: 0 }}>
+                <div className="flex items-center gap-3 mb-1">
+                  <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: "linear-gradient(135deg,#d9770622,#f59e0b33)" }}>
+                    <Settings2 className="w-5 h-5 text-amber-600" />
+                  </div>
+                  <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Master Data / Time Slots</div>
                 </div>
-                <p className="text-slate-500 font-medium">Orchestrate and manage academic intervals and period synchronization.</p>
+                <h1 className="text-[28px] font-display font-black text-slate-900 tracking-tight">Time Slots</h1>
+                <p className="text-sm text-slate-500 font-medium mt-0.5">Orchestrate academic intervals and period synchronization.</p>
               </motion.div>
               
-              <div className="flex items-center gap-3 overflow-x-auto md:overflow-visible pb-2 md:pb-0">
+              <div className="flex items-center gap-2.5 flex-wrap">
                 <TimeSlotImport timeSlots={timeSlots} onImportComplete={refetch} />
-
-                <Button variant="outline" className="gap-2 h-11 px-6 rounded-xl border-2 border-slate-200 font-bold hover:bg-slate-50 hover:border-slate-300 transition-all" onClick={handleExport}>
-                  <Upload className="w-4 h-4" /> Export Dataset
+                <Button variant="outline" className="gap-2 h-10 px-4 rounded-xl border border-slate-200 text-sm font-semibold hover:border-teal-300 hover:text-teal-700" onClick={handleExport}>
+                  <Upload className="w-4 h-4" /> Export
                 </Button>
-
                 <Dialog open={bulkOpen} onOpenChange={setBulkOpen}>
                   <DialogTrigger asChild>
-                    <Button className="premium-gradient premium-gradient-hover gap-2 h-11 px-8 shadow-xl shadow-indigo-500/20 text-white font-black rounded-xl transition-all hover:scale-105 active:scale-95">
-                      <Plus className="w-5 h-5" /> Add New Period
+                    <Button className="gap-2 h-10 px-5 rounded-xl text-sm font-bold premium-gradient shadow-lg shadow-teal-500/20">
+                      <Plus className="w-4 h-4" /> Add Period
                     </Button>
                   </DialogTrigger>
-                  <DialogContent className="sm:max-w-xl rounded-[3rem] border-0 p-10 shadow-2xl bg-white/95 backdrop-blur-2xl">
+                  <DialogContent className="sm:max-w-xl rounded-2xl border border-slate-100 p-8 shadow-2xl bg-white">
                     <DialogHeader className="mb-6">
-                      <DialogTitle className="text-2xl font-black text-slate-900">Define Custom Interval</DialogTitle>
+                      <DialogTitle className="text-xl font-display font-black text-slate-900">Define Custom Interval</DialogTitle>
                     </DialogHeader>
                     <BulkTimeSlotDialog onSuccess={refetch} onClose={() => setBulkOpen(false)} />
                   </DialogContent>
                 </Dialog>
               </div>
             </div>
+          </div>
+        </div>
 
+        <div className="px-5 lg:px-8 py-6">
+          <div className="max-w-6xl mx-auto space-y-4">
             <ExportHint />
 
             <Dialog open={!!editGroup} onOpenChange={(v) => !v && setEditGroup(null)}>
-              <DialogContent className="sm:max-w-xl rounded-[3rem] border-0 p-10 shadow-2xl bg-white/95 backdrop-blur-2xl">
+              <DialogContent className="sm:max-w-xl rounded-2xl border border-slate-100 p-8 shadow-2xl bg-white">
                 <DialogHeader className="mb-6">
-                  <DialogTitle className="text-2xl font-black text-slate-900">Modify Period Chain</DialogTitle>
+                  <DialogTitle className="text-xl font-display font-black text-slate-900">Modify Period</DialogTitle>
                 </DialogHeader>
-                {editGroup && (
-                  <BulkTimeSlotDialog 
-                    editingGroup={editGroup} 
-                    onSuccess={refetch} 
-                    onClose={() => setEditGroup(null)} 
-                  />
-                )}
+                {editGroup && <BulkTimeSlotDialog editingGroup={editGroup} onSuccess={refetch} onClose={() => setEditGroup(null)} />}
               </DialogContent>
             </Dialog>
 
-            <motion.div 
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden"
+            <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
+              className="bg-white rounded-2xl border border-slate-100 overflow-hidden"
+              style={{ boxShadow: "0 2px 16px -4px rgba(0,0,0,0.06)" }}
             >
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-slate-50/50 hover:bg-slate-50/50 border-b border-slate-100">
-                    <TableHead className="py-6 px-8 font-black text-slate-400 uppercase tracking-widest text-[10px]">Reference Label</TableHead>
-                    <TableHead className="py-6 px-6 font-black text-slate-400 uppercase tracking-widest text-[10px]">Temporal Scope</TableHead>
-                    <TableHead className="py-6 px-6 font-black text-slate-400 uppercase tracking-widest text-[10px]">Active Synchronicity</TableHead>
-                    <TableHead className="py-6 px-8 text-right font-black text-slate-400 uppercase tracking-widest text-[10px]">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {isLoading ? (
-                    <TableRow><TableCell colSpan={4} className="text-center py-20"><Loader2 className="w-8 h-8 animate-spin text-indigo-500 mx-auto" /></TableCell></TableRow>
-                  ) : uniquePeriods.length === 0 ? (
-                    <TableRow><TableCell colSpan={4} className="text-center py-20 text-slate-400 font-medium">No time slots found. Create or import some to get started.</TableCell></TableRow>
-                  ) : (
-                  <AnimatePresence mode="popLayout">
-                    {uniquePeriods.map((slot, idx) => {
-                        const activeDaysGroup = Array.from(new Set(timeSlots
-                        .filter(s => s.label === slot.label && s.startTime === slot.startTime)
-                        .map(s => s.dayOfWeek)))
-                        .sort((a, b) => DAYS.indexOf(a) - DAYS.indexOf(b));
+              <div className="grid grid-cols-[2fr_1.5fr_2fr_auto] items-center px-6 py-3 bg-slate-50/80 border-b border-slate-100 gap-4">
+                {["Period Label","Time Range","Active Days",""].map(h => (
+                  <div key={h} className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">{h}</div>
+                ))}
+              </div>
 
-                        return (
-                        <motion.tr 
-                            key={`${slot.label}-${slot.startTime}`}
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            className="group border-b border-slate-50 last:border-0 hover:bg-slate-50/30 transition-all"
+              {isLoading ? (
+                <div className="flex items-center justify-center py-20"><Loader2 className="w-7 h-7 animate-spin text-teal-500" /></div>
+              ) : uniquePeriods.length === 0 ? (
+                <div className="text-center py-16">
+                  <Clock className="w-10 h-10 text-slate-200 mx-auto mb-3" />
+                  <p className="text-slate-400 font-semibold text-sm">No time slots defined yet.</p>
+                </div>
+              ) : (
+                <AnimatePresence mode="popLayout">
+                  <div className="divide-y divide-slate-50">
+                    {uniquePeriods.map((slot, idx) => {
+                      const activeDaysGroup = Array.from(new Set(
+                        timeSlots.filter(s => s.label === slot.label && s.startTime === slot.startTime).map(s => s.dayOfWeek)
+                      )).sort((a, b) => DAYS.indexOf(a) - DAYS.indexOf(b));
+                      const isBreak = slot.label.toLowerCase().includes("break") || slot.label.toLowerCase().includes("lunch");
+
+                      return (
+                        <motion.div
+                          key={`${slot.label}-${slot.startTime}`}
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          className="grid grid-cols-[2fr_1.5fr_2fr_auto] items-center px-6 py-4 gap-4 group hover:bg-slate-50/60 transition-all"
                         >
-                            <TableCell className="py-6 px-8">
-                                <div className="flex items-center gap-4">
-                                    <div className={`p-2 rounded-xl ${slot.label.toLowerCase().includes('break') ? 'bg-rose-50 text-rose-500' : 'bg-indigo-50 text-indigo-500'}`}>
-                                        <Clock className="w-5 h-5" />
-                                    </div>
-                                    <span className="font-bold text-slate-900 text-base">{slot.label}</span>
-                                </div>
-                            </TableCell>
-                            <TableCell className="py-6 px-6">
-                                <div className="flex items-center gap-3 font-mono text-sm font-bold text-slate-500 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100">
-                                    {formatTime(slot.startTime)} 
-                                    <ChevronRight className="w-4 h-4 text-indigo-300" />
-                                    {formatTime(slot.endTime)}
-                                </div>
-                            </TableCell>
-                            <TableCell className="py-6 px-6 text-slate-600">
-                                <div className="flex flex-wrap gap-1.5">
-                                    {activeDaysGroup.map(d => (
-                                    <span key={d} className="px-3 py-1 bg-white text-slate-600 text-[10px] rounded-lg font-black uppercase tracking-tighter shadow-sm border border-slate-100">
-                                        {d.slice(0, 3)}
-                                    </span>
-                                    ))}
-                                </div>
-                            </TableCell>
-                            <TableCell className="py-6 px-8 text-right">
-                                <div className="flex justify-end gap-2">
-                                    <Button 
-                                        variant="ghost" 
-                                        size="icon" 
-                                        className="h-10 w-10 rounded-xl text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 transition-all shadow-sm bg-white border border-slate-100"
-                                        onClick={() => handleEdit(slot)}
-                                    >
-                                    <Pencil className="w-4 h-4" />
-                                    </Button>
-                                    <Button 
-                                        variant="ghost" 
-                                        size="icon" 
-                                        className="h-10 w-10 rounded-xl text-rose-500 hover:text-rose-600 hover:bg-rose-50 transition-all shadow-sm bg-white border border-slate-100"
-                                        onClick={() => {
-                                            if(confirm(`Obliterate all ${activeDaysGroup.length} instances of this period across all days? This cannot be undone.`)) {
-                                            timeSlots
-                                                .filter(s => s.label === slot.label && s.startTime === slot.startTime)
-                                                .forEach(s => deleteMutation.mutate(s.id));
-                                            }
-                                        }}
-                                    >
-                                    <Trash2 className="w-4 h-4" />
-                                    </Button>
-                                </div>
-                            </TableCell>
-                        </motion.tr>
-                        );
+                          <div className="flex items-center gap-3">
+                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isBreak ? "bg-amber-50" : "bg-teal-50"}`}>
+                              <Clock className={`w-4 h-4 ${isBreak ? "text-amber-500" : "text-teal-500"}`} />
+                            </div>
+                            <span className="font-bold text-slate-900 text-sm">{slot.label}</span>
+                            {isBreak && <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-amber-100 text-amber-600">Break</span>}
+                          </div>
+
+                          <div className="flex items-center gap-2 font-mono text-xs font-bold text-slate-500 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100 w-fit">
+                            {formatTime(slot.startTime)}
+                            <ChevronRight className="w-3 h-3 text-teal-300" />
+                            {formatTime(slot.endTime)}
+                          </div>
+
+                          <div className="flex flex-wrap gap-1">
+                            {activeDaysGroup.map(d => (
+                              <span key={d} className="px-2 py-0.5 bg-teal-50 text-teal-700 text-[9px] font-black uppercase tracking-wide rounded border border-teal-100">
+                                {d.slice(0, 3)}
+                              </span>
+                            ))}
+                          </div>
+
+                          <div className="flex items-center gap-1.5 justify-end">
+                            <button onClick={() => handleEdit(slot)} className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-teal-600 hover:bg-teal-50 transition-all">
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => { if (confirm(`Delete all ${activeDaysGroup.length} instances of this period?`)) { timeSlots.filter(s => s.label === slot.label && s.startTime === slot.startTime).forEach(s => deleteMutation.mutate(s.id)); } }}
+                              className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-rose-500 hover:bg-rose-50 transition-all"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </motion.div>
+                      );
                     })}
-                  </AnimatePresence>
-                  )}
-                </TableBody>
-              </Table>
+                  </div>
+                </AnimatePresence>
+              )}
+
+              {!isLoading && uniquePeriods.length > 0 && (
+                <div className="px-6 py-3 border-t border-slate-50 bg-slate-50/50">
+                  <p className="text-[11px] font-semibold text-slate-400">{uniquePeriods.length} period{uniquePeriods.length !== 1 ? "s" : ""} defined</p>
+                </div>
+              )}
             </motion.div>
           </div>
-      </main>
+        </div>
+      </div>
     </div>
   );
 }

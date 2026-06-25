@@ -325,38 +325,39 @@ export default function Subjects() {
   const watchedDeptId = Number(form.watch("departmentId"));
 
   return (
-    <div className="flex min-h-screen bg-[#f8fafc]">
+    <div className="flex min-h-screen">
       <Sidebar />
-      <main className="flex-1 p-4 lg:p-8 overflow-y-auto">
-        <div className="max-w-6xl mx-auto space-y-8 pt-12 lg:pt-0">
-          
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-            <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
-              <div className="flex items-center gap-4 mb-2">
-                <div className="p-3 bg-white rounded-2xl shadow-sm border border-slate-100">
-                  <BookOpen className="w-8 h-8 text-indigo-600" />
+      <div className="flex-1 overflow-y-auto min-w-0">
+        <div className="page-hero px-5 lg:px-8 pt-16 lg:pt-7 pb-6">
+          <div className="max-w-6xl mx-auto">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <motion.div initial={{ opacity: 0, x: -16 }} animate={{ opacity: 1, x: 0 }}>
+                <div className="flex items-center gap-3 mb-1">
+                  <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: "linear-gradient(135deg,#2563eb22,#0891b233)" }}>
+                    <BookOpen className="w-5 h-5 text-blue-600" />
+                  </div>
+                  <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Master Data / Subjects</div>
                 </div>
-                <h1 className="text-4xl font-display font-black text-slate-900 tracking-tight">Subjects</h1>
-              </div>
-              <p className="text-slate-500 font-medium">Curate and manage your academic curriculum.</p>
-            </motion.div>
-            
-            <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="flex items-center gap-3 overflow-x-auto md:overflow-visible pb-2 md:pb-0">
+                <h1 className="text-[28px] font-display font-black text-slate-900 tracking-tight">Subjects</h1>
+                <p className="text-sm text-slate-500 font-medium mt-0.5">Curate and manage your academic curriculum.</p>
+              </motion.div>
+              
+              <motion.div initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} className="flex items-center gap-2.5 flex-wrap">
 
               <SubjectImport departments={departments} faculty={faculty} sections={sections} subjects={subjects} onImportComplete={refetch} />
-              <Button variant="outline" className="gap-2 h-11 px-6 rounded-xl border-2 border-slate-200 font-bold hover:bg-slate-50 hover:border-slate-300 transition-all" onClick={handleExport}>
-                <Upload className="w-4 h-4" /> Export Dataset
+              <Button variant="outline" className="gap-2 h-10 px-4 rounded-xl border border-slate-200 text-sm font-semibold hover:border-teal-300 hover:text-teal-700" onClick={handleExport}>
+                <Upload className="w-4 h-4" /> Export
               </Button>
 
               <Dialog open={open} onOpenChange={(v) => { setOpen(v); if(!v) { setEditingId(null); form.reset(); } }}>
                 <DialogTrigger asChild>
-                  <Button className="premium-gradient premium-gradient-hover gap-2 h-11 px-8 shadow-xl shadow-indigo-500/20 text-white font-black rounded-xl transition-all hover:scale-105 active:scale-95">
-                    <Plus className="w-5 h-5" /> Add Subject
+                  <Button className="gap-2 h-10 px-5 rounded-xl text-sm font-bold premium-gradient shadow-lg shadow-teal-500/20">
+                    <Plus className="w-4 h-4" /> Add Subject
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="sm:max-w-xl rounded-2xl">
+                <DialogContent className="sm:max-w-xl rounded-2xl border border-slate-100">
                   <DialogHeader>
-                    <DialogTitle className="text-2xl font-bold">{editingId ? "Edit Subject" : "Add New Subject"}</DialogTitle>
+                    <DialogTitle className="text-xl font-display font-black">{editingId ? "Edit Subject" : "New Subject"}</DialogTitle>
                   </DialogHeader>
                   <Form {...form}>
                     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
@@ -518,123 +519,70 @@ export default function Subjects() {
                         />
                       </div>
                       
-                      <Button type="submit" className="w-full h-12 premium-gradient premium-gradient-hover rounded-xl text-base font-bold shadow-lg shadow-indigo-500/20 mt-2" disabled={createMutation.isPending || updateMutation.isPending}>
-                        {editingId ? (updateMutation.isPending ? "Updating..." : "Save Changes") : (createMutation.isPending ? "Adding..." : "Add Subject")}
+                      <Button type="submit" className="w-full h-11 rounded-xl font-bold premium-gradient shadow-lg shadow-teal-500/20 mt-2" disabled={createMutation.isPending || updateMutation.isPending}>
+                        {editingId ? (updateMutation.isPending ? "Saving..." : "Save Changes") : (createMutation.isPending ? "Adding..." : "Add Subject")}
                       </Button>
                     </form>
                   </Form>
                 </DialogContent>
               </Dialog>
-            </motion.div>
+              </motion.div>
+            </div>
           </div>
-
-          <ExportHint />
-
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }} 
-            animate={{ opacity: 1, y: 0 }}
-            className="flex flex-col gap-4"
-          >
-            <div className="relative group">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
-              <Input 
-                placeholder="Search by subject name or code..." 
-                className="pl-12 h-14 bg-white border-slate-100 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 rounded-2xl text-lg transition-all" 
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-
-            <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
-              <Table>
-                <TableHeader className="bg-slate-50/50">
-                  <TableRow>
-                    <TableHead className="w-16 h-14"></TableHead>
-                    <TableHead className="cursor-pointer hover:text-indigo-600 transition-colors py-4 px-6" onClick={() => handleSort('code')}>
-                      <div className="flex items-center gap-2 font-bold uppercase tracking-wider text-xs">Code <ArrowUpDown className="w-3 h-3" /></div>
-                    </TableHead>
-                    <TableHead className="cursor-pointer hover:text-indigo-600 transition-colors py-4 px-6" onClick={() => handleSort('name')}>
-                      <div className="flex items-center gap-2 font-bold uppercase tracking-wider text-xs">Subject Name <ArrowUpDown className="w-3 h-3" /></div>
-                    </TableHead>
-                    <TableHead className="py-4 px-6 font-bold uppercase tracking-wider text-xs">Hours</TableHead>
-                    <TableHead className="py-4 px-6 font-bold uppercase tracking-wider text-xs">Department</TableHead>
-                    <TableHead className="py-4 px-6 font-bold uppercase tracking-wider text-xs">Faculty</TableHead>
-                    <TableHead className="py-4 px-6 font-bold uppercase tracking-wider text-xs">Type</TableHead>
-                    <TableHead className="text-right py-4 px-6 font-bold uppercase tracking-wider text-xs">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {isLoading ? (
-                    <TableRow><TableCell colSpan={8} className="text-center py-20"><Loader2 className="w-8 h-8 animate-spin text-indigo-500 mx-auto" /></TableCell></TableRow>
-                  ) : filteredAndSortedSubjects.length === 0 ? (
-                    <TableRow><TableCell colSpan={8} className="text-center py-20 text-slate-400 font-medium">No subjects found matching your search.</TableCell></TableRow>
-                  ) : (
-                    filteredAndSortedSubjects.map((subject, idx) => (
-                      <motion.tr 
-                        key={subject.id}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: idx * 0.05 }}
-                        className="group hover:bg-slate-50/50 transition-colors border-b border-slate-50 last:border-0"
-                      >
-                        <TableCell className="py-4 pl-6">
-                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold transition-all group-hover:scale-110 shadow-sm ${subject.type === 'lab' ? 'bg-amber-50 text-amber-600' : 'bg-indigo-50 text-indigo-600'}`}>
-                                {subject.type === 'lab' ? <FlaskConical className="w-5 h-5" /> : <BookOpen className="w-5 h-5" />}
-                            </div>
-                        </TableCell>
-                        <TableCell className="py-4 px-6 font-mono text-sm font-bold text-slate-500 uppercase">{subject.code}</TableCell>
-                        <TableCell className="py-4 px-6">
-                            <div className="flex flex-col">
-                                <p className="font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">{subject.name}</p>
-                                <span className="text-xs text-slate-400 font-medium">{sections?.find(s => s.id === subject.sectionId)?.name || 'Generic'}</span>
-                            </div>
-                        </TableCell>
-                        <TableCell className="py-4 px-6">
-                          <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 w-fit">
-                            <Clock className="w-3 h-3 text-slate-500" />
-                            <span className="text-xs font-bold text-slate-600">{subject.weeklyHours}h</span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="py-4 px-6">
-                            <span className="text-sm font-medium text-slate-600">{departments?.find(d => d.id === subject.departmentId)?.name || "N/A"}</span>
-                        </TableCell>
-                        <TableCell className="py-4 px-6">
-                            <span className="text-sm font-medium text-slate-700">{faculty?.find(f => f.id === subject.facultyId)?.name || <span className="text-slate-300 italic">Unassigned</span>}</span>
-                        </TableCell>
-                        <TableCell className="py-4 px-6">
-                          <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${subject.type === 'lab' ? 'bg-amber-100 text-amber-700' : 'bg-indigo-100 text-indigo-700'}`}>
-                            {subject.type || 'lecture'}
-                          </span>
-                        </TableCell>
-                        <TableCell className="py-4 px-6 text-right">
-                          <div className="flex justify-end gap-2">
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="w-10 h-10 rounded-xl text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 transition-all shadow-sm bg-white border border-slate-100"
-                              onClick={() => handleEdit(subject)}
-                            >
-                              <Pencil className="w-4 h-4" />
-                            </Button>
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="w-10 h-10 rounded-xl text-rose-500 hover:text-rose-600 hover:bg-rose-50 transition-all shadow-sm bg-white border border-slate-100"
-                              onClick={() => handleDelete(subject.id)}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </motion.tr>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          </motion.div>
         </div>
-      </main>
+
+        <div className="px-5 lg:px-8 py-6">
+          <div className="max-w-6xl mx-auto space-y-4">
+            <ExportHint />
+            <div className="relative">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <Input placeholder="Search by subject name or code…" className="pl-11 h-11 bg-white border-slate-200 rounded-xl text-sm focus:border-teal-400" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+            </div>
+
+            <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden" style={{ boxShadow: "0 2px 16px -4px rgba(0,0,0,0.06)" }}>
+              <div className="grid grid-cols-[3rem_5rem_2fr_4rem_1.5fr_1.5fr_4rem_auto] items-center px-4 py-3 bg-slate-50/80 border-b border-slate-100 gap-3">
+                <div />{["Code","Name","Hrs","Dept","Faculty","Type",""].map(h => (
+                  <div key={h} className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">{h}</div>
+                ))}
+              </div>
+              {isLoading ? (
+                <div className="flex items-center justify-center py-20"><Loader2 className="w-7 h-7 animate-spin text-teal-500" /></div>
+              ) : filteredAndSortedSubjects.length === 0 ? (
+                <div className="text-center py-16"><BookOpen className="w-10 h-10 text-slate-200 mx-auto mb-3" /><p className="text-slate-400 font-semibold text-sm">No subjects found.</p></div>
+              ) : (
+                <div className="divide-y divide-slate-50">
+                  {filteredAndSortedSubjects.map((subject, idx) => (
+                    <motion.div key={subject.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.03 }}
+                      className="grid grid-cols-[3rem_5rem_2fr_4rem_1.5fr_1.5fr_4rem_auto] items-center px-4 py-3.5 gap-3 group hover:bg-slate-50/60 transition-all">
+                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform ${subject.type === "lab" ? "bg-amber-50" : "bg-blue-50"}`}>
+                        {subject.type === "lab" ? <FlaskConical className="w-4 h-4 text-amber-600" /> : <BookOpen className="w-4 h-4 text-blue-600" />}
+                      </div>
+                      <span className="font-mono text-[11px] font-black text-slate-500 uppercase truncate">{subject.code}</span>
+                      <div>
+                        <p className="font-bold text-slate-900 text-sm group-hover:text-teal-600 transition-colors truncate">{subject.name}</p>
+                        <p className="text-[10px] text-slate-400">{sections?.find(s => s.id === subject.sectionId)?.name || "Generic"}</p>
+                      </div>
+                      <span className="text-[11px] font-bold text-slate-500 flex items-center gap-1"><Clock className="w-3 h-3"/>{subject.weeklyHours}h</span>
+                      <span className="text-[12px] text-slate-600 font-medium truncate">{departments?.find(d => d.id === subject.departmentId)?.name || "—"}</span>
+                      <span className="text-[12px] text-slate-500 truncate">{faculty?.find(f => f.id === subject.facultyId)?.name || <span className="text-slate-300 italic text-[11px]">Unassigned</span>}</span>
+                      <span className={`text-[10px] font-black uppercase px-1.5 py-0.5 rounded-md ${subject.type === "lab" ? "bg-amber-100 text-amber-700" : "bg-blue-100 text-blue-700"}`}>{subject.type || "lec"}</span>
+                      <div className="flex items-center gap-1.5 justify-end">
+                        <button onClick={() => handleEdit(subject)} className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-teal-600 hover:bg-teal-50 transition-all"><Pencil className="w-3.5 h-3.5" /></button>
+                        <button onClick={() => handleDelete(subject.id)} className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-rose-500 hover:bg-rose-50 transition-all"><Trash2 className="w-3.5 h-3.5" /></button>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              )}
+              {!isLoading && filteredAndSortedSubjects.length > 0 && (
+                <div className="px-6 py-3 border-t border-slate-50 bg-slate-50/50">
+                  <p className="text-[11px] font-semibold text-slate-400">{filteredAndSortedSubjects.length} subject{filteredAndSortedSubjects.length !== 1 ? "s" : ""}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

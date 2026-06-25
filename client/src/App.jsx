@@ -1,7 +1,7 @@
 import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { Toaster } from "@/components/ui/toaster";
+import { Toaster } from "@/components/ui/toaster.tsx";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useUser } from "@/hooks/use-auth";
 import { Loader2 } from "lucide-react";
@@ -24,7 +24,11 @@ function ProtectedRoute({ component: Component }) {
   const [, setLocation] = useLocation();
 
   if (isLoading) {
-    return <div className="h-screen w-full flex items-center justify-center"><Loader2 className="animate-spin text-primary w-8 h-8" /></div>;
+    return (
+      <div className="h-screen w-full flex items-center justify-center">
+        <Loader2 className="animate-spin text-primary w-8 h-8" />
+      </div>
+    );
   }
 
   if (!user) {
@@ -56,7 +60,11 @@ function PublicRoute({ component: Component }) {
   const [, setLocation] = useLocation();
 
   if (isLoading) {
-    return <div className="h-screen w-full flex items-center justify-center"><Loader2 className="animate-spin text-primary w-8 h-8" /></div>;
+    return (
+      <div className="h-screen w-full flex items-center justify-center">
+        <Loader2 className="animate-spin text-primary w-8 h-8" />
+      </div>
+    );
   }
 
   // If user is logged in, redirect to home
@@ -77,7 +85,7 @@ function Router() {
         <Route path="/login">
           <PublicRoute component={Login} />
         </Route>
-        
+
         <Route path="/">
           <ProtectedRoute component={Dashboard} />
         </Route>

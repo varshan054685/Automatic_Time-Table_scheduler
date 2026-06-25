@@ -228,46 +228,44 @@ export default function Classrooms() {
   }, [classrooms, searchTerm, sortConfig]);
 
   return (
-    <div className="flex min-h-screen bg-[#f8fafc]">
+    <div className="flex min-h-screen">
       <Sidebar />
-      <main className="flex-1 p-4 lg:p-8 overflow-y-auto">
-        <div className="max-w-6xl mx-auto space-y-8 pt-12 lg:pt-0">
-          
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-            <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
-              <div className="flex items-center gap-4 mb-2">
-                <div className="p-3 bg-white rounded-2xl shadow-sm border border-slate-100">
-                  <School className="w-8 h-8 text-indigo-600" />
+      <div className="flex-1 overflow-y-auto min-w-0">
+        {/* Hero */}
+        <div className="page-hero px-5 lg:px-8 pt-16 lg:pt-7 pb-6">
+          <div className="max-w-6xl mx-auto">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <motion.div initial={{ opacity: 0, x: -16 }} animate={{ opacity: 1, x: 0 }}>
+                <div className="flex items-center gap-3 mb-1">
+                  <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: "linear-gradient(135deg,#0891b222,#0e749033)" }}>
+                    <School className="w-5 h-5 text-sky-600" />
+                  </div>
+                  <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Master Data / Classrooms</div>
                 </div>
-                <h1 className="text-4xl font-display font-black text-slate-900 tracking-tight">Classrooms</h1>
-              </div>
-              <p className="text-slate-500 font-medium">Manage and allocated physical teaching spaces.</p>
-            </motion.div>
-            
-            <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="flex items-center gap-3 overflow-x-auto md:overflow-visible pb-2 md:pb-0">
-              <ClassroomImport classrooms={classrooms} onImportComplete={refetch} />
-              <Button variant="outline" className="gap-2 h-11 px-6 rounded-xl border-2 border-slate-200 font-bold hover:bg-slate-50 hover:border-slate-300 transition-all" onClick={handleExport}>
-                <Upload className="w-4 h-4" /> Export Dataset
-              </Button>
+                <h1 className="text-[28px] font-display font-black text-slate-900 tracking-tight">Classrooms</h1>
+                <p className="text-sm text-slate-500 font-medium mt-0.5">Manage physical teaching spaces and labs.</p>
+              </motion.div>
 
-              <Dialog open={open} onOpenChange={(v) => { setOpen(v); if(!v) { setEditingId(null); form.reset(); } }}>
-                <DialogTrigger asChild>
-                  <Button className="premium-gradient premium-gradient-hover gap-2 h-11 px-8 shadow-xl shadow-indigo-500/20 text-white font-black rounded-xl transition-all hover:scale-105 active:scale-95">
-                    <Plus className="w-5 h-5" /> Add Classroom
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-md rounded-2xl">
-                  <DialogHeader>
-                    <DialogTitle className="text-2xl font-bold">{editingId ? "Edit Classroom" : "Add New Classroom"}</DialogTitle>
-                  </DialogHeader>
-                  <Form {...form}>
-                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5 py-4">
-                      <FormField
-                        control={form.control}
-                        name="roomNumber"
-                        render={({ field }) => (
+              <motion.div initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} className="flex items-center gap-2.5 flex-wrap">
+                <ClassroomImport classrooms={classrooms} onImportComplete={refetch} />
+                <Button variant="outline" className="gap-2 h-10 px-4 rounded-xl border border-slate-200 text-sm font-semibold hover:border-teal-300 hover:text-teal-700" onClick={handleExport}>
+                  <Upload className="w-4 h-4" /> Export
+                </Button>
+                <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) { setEditingId(null); form.reset(); } }}>
+                  <DialogTrigger asChild>
+                    <Button className="gap-2 h-10 px-5 rounded-xl text-sm font-bold premium-gradient shadow-lg shadow-teal-500/20">
+                      <Plus className="w-4 h-4" /> Add Classroom
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-md rounded-2xl border border-slate-100">
+                    <DialogHeader>
+                      <DialogTitle className="text-xl font-display font-black">{editingId ? "Edit Classroom" : "New Classroom"}</DialogTitle>
+                    </DialogHeader>
+                    <Form {...form}>
+                      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pt-2">
+                        <FormField control={form.control} name="roomNumber" render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="text-slate-700 font-semibold">Room Number</FormLabel>
+                            <FormLabel className="text-sm font-bold text-slate-700">Room Number</FormLabel>
                             <FormControl>
                               <div className="relative">
                                 <Hash className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
@@ -276,14 +274,10 @@ export default function Classrooms() {
                             </FormControl>
                             <FormMessage />
                           </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="capacity"
-                        render={({ field }) => (
+                        )} />
+                        <FormField control={form.control} name="capacity" render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="text-slate-700 font-semibold">Capacity (No. of Students)</FormLabel>
+                            <FormLabel className="text-sm font-bold text-slate-700">Capacity</FormLabel>
                             <FormControl>
                               <div className="relative">
                                 <Users className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
@@ -292,19 +286,13 @@ export default function Classrooms() {
                             </FormControl>
                             <FormMessage />
                           </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="type"
-                        render={({ field }) => (
+                        )} />
+                        <FormField control={form.control} name="type" render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="text-slate-700 font-semibold">Room Type</FormLabel>
+                            <FormLabel className="text-sm font-bold text-slate-700">Room Type</FormLabel>
                             <Select onValueChange={field.onChange} value={field.value}>
                               <FormControl>
-                                <SelectTrigger className="h-11 rounded-xl">
-                                  <SelectValue placeholder="Select type" />
-                                </SelectTrigger>
+                                <SelectTrigger className="h-11 rounded-xl"><SelectValue placeholder="Select type" /></SelectTrigger>
                               </FormControl>
                               <SelectContent className="rounded-xl">
                                 <SelectItem value="lecture">Lecture / Classroom</SelectItem>
@@ -313,112 +301,77 @@ export default function Classrooms() {
                             </Select>
                             <FormMessage />
                           </FormItem>
-                        )}
-                      />
-                      <Button type="submit" className="w-full h-12 premium-gradient premium-gradient-hover rounded-xl text-base font-bold shadow-lg shadow-indigo-500/20" disabled={createMutation.isPending || updateMutation.isPending}>
-                        {editingId ? (updateMutation.isPending ? "Updating..." : "Update Space") : (createMutation.isPending ? "Add Space" : "Create Classroom")}
-                      </Button>
-                    </form>
-                  </Form>
-                </DialogContent>
-              </Dialog>
-            </motion.div>
+                        )} />
+                        <Button type="submit" className="w-full h-11 rounded-xl font-bold premium-gradient shadow-lg shadow-teal-500/20" disabled={createMutation.isPending || updateMutation.isPending}>
+                          {editingId ? (updateMutation.isPending ? "Saving..." : "Save Changes") : (createMutation.isPending ? "Creating..." : "Create Classroom")}
+                        </Button>
+                      </form>
+                    </Form>
+                  </DialogContent>
+                </Dialog>
+              </motion.div>
+            </div>
           </div>
-
-          <ExportHint />
-
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }} 
-            animate={{ opacity: 1, y: 0 }}
-            className="flex flex-col gap-4"
-          >
-            <div className="relative group">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
-              <Input 
-                placeholder="Search by room number..." 
-                className="pl-12 h-14 bg-white border-slate-100 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 rounded-2xl text-lg transition-all" 
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-
-            <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
-              <Table>
-                <TableHeader className="bg-slate-50/50">
-                  <TableRow>
-                    <TableHead className="w-16 h-14"></TableHead>
-                    <TableHead className="cursor-pointer hover:text-indigo-600 transition-colors py-4 px-6" onClick={() => handleSort('roomNumber')}>
-                      <div className="flex items-center gap-2 font-bold uppercase tracking-wider text-xs">Room ID <ArrowUpDown className="w-3 h-3" /></div>
-                    </TableHead>
-                    <TableHead className="cursor-pointer hover:text-indigo-600 transition-colors py-4 px-6" onClick={() => handleSort('capacity')}>
-                      <div className="flex items-center gap-2 font-bold uppercase tracking-wider text-xs">Capacity <ArrowUpDown className="w-3 h-3" /></div>
-                    </TableHead>
-                    <TableHead className="py-4 px-6 font-bold uppercase tracking-wider text-xs">Type</TableHead>
-                    <TableHead className="text-right py-4 px-6 font-bold uppercase tracking-wider text-xs">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {isLoading ? (
-                    <TableRow><TableCell colSpan={5} className="text-center py-20"><Loader2 className="w-8 h-8 animate-spin text-indigo-500 mx-auto" /></TableCell></TableRow>
-                  ) : filteredAndSortedClassrooms.length === 0 ? (
-                    <TableRow><TableCell colSpan={5} className="text-center py-20 text-slate-400 font-medium">No classrooms found matching your search.</TableCell></TableRow>
-                  ) : (
-                    filteredAndSortedClassrooms.map((room, idx) => (
-                      <motion.tr 
-                        key={room.id}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: idx * 0.05 }}
-                        className="group hover:bg-slate-50/50 transition-colors border-b border-slate-50 last:border-0"
-                      >
-                        <TableCell className="py-4 pl-6">
-                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold transition-transform group-hover:scale-110 ${room.type === 'lab' ? 'bg-indigo-50 text-indigo-600' : 'bg-slate-50 text-slate-600'}`}>
-                            {room.type === 'lab' ? <Laptop className="w-5 h-5" /> : <School className="w-5 h-5" />}
-                          </div>
-                        </TableCell>
-                        <TableCell className="py-4 px-6">
-                            <p className="font-bold text-slate-900 group-hover:text-indigo-600 transition-colors uppercase tracking-tight">{room.roomNumber}</p>
-                        </TableCell>
-                        <TableCell className="py-4 px-6">
-                          <div className="flex items-center gap-2">
-                            <Users className="w-4 h-4 text-slate-400" />
-                            <span className="font-semibold text-slate-700">{room.capacity} students</span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="py-4 px-6">
-                          <span className={`px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider ${room.type === 'lab' ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-700'}`}>
-                            {room.type}
-                          </span>
-                        </TableCell>
-                        <TableCell className="py-4 px-6 text-right">
-                          <div className="flex justify-end gap-2">
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="w-10 h-10 rounded-xl text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 transition-all shadow-sm bg-white border border-slate-100"
-                              onClick={() => handleEdit(room)}
-                            >
-                              <Pencil className="w-4 h-4" />
-                            </Button>
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="w-10 h-10 rounded-xl text-rose-500 hover:text-rose-600 hover:bg-rose-50 transition-all shadow-sm bg-white border border-slate-100"
-                              onClick={() => handleDelete(room.id)}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </motion.tr>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          </motion.div>
         </div>
-      </main>
+
+        <div className="px-5 lg:px-8 py-6">
+          <div className="max-w-6xl mx-auto space-y-4">
+            <ExportHint />
+            <div className="relative">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <Input placeholder="Search by room number…" className="pl-11 h-11 bg-white border-slate-200 rounded-xl text-sm focus:border-teal-400" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+            </div>
+
+            {/* Cards grid */}
+            {isLoading ? (
+              <div className="flex items-center justify-center py-20"><Loader2 className="w-7 h-7 animate-spin text-teal-500" /></div>
+            ) : filteredAndSortedClassrooms.length === 0 ? (
+              <div className="text-center py-16 bg-white rounded-2xl border border-slate-100">
+                <School className="w-10 h-10 text-slate-200 mx-auto mb-3" />
+                <p className="text-slate-400 font-semibold text-sm">No classrooms found.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {filteredAndSortedClassrooms.map((room, idx) => (
+                  <motion.div
+                    key={room.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: idx * 0.04 }}
+                    className="bg-white rounded-2xl border border-slate-100 p-4 group hover:border-teal-200 transition-all"
+                    style={{ boxShadow: "0 2px 12px -4px rgba(0,0,0,0.05)" }}
+                    onMouseEnter={(e) => { e.currentTarget.style.boxShadow = "0 6px 24px -6px rgba(15,160,135,0.12)"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.boxShadow = "0 2px 12px -4px rgba(0,0,0,0.05)"; }}
+                  >
+                    <div className="flex items-start justify-between mb-3">
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${room.type === "lab" ? "bg-amber-50" : "bg-sky-50"}`}>
+                        {room.type === "lab" ? <Laptop className="w-5 h-5 text-amber-600" /> : <School className="w-5 h-5 text-sky-600" />}
+                      </div>
+                      <div className="flex gap-1.5">
+                        <button onClick={() => handleEdit(room)} className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-teal-600 hover:bg-teal-50 transition-all">
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                        <button onClick={() => handleDelete(room.id)} className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-rose-500 hover:bg-rose-50 transition-all">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                    <p className="font-black text-slate-900 text-lg uppercase tracking-tight group-hover:text-teal-600 transition-colors">{room.roomNumber}</p>
+                    <div className="flex items-center justify-between mt-2">
+                      <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md ${room.type === "lab" ? "bg-amber-100 text-amber-700" : "bg-sky-100 text-sky-700"}`}>
+                        {room.type}
+                      </span>
+                      <span className="text-[11px] font-semibold text-slate-400 flex items-center gap-1">
+                        <Users className="w-3 h-3" />{room.capacity}
+                      </span>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
