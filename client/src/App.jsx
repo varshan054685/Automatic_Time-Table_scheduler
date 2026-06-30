@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { useUser } from "@/hooks/use-auth";
 import { Loader2 } from "lucide-react";
 import { WorkspaceSetupDialog } from "@/components/WorkspaceSetupDialog";
+import { Chatbot } from "@/components/Chatbot";
 import { motion, AnimatePresence } from "framer-motion";
 
 import Login from "@/pages/Login";
@@ -134,6 +135,7 @@ function App() {
       <TooltipProvider>
         <Toaster />
         <Router />
+        <Chatbot />
       </TooltipProvider>
     </QueryClientProvider>
   );

@@ -253,6 +253,12 @@
   padding-top: env(safe-area-inset-top, 0px);
 }
 
+/* ─── Login dark input placeholder ─── */
+.dark-input::placeholder {
+  color: #64748b;
+  opacity: 1;
+}
+
 /* ─── No scrollbar utility ─── */
 .no-scrollbar {
   scrollbar-width: none;

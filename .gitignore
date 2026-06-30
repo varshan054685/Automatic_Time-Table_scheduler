@@ -1,11 +1,90 @@
-node_modules
-dist
-.DS_Store
-server/public
-vite.config.ts.*
-*.tar.gz
+# ─────────────────────────────────────────────
+# Environment & Secrets  (NEVER commit these)
+# ─────────────────────────────────────────────
 .env
+.env.*
+!.env.example
+!.env.production.example
+
+# client-side env (contains live API URL)
 client/.env
-.env.example
+client/.env.*
+!client/.env.example
+!client/.env.production.example
+
+# ─────────────────────────────────────────────
+# Node / npm
+# ─────────────────────────────────────────────
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnp
+.pnp.js
+.npm/
+
+# ─────────────────────────────────────────────
+# Build output
+# ─────────────────────────────────────────────
+dist/
+dist-ssr/
+build/
+out/
+server/public/
+
+# ─────────────────────────────────────────────
+# TypeScript
+# ─────────────────────────────────────────────
+*.tsbuildinfo
+vite.config.ts.*
+
+# ─────────────────────────────────────────────
+# Python service
+# ─────────────────────────────────────────────
+python-service/venv/
+python-service/__pycache__/
+python-service/*.pyc
+python-service/*.pyo
+**/__pycache__/
+**/*.py[cod]
+**/*$py.class
+*.egg-info/
+.eggs/
+*.egg
+.Python
+
+# ─────────────────────────────────────────────
+# OS & Editor artefacts
+# ─────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*.swo
+*~
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+
+# ─────────────────────────────────────────────
+# Logs & temp files
+# ─────────────────────────────────────────────
+logs/
+*.log
+*.tar.gz
+*.zip
+tmp/
+temp/
+
+# ─────────────────────────────────────────────
+# Test & coverage
+# ─────────────────────────────────────────────
+coverage/
+.nyc_output/
+*.lcov
+
+# ─────────────────────────────────────────────
+# Misc
+# ─────────────────────────────────────────────
 TODO.md
-excel

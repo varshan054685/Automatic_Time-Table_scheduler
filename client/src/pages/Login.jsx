@@ -24,12 +24,19 @@ const DarkInput = ({ icon: Icon, rightEl, ...props }) => (
     {Icon && <Icon className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-teal-400/60 pointer-events-none" />}
     <input
       {...props}
-      className={`w-full h-12 rounded-xl border border-white/10 bg-white/6 text-white placeholder:text-slate-500
+      className={`dark-input w-full h-12 rounded-xl border border-white/10 text-white
         focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-500/50
         transition-all duration-200 text-sm font-medium
         ${Icon ? "pl-10" : "pl-4"} ${rightEl ? "pr-10" : "pr-4"}
         ${props.disabled ? "opacity-50 cursor-not-allowed" : ""}
       `}
+      style={{
+        color: 'white',
+        WebkitTextFillColor: 'white',
+        background: 'rgba(255,255,255,0.07)',
+        WebkitBoxShadow: '0 0 0px 1000px rgba(15,25,40,0.95) inset',
+        caretColor: 'white',
+      }}
     />
     {rightEl}
   </div>
@@ -45,6 +52,7 @@ const OtpRow = ({ field, disabled }) => (
             focus:bg-white/14 focus:border-teal-400 focus:ring-2 focus:ring-teal-500/30
             data-[active=true]:border-teal-400 data-[active=true]:scale-110 data-[active=true]:bg-white/14
             transition-all duration-200"
+          style={{ color: 'white', WebkitTextFillColor: 'white' }}
         />
       ))}
     </InputOTPGroup>

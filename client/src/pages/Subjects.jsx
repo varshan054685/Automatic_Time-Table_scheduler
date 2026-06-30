@@ -541,8 +541,8 @@ export default function Subjects() {
 
             <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden" style={{ boxShadow: "0 2px 16px -4px rgba(0,0,0,0.06)" }}>
               <div className="grid grid-cols-[3rem_5rem_2fr_4rem_1.5fr_1.5fr_4rem_auto] items-center px-4 py-3 bg-slate-50/80 border-b border-slate-100 gap-3">
-                <div />{["Code","Name","Hrs","Dept","Faculty","Type",""].map(h => (
-                  <div key={h} className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">{h}</div>
+                <div />{["Code","Name","Hrs","Dept","Faculty","Type","Action"].map(h => (
+                  <div key={h} className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-500 text-left">{h}</div>
                 ))}
               </div>
               {isLoading ? (
@@ -565,8 +565,8 @@ export default function Subjects() {
                       <span className="text-[11px] font-bold text-slate-500 flex items-center gap-1"><Clock className="w-3 h-3"/>{subject.weeklyHours}h</span>
                       <span className="text-[12px] text-slate-600 font-medium truncate">{departments?.find(d => d.id === subject.departmentId)?.name || "—"}</span>
                       <span className="text-[12px] text-slate-500 truncate">{faculty?.find(f => f.id === subject.facultyId)?.name || <span className="text-slate-300 italic text-[11px]">Unassigned</span>}</span>
-                      <span className={`text-[10px] font-black uppercase px-1.5 py-0.5 rounded-md ${subject.type === "lab" ? "bg-amber-100 text-amber-700" : "bg-blue-100 text-blue-700"}`}>{subject.type || "lec"}</span>
-                      <div className="flex items-center gap-1.5 justify-end">
+                      <span className={`text-[10px] font-black uppercase px-1.5 py-0.5 rounded-md text-left ${subject.type === "lab" ? "bg-amber-100 text-amber-700" : "bg-blue-100 text-blue-700"}`}>{subject.type || "lec"}</span>
+                      <div className="flex items-center gap-1.5">
                         <button onClick={() => handleEdit(subject)} className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-teal-600 hover:bg-teal-50 transition-all"><Pencil className="w-3.5 h-3.5" /></button>
                         <button onClick={() => handleDelete(subject.id)} className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-rose-500 hover:bg-rose-50 transition-all"><Trash2 className="w-3.5 h-3.5" /></button>
                       </div>

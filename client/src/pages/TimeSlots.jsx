@@ -447,8 +447,8 @@ export default function TimeSlots() {
               style={{ boxShadow: "0 2px 16px -4px rgba(0,0,0,0.06)" }}
             >
               <div className="grid grid-cols-[2fr_1.5fr_2fr_auto] items-center px-6 py-3 bg-slate-50/80 border-b border-slate-100 gap-4">
-                {["Period Label","Time Range","Active Days",""].map(h => (
-                  <div key={h} className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-500">{h}</div>
+                {["Period Label","Time Range","Active Days","Action"].map(h => (
+                  <div key={h} className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-500 text-left">{h}</div>
                 ))}
               </div>
 
@@ -498,7 +498,7 @@ export default function TimeSlots() {
                             ))}
                           </div>
 
-                          <div className="flex items-center gap-1.5 justify-end">
+                          <div className="flex items-center gap-1.5">
                             <button onClick={() => handleEdit(slot)} className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-teal-600 hover:bg-teal-50 transition-all">
                               <Pencil className="w-3.5 h-3.5" />
                             </button>
