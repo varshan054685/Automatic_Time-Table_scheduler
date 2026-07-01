@@ -129,13 +129,29 @@ function Router() {
   );
 }
 
+// AppContent runs inside QueryClientProvider so useUser works correctly
+function AppContent() {
+  const { user, isLoading } = useUser();
+
+  // Only show the chatbot when the user is fully authenticated with a workspace.
+  // On the login page there's no session, so the /api/chatbot endpoint would
+  // return 401 — no point rendering it at all.
+  const showChatbot = !isLoading && !!user?.workspace;
+
+  return (
+    <>
+      <Toaster />
+      <Router />
+      {showChatbot && <Chatbot />}
+    </>
+  );
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <Toaster />
-        <Router />
-        <Chatbot />
+        <AppContent />
       </TooltipProvider>
     </QueryClientProvider>
   );

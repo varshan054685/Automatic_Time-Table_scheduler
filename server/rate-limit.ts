@@ -34,6 +34,22 @@ export const apiLimiter = rateLimit({
 });
 
 /**
+ * Rate limiter for the chatbot endpoint.
+ * 20 requests per 10 minutes per IP — protects Gemini free-tier quota.
+ */
+export const chatbotLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: "Chatbot rate limit reached. Please wait a moment before sending another message." },
+  handler: (req, res, _next, options) => {
+    log(`RATE_LIMIT chatbot hit by IP=${req.ip}`, "security");
+    res.status(429).json(options.message);
+  },
+});
+
+/**
  * Rate limiter for timetable generation (expensive CPU operation).
  * 5 requests per 15 minutes per IP.
  */
