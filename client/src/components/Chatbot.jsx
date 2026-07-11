@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { MessageCircle, X, Send, Bot, User, Sparkles, AlertCircle } from "lucide-react";
+import { apiUrl } from "@/lib/api-base";
 
 // ─── API call ─────────────────────────────────────────────────────────────────
 
@@ -10,7 +11,7 @@ import { MessageCircle, X, Send, Bot, User, Sparkles, AlertCircle } from "lucide
  * Returns the assistant reply text, or throws on error.
  */
 async function sendChatMessage(messages) {
-  const res = await fetch("/api/chatbot", {
+  const res = await fetch(apiUrl("/api/chatbot"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     credentials: "include",
