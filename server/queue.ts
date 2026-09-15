@@ -1,6 +1,6 @@
 import { storage } from "./storage";
 import { processTimetableJob } from "./worker";
-import { log } from "./index";
+import { log } from "./logger";
 
 // In-memory queue for section-based generation (no Redis dependency)
 const memoryQueue: any[] = [];

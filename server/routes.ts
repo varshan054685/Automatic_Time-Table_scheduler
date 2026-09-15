@@ -6,7 +6,7 @@ import { api, generateTimetableSchema } from "@shared/routes";
 import { addGenerationJobs } from "./queue";
 import { generationLimiter, chatbotLimiter } from "./rate-limit";
 import { z } from "zod";
-import { log } from "./index";
+import { log } from "./logger";
 import { retrieveRelevantDocs } from "./chatbot-docs";
 import { GoogleGenAI } from "@google/genai";
 
@@ -815,6 +815,98 @@ ${docContext}
 
     const entries = await storage.getTimetable(sectionId, facultyId, (req as any).workspaceId);
     res.json(entries);
+  });
+
+  // ─── Sync Routes (Phase 6 — offline-first clients) ───
+  // Full snapshot of the workspace for initial sync. Mobile clients call this
+  // once after login, then rely on /api/sync/changes for incremental updates.
+  app.get("/api/sync/bootstrap", requireWorkspace, async (req: Request, res: Response) => {
+    try {
+      const wsId = (req as any).workspaceId;
+      const ws = await storage.getWorkspace(wsId);
+      const bootstrap = await storage.getSyncBootstrap(wsId);
+      res.json({
+        workspace: ws,
+        serverTime: new Date().toISOString(),
+        ...bootstrap,
+      });
+    } catch (err: any) {
+      res.status(500).json({ message: "Failed to load workspace data" });
+    }
+  });
+
+  // Incremental changes since a timestamp. Returns CREATE/UPDATE/DELETE
+  // operations per entity so clients can apply remote changes without a
+  // full re-download.
+  app.get("/api/sync/changes", requireWorkspace, async (req: Request, res: Response) => {
+    try {
+      const wsId = (req as any).workspaceId;
+      const sinceRaw = String(req.query.since ?? "");
+      const since = new Date(sinceRaw);
+      if (isNaN(since.getTime())) {
+        return res.status(400).json({ message: "Invalid 'since' timestamp. Use ISO 8601 format." });
+      }
+      const changes = await storage.getChangesSince(wsId, since);
+      res.json({ changes, serverTime: new Date().toISOString() });
+    } catch (err: any) {
+      res.status(500).json({ message: "Failed to load changes" });
+    }
+  });
+
+  // Push batched client operations. Each operation is applied with an
+  // optimistic-concurrency check against the provided baseVersion; conflicts
+  // are returned per-item so the client can resolve them without losing data.
+  const syncPushSchema = z.object({
+    operations: z.array(z.object({
+      entityType: z.string().min(1),
+      operation: z.enum(["CREATE", "UPDATE", "DELETE"]),
+      clientId: z.string().max(100).nullable().optional(),
+      serverId: z.number().int().positive().nullable().optional(),
+      baseVersion: z.number().int().positive().nullable().optional(),
+      payload: z.record(z.any()).optional(),
+    })).max(500),
+  });
+
+  app.post("/api/sync/push", requireWorkspace, async (req: Request, res: Response) => {
+    try {
+      const parsed = syncPushSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid push payload" });
+      }
+      const wsId = (req as any).workspaceId;
+      const isOwner = (req as any).workspaceRole === "owner";
+      const results: any[] = [];
+      for (const op of parsed.data.operations) {
+        // SECURITY: viewers may only create change requests — direct master-data
+        // mutations (the equivalent of the CRUD viewerCheck) are rejected here.
+        // Server-side role checks are authoritative; the UI gates are cosmetic.
+        const isChangeRequestCreate = op.entityType === "change_request" && op.operation === "CREATE";
+        if (!isOwner && !isChangeRequestCreate) {
+          results.push({
+            ...op,
+            result: { status: "error", error: "Only workspace owners can modify master data directly." },
+          });
+          continue;
+        }
+        // change_request.requested_by is server-owned — never trust the client.
+        const payload = isChangeRequestCreate
+          ? { ...(op.payload ?? {}), requestedBy: (req as any).wsUserId }
+          : op.payload;
+        const result = await storage.applySyncOperation({
+          entityType: op.entityType,
+          clientId: op.clientId ?? null,
+          serverId: op.serverId ?? null,
+          operation: op.operation,
+          payload,
+          baseVersion: op.baseVersion ?? null,
+          workspaceId: wsId,
+        });
+        results.push({ ...op, result });
+      }
+      res.json({ results, serverTime: new Date().toISOString() });
+    } catch (err: any) {
+      res.status(500).json({ message: "Sync push failed" });
+    }
   });
 
   return httpServer;

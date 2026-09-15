@@ -18,8 +18,7 @@ import {
 } from "@/hooks/use-master-data";
 import { useTimetable } from "@/hooks/use-timetable";
 import { useQuery } from "@tanstack/react-query";
-import { api } from "@shared/routes";
-import { apiUrl } from "@/lib/api-base";
+import { ensureInstitution } from "@/lib/desktop-api";
 import { motion } from "framer-motion";
 import {
   User,
@@ -65,14 +64,10 @@ export function ProfileSection({ onNavigate }) {
   const { data: timeSlots } = useTimeSlots();
   const { data: timetable = [] } = useTimetable({});
 
+  // Activity feed from local generation history (cloud change requests removed).
   const { data: requests = [] } = useQuery({
-    queryKey: [api.changeRequests.list.path],
-    queryFn: async () => {
-      const res = await fetch(apiUrl(api.changeRequests.list.path), { credentials: "include" });
-      if (!res.ok) return [];
-      return await res.json();
-    },
-    refetchInterval: 5000,
+    queryKey: ["institution-current"],
+    queryFn: async () => ensureInstitution(),
   });
 
   const [profileData, setProfileData] = useState({
@@ -106,19 +101,14 @@ export function ProfileSection({ onNavigate }) {
 
   const hasChanges = JSON.stringify(profileData) !== savedSnapshot;
 
+  // Local profile: display name is stored in app settings (no online account).
   const updateProfileMutation = useMutation({
     mutationFn: async (data) => {
-      const res = await fetch(apiUrl(api.auth.updateProfile.path), {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(data),
-      });
-      if (!res.ok) throw new Error("Failed to update profile");
-      return await res.json();
+      await window.api.settings.set("profile.name", data.name || "Local User");
+      return { ok: true };
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [api.auth.me.path] });
+      queryClient.invalidateQueries();
       toast({ title: "Profile updated successfully" });
     },
     onError: () => {

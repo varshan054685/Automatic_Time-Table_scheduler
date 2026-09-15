@@ -1,173 +1,95 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api } from "@shared/routes";
-import { apiUrl } from "@/lib/api-base";
+import { ensureInstitution, clearInstitutionIdCache } from "@/lib/desktop-api";
+
+/**
+ * Local-desktop auth contract (no online accounts — spec §5):
+ * useUser() always resolves to a local "owner" user whose workspace is the
+ * local institution. Login/OTP/OAuth flows are removed; the hook names are
+ * kept so existing pages render unchanged.
+ */
+
+const USER_KEY = ["local-user"];
 
 export function useUser() {
   const { data, isLoading, error } = useQuery({
-    queryKey: [api.auth.me.path],
+    queryKey: USER_KEY,
     queryFn: async () => {
-      const res = await fetch(apiUrl(api.auth.me.path), { credentials: "include" });
-      if (res.status === 401) return null;
-      if (!res.ok) throw new Error("Failed to fetch user");
-      return await res.json();
+      const inst = await ensureInstitution();
+      const profileName = await window.api.settings.get("profile.name");
+      return {
+        id: 1,
+        name: (profileName && String(profileName)) || "Local User",
+        email: null,
+        role: "owner",
+        workspace: {
+          id: inst.id,
+          workspaceName: inst.name,
+          role: "owner",
+          academicYear: inst.academicYear,
+          institutionType: inst.type,
+        },
+      };
     },
+    staleTime: 30_000,
     retry: false,
-    staleTime: 0, // Always refetch on mount to catch OAuth login
-    refetchOnMount: true,
   });
   return { user: data, isLoading, error };
 }
 
-export function useLogin() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async (credentials) => {
-      const res = await fetch(apiUrl(api.auth.login.path), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(credentials),
-        credentials: "include",
-      });
-      
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        const error = new Error(data.message || "Login failed");
-        error.field = data.field;
-        throw error;
-      }
-      return await res.json();
-    },
-    onSuccess: (user) => {
-      queryClient.setQueryData([api.auth.me.path], user);
-    },
-  });
-}
-
-export function useRegister() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async (data) => {
-      const res = await fetch(apiUrl(api.auth.register.path), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-        credentials: "include",
-      });
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.message || "Registration failed");
-      }
-      return await res.json();
-    },
-    onSuccess: (user) => {
-      queryClient.setQueryData([api.auth.me.path], user);
-    },
-  });
-}
-
+/** Kept for API compatibility — the desktop app has no logout. */
 export function useLogout() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async () => {
-      await fetch(apiUrl(api.auth.logout.path), { 
-        method: "POST",
-        credentials: "include" 
-      });
+    mutationFn: async () => undefined,
+    onSuccess: () => {
+      queryClient.setQueryData(USER_KEY, null);
+    },
+  });
+}
+
+/** Rename the local institution (Settings → Workspace section). */
+export function useUpdateWorkspace() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ name }) => {
+      const inst = await ensureInstitution();
+      return window.api.institutions.update(inst.id, { name });
     },
     onSuccess: () => {
-      // Clear timetable selections so next login starts fresh
-      localStorage.removeItem("tt_selectedDept");
-      localStorage.removeItem("tt_selectedSection");
-      localStorage.removeItem("tt_selectedFaculty");
-      queryClient.setQueryData([api.auth.me.path], null);
+      clearInstitutionIdCache();
+      queryClient.invalidateQueries({ queryKey: USER_KEY });
     },
   });
 }
 
-export function useRequestOtp() {
+/** Switch the active academic year for the local institution. */
+export function useSetActiveYear() {
+  const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (data) => {
-      const res = await fetch(apiUrl(api.auth.requestOtp.path), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.message || "Failed to send OTP");
-      }
-      return await res.json();
+    mutationFn: async ({ yearId }) => {
+      const inst = await ensureInstitution();
+      return window.api.academicYears.activate(inst.id, yearId);
+    },
+    onSuccess: () => {
+      clearInstitutionIdCache();
+      queryClient.invalidateQueries({ queryKey: USER_KEY });
     },
   });
 }
 
-export function useVerifyOtp() {
-  return useMutation({
-    mutationFn: async (data) => {
-      const res = await fetch(apiUrl(api.auth.verifyOtp.path), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.message || "OTP verification failed");
-      }
-      return await res.json();
-    },
-  });
-}
-
-export function useGoogleLogin() {
+// ─── Removed cloud flows. Kept as no-op hooks so any lingering imports ────
+// ─── fail loudly at runtime instead of silently doing nothing.        ────
+function removed(name) {
   return () => {
-    window.location.href = apiUrl(api.auth.googleLogin.path);
+    throw new Error(`${name} was removed in the offline desktop edition.`);
   };
 }
 
-export function useAuthConfig() {
-  const { data, isLoading } = useQuery({
-    queryKey: ["/api/auth/config"],
-    queryFn: async () => {
-      const res = await fetch(apiUrl("/api/auth/config"));
-      if (!res.ok) throw new Error("Failed to fetch auth config");
-      return await res.json();
-    },
-    retry: false,
-  });
-  return { config: data, isLoading };
-}
-
-export function useForgotPassword() {
-  return useMutation({
-    mutationFn: async (data) => {
-      const res = await fetch(apiUrl("/api/auth/forgot-password"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.message || "Failed to send reset code");
-      }
-      return await res.json();
-    },
-  });
-}
-
-export function useResetPassword() {
-  return useMutation({
-    mutationFn: async (data) => {
-      const res = await fetch(apiUrl("/api/auth/reset-password"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.message || "Failed to reset password");
-      }
-      return await res.json();
-    },
-  });
-}
-
+export const useLogin = removed("useLogin");
+export const useRegister = removed("useRegister");
+export const useRequestOtp = removed("useRequestOtp");
+export const useVerifyOtp = removed("useVerifyOtp");
+export const useGoogleLogin = removed("useGoogleLogin");
+export const useAuthConfig = removed("useAuthConfig");
+export const useForgotPassword = removed("useForgotPassword");
+export const useResetPassword = removed("useResetPassword");

@@ -27,7 +27,8 @@ async function buildServer() {
       "passport-local",
       "express-session",
       "connect-pg-simple",
-      "memorystore"
+      "memorystore",
+      "better-sqlite3"
     ],
 
     define: {

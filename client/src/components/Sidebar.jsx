@@ -17,12 +17,9 @@ import {
   ChevronRight,
   Zap,
 } from "lucide-react";
-import { useLogout, useUser } from "@/hooks/use-auth";
+import { useUser } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { useQuery } from "@tanstack/react-query";
-import { api } from "@shared/routes";
-import { apiUrl } from "@/lib/api-base";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Tooltip,
@@ -44,7 +41,6 @@ const navItems = [
 
 export function Sidebar() {
   const [location] = useLocation();
-  const logoutMutation = useLogout();
   const { user } = useUser();
   const isMobile = useIsMobile();
   const [isOpen, setIsOpen] = useState(() => {
@@ -68,20 +64,11 @@ export function Sidebar() {
   };
 
   const isOwner = user?.workspace?.role === "owner";
-  const workspaceName = user?.workspace?.workspaceName || "Workspace";
+  const workspaceName = user?.workspace?.workspaceName || "Institution";
 
-  const { data: requests = [] } = useQuery({
-    queryKey: [api.changeRequests.list.path],
-    queryFn: async () => {
-      const res = await fetch(apiUrl(api.changeRequests.list.path), { credentials: "include" });
-      if (!res.ok) return [];
-      return await res.json();
-    },
-    enabled: isOwner,
-    refetchInterval: 5000,
-  });
-
-  const pendingCount = requests.filter((r) => r.status === "pending").length;
+  // Change requests were a multi-user cloud feature — removed in the offline
+  // desktop edition. The badge simply never shows now.
+  const pendingCount = 0;
 
   const initials = user?.name
     ? user.name.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2)
@@ -310,7 +297,7 @@ export function Sidebar() {
                 )}
               </Tooltip>
 
-              {/* Sign out */}
+              {/* Quit — desktop equivalent of the old sign-out */}
               <Tooltip delayDuration={0}>
                 <TooltipTrigger asChild>
                   <button
@@ -320,15 +307,15 @@ export function Sidebar() {
                       transition-all duration-200 text-[12px] font-semibold
                       ${!isOpen && "justify-center"}
                     `}
-                    onClick={() => { logoutMutation.mutate(); if (isMobile) setIsOpen(false); }}
+                    onClick={() => { if (window.desktopApi?.quit) window.desktopApi.quit(); else window.close(); }}
                   >
                     <LogOut className="w-4 h-4 shrink-0" />
-                    {isOpen && <span>Sign Out</span>}
+                    {isOpen && <span>Quit</span>}
                   </button>
                 </TooltipTrigger>
                 {!isOpen && !isMobile && (
                   <TooltipContent side="right" sideOffset={12} className="font-semibold">
-                    Sign Out
+                    Quit
                   </TooltipContent>
                 )}
               </Tooltip>

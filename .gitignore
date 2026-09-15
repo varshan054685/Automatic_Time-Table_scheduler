@@ -85,6 +85,42 @@ coverage/
 *.lcov
 
 # ─────────────────────────────────────────────
+# Local SQLite / database files
+# ─────────────────────────────────────────────
+data/
+*.sqlite
+*.sqlite3
+*.sqlite-shm
+*.sqlite-wal
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# ─────────────────────────────────────────────
+# Mobile (Expo / React Native)
+# ─────────────────────────────────────────────
+mobile/.expo/
+mobile/node_modules/
+mobile/android/
+mobile/ios/
+mobile/dist/
+mobile/web-build/
+mobile/expo-env.d.ts
+
+# ─────────────────────────────────────────────
+# IDE / tool config
+# ─────────────────────────────────────────────
+.claude/
+
+# ─────────────────────────────────────────────
 # Misc
 # ─────────────────────────────────────────────
 TODO.md
+
+# ─────────────────────────────────────────────
+# Electron / desktop
+# ─────────────────────────────────────────────
+release/
+dist/electron/
+

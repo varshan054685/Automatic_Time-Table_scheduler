@@ -85,6 +85,7 @@ CREATE TABLE "users" (
 	"password" text NOT NULL,
 	"role" text DEFAULT 'staff' NOT NULL,
 	"name" text NOT NULL,
+	"avatar" text,
 	"created_at" timestamp DEFAULT now(),
 	CONSTRAINT "users_email_unique" UNIQUE("email")
 );

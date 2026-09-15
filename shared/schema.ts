@@ -1,7 +1,7 @@
-import { pgTable, text, serial, integer, boolean, jsonb, timestamp, uuid } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, boolean, timestamp, jsonb, serial } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 
 // === USER & AUTH ===
 export const users = pgTable("users", {
@@ -44,7 +44,11 @@ export const workspaceMembers = pgTable("workspace_members", {
   workspaceId: integer("workspace_id").notNull(),
   userId: integer("user_id").notNull(),
   role: text("role").notNull().default("viewer"), // 'owner', 'viewer'
+  clientId: text("client_id"),
+  version: integer("version").notNull().default(1),
   createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()),
+  deletedAt: timestamp("deleted_at"),
 });
 
 export const changeRequests = pgTable("change_requests", {
@@ -52,9 +56,13 @@ export const changeRequests = pgTable("change_requests", {
   workspaceId: integer("workspace_id").notNull(),
   requestedBy: integer("requested_by").notNull(),
   type: text("type").notNull(), // 'edit', 'delete'
-  data: jsonb("data").notNull(),
+  data: jsonb("data").$type<Record<string, any>>().notNull(),
   status: text("status").notNull().default("pending"), // 'pending', 'approved', 'rejected'
+  clientId: text("client_id"),
+  version: integer("version").notNull().default(1),
   createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()),
+  deletedAt: timestamp("deleted_at"),
 });
 
 // === MASTER DATA ===
@@ -63,7 +71,11 @@ export const departments = pgTable("departments", {
   workspaceId: integer("workspace_id").notNull(),
   name: text("name").notNull(),
   code: text("code").notNull(),
+  clientId: text("client_id"),
+  version: integer("version").notNull().default(1),
   createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()),
+  deletedAt: timestamp("deleted_at"),
 });
 
 export const classrooms = pgTable("classrooms", {
@@ -72,7 +84,11 @@ export const classrooms = pgTable("classrooms", {
   roomNumber: text("room_number").notNull(),
   capacity: integer("capacity").notNull(),
   type: text("type").default("lecture"), // lecture, lab
+  clientId: text("client_id"),
+  version: integer("version").notNull().default(1),
   createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()),
+  deletedAt: timestamp("deleted_at"),
 });
 
 export const subjects = pgTable("subjects", {
@@ -85,18 +101,26 @@ export const subjects = pgTable("subjects", {
   facultyId: integer("faculty_id"), // Default faculty
   sectionId: integer("section_id"), // Primary section
   type: text("type").default("lecture"), // lecture, lab
+  clientId: text("client_id"),
+  version: integer("version").notNull().default(1),
   createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()),
+  deletedAt: timestamp("deleted_at"),
 });
 
 export const faculty = pgTable("faculty", {
   id: serial("id").primaryKey(),
   workspaceId: integer("workspace_id").notNull(),
   name: text("name").notNull(),
-  code: text("code").notNull(), 
+  code: text("code").notNull(),
   departmentId: integer("department_id").notNull(),
   email: text("email"),
-  availability: jsonb("availability").$type<string[]>().default([]), 
+  availability: jsonb("availability").$type<string[]>().default([]),
+  clientId: text("client_id"),
+  version: integer("version").notNull().default(1),
   createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()),
+  deletedAt: timestamp("deleted_at"),
 });
 
 export const sections = pgTable("sections", {
@@ -107,7 +131,11 @@ export const sections = pgTable("sections", {
   semester: integer("semester").notNull(),
   departmentId: integer("department_id").notNull(),
   classroomId: integer("classroom_id"),
+  clientId: text("client_id"),
+  version: integer("version").notNull().default(1),
   createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()),
+  deletedAt: timestamp("deleted_at"),
 });
 
 export const timeSlots = pgTable("time_slots", {
@@ -117,6 +145,11 @@ export const timeSlots = pgTable("time_slots", {
   startTime: text("start_time").notNull(), // "09:00"
   endTime: text("end_time").notNull(), // "10:00"
   label: text("label").notNull(), // "Period 1"
+  clientId: text("client_id"),
+  version: integer("version").notNull().default(1),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()),
+  deletedAt: timestamp("deleted_at"),
 });
 
 export const timetable = pgTable("timetable", {
@@ -127,6 +160,11 @@ export const timetable = pgTable("timetable", {
   facultyId: integer("faculty_id").notNull(),
   classroomId: integer("classroom_id").notNull(),
   timeSlotId: integer("time_slot_id").notNull(),
+  clientId: text("client_id"),
+  version: integer("version").notNull().default(1),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()),
+  deletedAt: timestamp("deleted_at"),
 });
 
 export const generationJobs = pgTable("generation_jobs", {

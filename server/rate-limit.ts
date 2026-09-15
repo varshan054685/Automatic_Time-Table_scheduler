@@ -1,5 +1,5 @@
 import rateLimit from "express-rate-limit";
-import { log } from "./index";
+import { log } from "./logger";
 
 /**
  * Rate limiter for authentication endpoints (login, register).

@@ -1,6 +1,6 @@
 import { storage } from "./storage";
 import { generateWithPython } from "./python-scheduler";
-import { log } from "./index";
+import { log } from "./logger";
 
 /**
  * Process a single section's timetable generation.

@@ -5,11 +5,8 @@ import { Toaster } from "@/components/ui/toaster.tsx";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useUser } from "@/hooks/use-auth";
 import { Loader2 } from "lucide-react";
-import { WorkspaceSetupDialog } from "@/components/WorkspaceSetupDialog";
-import { Chatbot } from "@/components/Chatbot";
 import { motion, AnimatePresence } from "framer-motion";
 
-import Login from "@/pages/Login";
 import Dashboard from "@/pages/Dashboard";
 import Departments from "@/pages/Departments";
 import Classrooms from "@/pages/Classrooms";
@@ -20,9 +17,13 @@ import Sections from "@/pages/Sections";
 import TimeSlots from "@/pages/TimeSlots";
 import Settings from "@/pages/Settings";
 
+/**
+ * Offline desktop routing. No login gate and no workspace-setup dialog —
+ * the local institution is auto-created on first launch (spec §5/§6).
+ * Page components and their visual design are unchanged.
+ */
 function ProtectedRoute({ component: Component }) {
-  const { user, isLoading } = useUser();
-  const [, setLocation] = useLocation();
+  const { isLoading } = useUser();
 
   if (isLoading) {
     return (
@@ -30,16 +31,6 @@ function ProtectedRoute({ component: Component }) {
         <Loader2 className="animate-spin text-primary w-8 h-8" />
       </div>
     );
-  }
-
-  if (!user) {
-    setLocation("/login");
-    return null;
-  }
-
-  // Show workspace setup if user has no workspace
-  if (!user.workspace) {
-    return <WorkspaceSetupDialog />;
   }
 
   return (
@@ -55,38 +46,12 @@ function ProtectedRoute({ component: Component }) {
   );
 }
 
-// PublicRoute - for pages like login that should redirect if already logged in
-function PublicRoute({ component: Component }) {
-  const { user, isLoading } = useUser();
-  const [, setLocation] = useLocation();
-
-  if (isLoading) {
-    return (
-      <div className="h-screen w-full flex items-center justify-center">
-        <Loader2 className="animate-spin text-primary w-8 h-8" />
-      </div>
-    );
-  }
-
-  // If user is logged in, redirect to home
-  if (user) {
-    setLocation("/");
-    return null;
-  }
-
-  return <Component />;
-}
-
 function Router() {
   const [location] = useLocation();
 
   return (
     <AnimatePresence mode="wait">
       <Switch location={location} key={location}>
-        <Route path="/login">
-          <PublicRoute component={Login} />
-        </Route>
-
         <Route path="/">
           <ProtectedRoute component={Dashboard} />
         </Route>
@@ -129,29 +94,12 @@ function Router() {
   );
 }
 
-// AppContent runs inside QueryClientProvider so useUser works correctly
-function AppContent() {
-  const { user, isLoading } = useUser();
-
-  // Only show the chatbot when the user is fully authenticated with a workspace.
-  // On the login page there's no session, so the /api/chatbot endpoint would
-  // return 401 — no point rendering it at all.
-  const showChatbot = !isLoading && !!user?.workspace;
-
-  return (
-    <>
-      <Toaster />
-      <Router />
-      {showChatbot && <Chatbot />}
-    </>
-  );
-}
-
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <AppContent />
+        <Toaster />
+        <Router />
       </TooltipProvider>
     </QueryClientProvider>
   );

@@ -29,9 +29,6 @@ import {
   Zap,
 } from "lucide-react";
 import { useLocation } from "wouter";
-import { useQuery } from "@tanstack/react-query";
-import { api } from "@shared/routes";
-import { apiUrl } from "@/lib/api-base";
 import { useUser } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
@@ -49,16 +46,8 @@ export default function Dashboard() {
   const { user } = useUser();
   const isOwner  = user?.workspace?.role === "owner";
 
-  const { data: requests = [] } = useQuery({
-    queryKey: [api.changeRequests.list.path],
-    queryFn: async () => {
-      const res = await fetch(apiUrl(api.changeRequests.list.path), { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch");
-      return await res.json();
-    },
-  });
-
-  const pendingRequests = requests.filter((r) => r.status === "pending").slice(0, 5);
+  // Change requests were a multi-user cloud feature — removed offline.
+  const pendingRequests = [];
 
   const kpi = [
     { label: "Departments", value: departments?.length || 0, icon: Building2,    colorClass: "text-teal-600" },

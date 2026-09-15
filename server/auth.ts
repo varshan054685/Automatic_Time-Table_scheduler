@@ -8,7 +8,7 @@ import { storage } from "./storage";
 import { z } from "zod";
 import bcrypt from "bcrypt";
 import crypto from "crypto";
-import { log } from "./index";
+import { log } from "./logger";
 import { authLimiter } from "./rate-limit";
 import nodemailer from "nodemailer";
 import sgMail from "@sendgrid/mail";
@@ -747,23 +747,102 @@ export function setupAuth(app: Express) {
     }
   });
 
-  // ─── Google OAuth Routes ───
-  app.get("/api/auth/google", passport.authenticate("google", { scope: ["profile", "email"] }));
+  // ─── Mobile Google Login (ID-token exchange) ───
+  // React Native cannot run the full browser redirect flow reliably, so the
+  // mobile app obtains a Google ID token (via expo-auth-session or Google
+  // Sign-In), sends it here, and receives the same session-cookie login as
+  // the web app. The token is verified against Google's tokeninfo endpoint.
+  const googleMobileSchema = z.object({
+    idToken: z.string().min(1).max(5000),
+  });
 
-  app.get("/api/auth/google/callback",
-    passport.authenticate("google", { failureRedirect: "/login" }),
-    async (req, res) => {
+  app.post("/api/auth/google/mobile", authLimiter, async (req, res, next) => {
+    try {
+      if (!isGoogleOauthConfigured()) {
+        return res.status(400).json({ message: "Google authentication is not configured on this server." });
+      }
+      const parsed = googleMobileSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid input: idToken is required" });
+      }
+
+      // Verify the ID token with Google's public tokeninfo endpoint.
+      const tokenResp = await fetch(
+        `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(parsed.data.idToken)}`
+      );
+      const tokenInfo: any = await tokenResp.json();
+
+      if (!tokenResp.ok || !tokenInfo.sub || !tokenInfo.email) {
+        log(`GOOGLE_MOBILE_FAILED reason=invalid_token IP=${req.ip}`, "security");
+        return res.status(401).json({ message: "Invalid Google token" });
+      }
+
+      // Optional hardening: verify the token audience matches our client ID.
+      if (googleClientId && tokenInfo.aud && tokenInfo.aud !== googleClientId) {
+        log(`GOOGLE_MOBILE_FAILED reason=audience_mismatch IP=${req.ip}`, "security");
+        return res.status(401).json({ message: "Token audience mismatch" });
+      }
+
+      const email = tokenInfo.email.toLowerCase();
+      const googleId = tokenInfo.sub;
+
+      // Find or create the user (same linking logic as the web Google strategy).
+      let user = await storage.getUserByGoogleId(googleId);
+      if (!user) {
+        const existing = await storage.getUserByEmail(email);
+        if (existing) {
+          user = await storage.updateUser(existing.id, { googleId });
+        } else {
+          user = await storage.createUser({
+            email,
+            name: tokenInfo.name || email.split("@")[0],
+            googleId,
+            password: await bcrypt.hash(crypto.randomBytes(32).toString("hex"), BCRYPT_ROUNDS),
+            role: "admin",
+            isVerified: true,
+          });
+        }
+      }
+
+      req.login(user, async (err) => {
+        if (err) return next(err);
+        log(`GOOGLE_MOBILE_LOGIN_SUCCESS userId=${user.id} IP=${req.ip}`, "security");
+        const membership = await storage.getUserWorkspaceMembership(user.id);
+        const { password: _, ...safeUser } = user;
+        res.status(200).json({ ...safeUser, workspace: membership || null });
+      });
+    } catch (err: any) {
+      console.error("Google mobile login error:", err.message);
+      res.status(500).json({ message: "Google login failed" });
+    }
+  });
+
+  // ─── Google OAuth Routes ───
+  const isGoogleOauthConfigured = () =>
+    !!(googleClientId && googleClientSecret && googleClientId !== "your-google-client-id.apps.googleusercontent.com");
+
+  app.get("/api/auth/google", (req, res, next) => {
+    if (!isGoogleOauthConfigured()) {
+      return res.status(400).json({ message: "Google authentication is not configured on this server." });
+    }
+    passport.authenticate("google", { scope: ["profile", "email"] })(req, res, next);
+  });
+
+  app.get("/api/auth/google/callback", (req, res, next) => {
+    if (!isGoogleOauthConfigured()) {
+      return res.redirect("/login?error=google_not_configured");
+    }
+    passport.authenticate("google", { failureRedirect: "/login" })(req, res, async (err?: any) => {
+      if (err) return next(err);
       const user = req.user as any;
       log(`GOOGLE_LOGIN_SUCCESS userId=${user?.id} IP=${req.ip}`, "security");
       const membership = await storage.getUserWorkspaceMembership(user.id);
-      // In development, redirect to the Vite dev server (5173).
-      // In production, use FRONTEND_URL env var to redirect to Vercel frontend
       const frontendUrl = process.env.NODE_ENV === "development"
         ? "http://localhost:5173/"
         : (process.env.FRONTEND_URL || "/");
       res.redirect(frontendUrl);
-    }
-  );
+    });
+  });
 
   // ─── Login (rate limited) ───
   const loginSchema = z.object({

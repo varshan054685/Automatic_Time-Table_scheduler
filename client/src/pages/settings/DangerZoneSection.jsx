@@ -5,11 +5,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from "@/hooks/use-auth";
-import { api } from "@shared/routes";
-import { apiUrl } from "@/lib/api-base";
+import { clearInstitutionIdCache } from "@/lib/desktop-api";
 import { motion, AnimatePresence } from "framer-motion";
-import { AlertTriangle, ChevronDown, Trash2, LogOut, Loader2, ShieldAlert } from "lucide-react";
+import { AlertTriangle, ChevronDown, Trash2, Loader2, ShieldAlert } from "lucide-react";
 
+/**
+ * Danger Zone — offline edition. "Delete Workspace" becomes "Reset All Data":
+ * a verified safety backup is created first, then all academic rows are wiped.
+ * Visual design is unchanged from the original.
+ */
 export function DangerZoneSection() {
   const { user } = useUser();
   const { toast } = useToast();
@@ -21,47 +25,35 @@ export function DangerZoneSection() {
 
   const workspaceName = user?.workspace?.workspaceName || "";
 
-  const deleteWsMutation = useMutation({
+  const resetMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch(apiUrl(api.workspaces.delete.path), { method: "DELETE", credentials: "include" });
-      if (!res.ok) throw new Error("Failed to delete workspace");
-      return await res.json();
+      // Safety backup before the destructive operation (spec §13).
+      await window.api.backup.create("before-reset");
+      // Wipe all academic data. The IPC handler clears rows inside one
+      // transaction (see api:data:resetAll in electron/ipc/register.ts).
+      return window.api.data.resetAll();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [api.auth.me.path] });
-      toast({ title: "Workspace deleted successfully." });
+      clearInstitutionIdCache();
+      queryClient.invalidateQueries();
+      toast({ title: "All data has been reset. A safety backup was saved first." });
+    },
+    onError: (err) => {
+      toast({ title: "Reset failed", description: err.message, variant: "destructive" });
     },
   });
 
-  const leaveWsMutation = useMutation({
-    mutationFn: async () => {
-      const res = await fetch(apiUrl(api.workspaces.leave.path), { method: "POST", credentials: "include" });
-      if (!res.ok) throw new Error("Failed to leave workspace");
-      return await res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [api.auth.me.path] });
-      toast({ title: "You have left the workspace." });
-    },
-  });
-
-  const isPending = deleteWsMutation.isPending || leaveWsMutation.isPending;
+  const isPending = resetMutation.isPending;
   const canDelete = isOwner && confirmName.trim() === workspaceName.trim();
-
-  const handleLeave = () => {
-    if (confirm("Are you sure you want to leave this workspace?")) {
-      leaveWsMutation.mutate();
-    }
-  };
 
   const handleDelete = () => {
     if (!canDelete) return;
     if (
       confirm(
-        "WARNING: This will permanently delete the workspace and ALL associated data (Timetables, Departments, Faculty, etc). This action cannot be undone. Are you sure?"
+        "WARNING: This will permanently delete ALL data (Timetables, Departments, Faculty, etc). A safety backup will be saved first. This action cannot be undone. Are you sure?"
       )
     ) {
-      deleteWsMutation.mutate();
+      resetMutation.mutate();
     }
   };
 
@@ -109,13 +101,11 @@ export function DangerZoneSection() {
                   <div className="flex items-start gap-3">
                     <AlertTriangle className="w-5 h-5 text-rose-500 shrink-0 mt-0.5" />
                     <div className="flex-1">
-                      <h4 className="text-sm font-black text-rose-900">
-                        {isOwner ? "Delete Workspace" : "Leave Workspace"}
-                      </h4>
+                      <h4 className="text-sm font-black text-rose-900">Reset All Data</h4>
                       <p className="text-sm text-rose-700/80 mt-1 font-medium leading-relaxed">
-                        {isOwner
-                          ? "Permanently delete this workspace and all associated data including timetables, departments, faculty, and schedules. This cannot be undone."
-                          : "Leave this workspace and lose access to all shared resources. You can rejoin with an invite code."}
+                        Permanently delete all data including timetables, departments, faculty, and
+                        schedules. A verified safety backup is created first so you can restore later
+                        from Settings → Data. This cannot be undone.
                       </p>
 
                       {isOwner && (
@@ -128,6 +118,7 @@ export function DangerZoneSection() {
                             value={confirmName}
                             onChange={(e) => setConfirmName(e.target.value)}
                             placeholder={workspaceName}
+
                           />
                         </div>
                       )}
@@ -137,20 +128,14 @@ export function DangerZoneSection() {
                         variant="destructive"
                         className="mt-4 h-10 px-5 rounded-xl font-bold flex items-center gap-2"
                         disabled={isPending || (isOwner && !canDelete)}
-                        onClick={isOwner ? handleDelete : handleLeave}
+                        onClick={handleDelete}
                       >
                         {isPending ? (
                           <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : isOwner ? (
-                          <Trash2 className="w-4 h-4" />
                         ) : (
-                          <LogOut className="w-4 h-4" />
+                          <Trash2 className="w-4 h-4" />
                         )}
-                        {isPending
-                          ? "Processing..."
-                          : isOwner
-                            ? "Delete Workspace"
-                            : "Leave Workspace"}
+                        {isPending ? "Processing..." : "Reset All Data"}
                       </Button>
                     </div>
                   </div>

@@ -156,7 +156,7 @@ export default function Login() {
     forgotPasswordMutation.isPending || resetPasswordMutation.isPending;
   const error = loginMutation.error || registerMutation.error ||
     requestOtpMutation.error || verifyOtpMutation.error;
-  const showGoogleButton = !isRegister && !isForgotPassword && authConfig?.googleOAuthEnabled !== false;
+  const showGoogleButton = !isRegister && !isForgotPassword && authConfig?.googleOAuthEnabled === true;
 
   /* ── Page title helper ── */
   const pageTitle = isForgotPassword ? "Reset Password" : isRegister ? "Create Account" : "Welcome Back";

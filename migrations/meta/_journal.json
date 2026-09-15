@@ -15,6 +15,13 @@
       "when": 1777432069579,
       "tag": "0001_brown_steel_serpent",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1786591561502,
+      "tag": "0002_sync_columns",
+      "breakpoints": true
     }
   ]
 }

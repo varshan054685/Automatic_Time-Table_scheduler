@@ -15,8 +15,8 @@ import {
   useClassrooms,
   useTimeSlots,
 } from "@/hooks/use-master-data";
-import { api } from "@shared/routes";
-import { apiUrl } from "@/lib/api-base";
+import { useUpdateWorkspace } from "@/hooks/use-auth";
+import { ensureInstitution } from "@/lib/desktop-api";
 import { motion } from "framer-motion";
 import { Building2, Calendar, Copy, Check, Pencil, Loader2, GraduationCap, BookOpen, LayoutGrid, School } from "lucide-react";
 import { calcWorkspaceHealth } from "./helpers";
@@ -35,12 +35,8 @@ export function WorkspaceSection() {
   const { data: timeSlots } = useTimeSlots();
 
   const { data: wsData } = useQuery({
-    queryKey: [api.workspaces.current.path],
-    queryFn: async () => {
-      const res = await fetch(apiUrl(api.workspaces.current.path), { credentials: "include" });
-      if (!res.ok) throw new Error("Failed");
-      return await res.json();
-    },
+    queryKey: ["institution-current"],
+    queryFn: async () => ensureInstitution(),
     enabled: !!user?.workspace,
   });
 
@@ -60,27 +56,20 @@ export function WorkspaceSection() {
     }
   }, [user, wsData]);
 
-  const updateWsMutation = useMutation({
-    mutationFn: async (data) => {
-      const res = await fetch(apiUrl(api.workspaces.current.path), {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(data),
-      });
-      if (!res.ok) throw new Error("Failed to update workspace");
-      return await res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [api.auth.me.path] });
-      queryClient.invalidateQueries({ queryKey: [api.workspaces.current.path] });
-      toast({ title: "Workspace updated successfully" });
-      setIsEditing(false);
-    },
-    onError: () => {
-      toast({ title: "Failed to update workspace", variant: "destructive" });
-    },
-  });
+  const updateWsMutation = useUpdateWorkspace();
+
+  const handleSaveWorkspace = (data) => {
+    updateWsMutation.mutate(data, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ["institution-current"] });
+        toast({ title: "Institution updated successfully" });
+        setIsEditing(false);
+      },
+      onError: () => {
+        toast({ title: "Failed to update institution", variant: "destructive" });
+      },
+    });
+  };
 
   const workspaceId = wsData?.id ?? user?.workspace?.workspaceId;
   const { score: healthScore, checks: healthChecks } = calcWorkspaceHealth({
@@ -132,7 +121,7 @@ export function WorkspaceSection() {
             className="space-y-4 max-w-lg"
             onSubmit={(e) => {
               e.preventDefault();
-              updateWsMutation.mutate(workspaceData);
+              handleSaveWorkspace(workspaceData);
             }}
           >
             <div className="grid gap-2">

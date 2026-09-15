@@ -6,6 +6,8 @@ import helmet from "helmet";
 import "dotenv/config";
 import { apiLimiter } from "./rate-limit";
 import "./worker";
+import { log } from "./logger";
+export { log };
 
 const app = express();
 const httpServer = createServer(app);
@@ -66,16 +68,7 @@ app.use("/api/", apiLimiter);
 
 
 
-export function log(message: string, source = "express") {
-  const formattedTime = new Date().toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: true,
-  });
 
-  console.log(`${formattedTime} [${source}] ${message}`);
-}
 
 // ─── Request logging middleware ───
 app.use((req, res, next) => {
@@ -146,7 +139,6 @@ app.use((req, res, next) => {
     {
       port,
       host: "0.0.0.0",
-      reusePort: true,
     },
     () => {
       log(`serving on port ${port}`);
