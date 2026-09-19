@@ -1,31 +1,23 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
-import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 
+/**
+ * Renderer build for the Electron desktop app.
+ *
+ * The client is a local SPA: the main process loads dist/public in production
+ * and the Vite dev server in development. There is deliberately NO API proxy
+ * and no cloud plugin — every data access goes through window.api (IPC), so a
+ * missing proxy can never silently fall back to a remote backend.
+ */
 export default defineConfig({
-  plugins: [
-    react(),
-    runtimeErrorOverlay(),
-    ...(process.env.NODE_ENV !== "production" &&
-    process.env.REPL_ID !== undefined
-      ? [
-          await import("@replit/vite-plugin-cartographer").then((m) =>
-            m.cartographer(),
-          ),
-          await import("@replit/vite-plugin-dev-banner").then((m) =>
-            m.devBanner(),
-          ),
-        ]
-      : []),
-  ],
+  plugins: [react()],
   css: {
     postcss: import.meta.dirname,
   },
   resolve: {
     alias: {
       "@": path.resolve(import.meta.dirname, "client", "src"),
-      "@shared": path.resolve(import.meta.dirname, "shared"),
       "@assets": path.resolve(import.meta.dirname, "attached_assets"),
     },
   },
@@ -35,16 +27,13 @@ export default defineConfig({
     emptyOutDir: true,
   },
   server: {
+    // The Electron dev window loads this exact URL — fail loudly rather than
+    // silently moving to another port.
+    port: 5173,
+    strictPort: true,
     fs: {
       strict: true,
       deny: ["**/.*"],
-    },
-    proxy: {
-      "/api": {
-        target: "http://localhost:5000",
-        changeOrigin: true,
-        secure: false,
-      },
     },
   },
 });

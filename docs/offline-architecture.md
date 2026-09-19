@@ -1,5 +1,13 @@
 # Current Architecture Analysis → Offline Desktop Transformation
 
+> **Historical document.** This is the Phase 1/2 *as-is* analysis of the original
+> online application, written before any code was changed. Everything below the
+> "Current Architecture" heading describes the legacy stack (Express, PostgreSQL,
+> OAuth, cloud workspaces) that has since been **removed** — it is kept as the
+> rationale for the transformation, not as a description of the shipped app.
+> For the live state see `implementation-status.md`; for the target see
+> `desktop-architecture.md`.
+
 > Phase 2 deliverable. Analysis only — no production code modified.
 
 ## 1. Current Architecture (as-is)

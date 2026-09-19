@@ -23,8 +23,12 @@ const api = {
   },
   database: {
     status: () => invoke("api:database:status"),
+    integrity: () => invoke("api:database:integrity"),
   },
   institutions: {
+    // Single-user desktop app: `current` resolves (creating on first run) the
+    // one local institution and its active academic year.
+    current: () => invoke("api:institutions:current"),
     list: () => invoke("api:institutions:list"),
     create: (data: unknown) => invoke("api:institutions:create", data),
     update: (id: number, data: unknown) => invoke("api:institutions:update", { id, data }),
@@ -81,18 +85,14 @@ const api = {
     create: (data: unknown) => invoke("api:subjects:create", data),
     update: (id: number, data: unknown) => invoke("api:subjects:update", { id, data }),
     delete: (id: number) => invoke("api:subjects:delete", id),
-    assignments: {
-      list: (filter?: { sectionId?: number; subjectId?: number }) =>
-        invoke("api:subjectAssignments:list", filter),
-      create: (data: unknown) => invoke("api:subjectAssignments:create", data),
-      update: (id: number, data: unknown) => invoke("api:subjectAssignments:update", { id, data }),
-      delete: (id: number) => invoke("api:subjectAssignments:delete", id),
-    },
   },
   timetable: {
     entries: (filters?: { versionId?: number; sectionId?: number; teacherId?: number; classroomId?: number }) =>
       invoke("api:timetable:entries", filters),
     versions: (institutionId?: number) => invoke("api:timetable:versions", institutionId),
+    conflicts: (institutionId?: number) => invoke("api:timetable:conflicts", institutionId),
+    activateVersion: (versionId: number) => invoke("api:timetable:activateVersion", versionId),
+    deleteVersion: (versionId: number) => invoke("api:timetable:deleteVersion", versionId),
   },
   dashboard: {
     stats: (institutionId: number) => invoke("api:dashboard:stats", institutionId),
@@ -112,7 +112,52 @@ const api = {
   data: {
     resetAll: () => invoke("api:data:resetAll"),
   },
-  // scheduler / excel / pdf / updater are added in their respective phases
+  scheduler: {
+    /** Ensure the local Python solver is up (spawns it on first use). */
+    ready: () => invoke("api:scheduler:ready"),
+    /** Start a generation job; resolves immediately with { jobId }. */
+    generate: (opts?: { allSections?: boolean; sectionIds?: number[]; institutionId?: number; timeLimitSeconds?: number }) =>
+      invoke("api:scheduler:generate", opts),
+    cancel: (jobId: number) => invoke("api:scheduler:cancel", jobId),
+    job: (jobId: number) => invoke("api:scheduler:job", jobId),
+    history: (institutionId?: number) => invoke("api:scheduler:history", institutionId),
+    /** Rows written to staging by a finished job (preview before accepting). */
+    staged: (jobId: number) => invoke("api:scheduler:staged", jobId),
+    /** User-approved promote of staged results → new active timetable version. */
+    accept: (jobId: number, label?: string) => invoke("api:scheduler:accept", { jobId, label }),
+    discard: (jobId: number) => invoke("api:scheduler:discard", jobId),
+    /** Pre-flight feasibility audit (no solving) for actionable diagnostics. */
+    audit: (opts?: { institutionId?: number; sectionIds?: number[] }) => invoke("api:scheduler:audit", opts),
+    /** Progress push events — returns an unsubscribe function. */
+    onProgress: (cb: (progress: Record<string, unknown>) => void) => {
+      const listener = (_e: unknown, payload: Record<string, unknown>) => cb(payload);
+      ipcRenderer.on("scheduler:progress", listener);
+      return () => ipcRenderer.removeListener("scheduler:progress", listener);
+    },
+  },
+  excel: {
+    /** Pick a workbook, validate it and get a row-level report (writes nothing). */
+    preview: (kind: string, institutionId?: number) =>
+      invoke("api:excel:preview", { kind, institutionId }),
+    /** Apply the valid rows of a previewed batch (user-approved). */
+    commit: (batchId: number) => invoke("api:excel:commit", { batchId }),
+    /** Save a blank import template to a chosen path. */
+    template: (kind: string) => invoke("api:excel:template", { kind }),
+    /** Export data rows directly to an Excel file (opens save dialog at previous location). */
+    exportData: (kind: string, data: Record<string, unknown>[], defaultFileName?: string) =>
+      invoke("api:excel:exportData", { kind, data, defaultFileName }),
+    /** Recent import batches (audit trail). */
+    batches: () => invoke("api:excel:batches"),
+  },
+  pdf: {
+    /**
+     * Export a report to PDF via the system save dialog. `kind` is one of
+     * timetable | teacherWorkload | roomUtilization | analytics.
+     */
+    exportReport: (kind: string, opts?: { sectionId?: number; departmentId?: number; institutionId?: number }) =>
+      invoke("api:pdf:export", { kind, ...(opts ?? {}) }),
+  },
+  // updater is added in its phase
 };
 
 // Type-only declaration merged by the renderer via global.d.ts

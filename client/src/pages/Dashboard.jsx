@@ -81,7 +81,7 @@ export default function Dashboard() {
   return (
     <AppShell
       pageTitle={`${greeting}, ${firstName}!`}
-      pageSubtitle={`${user?.workspace?.workspaceName} · Academic Scheduler`}
+      pageSubtitle={`${user?.workspace?.workspaceName || "Institution"} · Academic Scheduler`}
       rightActions={
         <Button
           onClick={() => navigate("/timetable")}
@@ -180,7 +180,7 @@ export default function Dashboard() {
                   return (
                     <div
                       key={req.id}
-                      onClick={() => navigate("/settings?tab=requests")}
+                      onClick={() => navigate("/history")}
                       className="flex items-center justify-between p-3.5 rounded-xl bg-slate-50 border border-transparent hover:border-teal-100 hover:bg-white cursor-pointer group transition-all"
                       style={{ boxShadow: "0 0 0 0 transparent" }}
                       onMouseEnter={(e) => { e.currentTarget.style.boxShadow = "0 2px 12px -4px rgba(15,160,135,0.12)"; }}
@@ -207,7 +207,7 @@ export default function Dashboard() {
                 <Button
                   variant="ghost"
                   className="w-full text-teal-600 hover:text-teal-700 hover:bg-teal-50 font-bold text-sm mt-1"
-                  onClick={() => navigate("/settings?tab=requests")}
+                  onClick={() => navigate("/history")}
                 >
                   View All Activity
                 </Button>

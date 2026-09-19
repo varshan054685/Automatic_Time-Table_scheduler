@@ -1,46 +1,19 @@
 import { QueryClient } from "@tanstack/react-query";
-import { apiUrl } from "./api-base";
 
-async function throwIfResNotOk(res) {
-  if (!res.ok) {
-    const text = (await res.text()) || res.statusText;
-    throw new Error(`${res.status}: ${text}`);
-  }
-}
-
-export async function apiRequest(method, url, data) {
-  const res = await fetch(apiUrl(url), {
-    method,
-    headers: data ? { "Content-Type": "application/json" } : {},
-    body: data ? JSON.stringify(data) : undefined,
-    credentials: "include",
-  });
-
-  await throwIfResNotOk(res);
-  return res;
-}
-
-export const getQueryFn = ({ on401: unauthorizedBehavior }) =>
-  async ({ queryKey }) => {
-    const res = await fetch(apiUrl(queryKey.join("/")), {
-      credentials: "include",
-    });
-
-    if (unauthorizedBehavior === "returnNull" && res.status === 401) {
-      return null;
-    }
-
-    await throwIfResNotOk(res);
-    return await res.json();
-  };
-
+/**
+ * Local-only React Query client.
+ *
+ * Every query goes through window.api.* (Electron IPC) and defines its own
+ * queryFn, so there is no HTTP default and no API base URL anywhere in the
+ * renderer. Mutations are user-triggered; refetching is driven by explicit
+ * invalidation, which is instant against the local database.
+ */
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      queryFn: getQueryFn({ on401: "throw" }),
       refetchInterval: false,
       refetchOnWindowFocus: false,
-      staleTime: Infinity,
+      staleTime: 30_000,
       retry: false,
     },
     mutations: {

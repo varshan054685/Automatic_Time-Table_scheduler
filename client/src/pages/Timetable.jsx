@@ -29,12 +29,19 @@ import {
   CheckCircle2,
   AlertTriangle,
   XCircle,
+  Trash2,
+  ShieldAlert,
 } from "lucide-react";
 import {
   useTimetable,
   useGenerateTimetable,
   useRegenerateAll,
   useGenerationStatus,
+  useSchedulerJob,
+  useAcceptStaged,
+  useDiscardStaged,
+  useCancelGeneration,
+  useConflicts,
 } from "@/hooks/use-timetable";
 import {
   useDepartments,
@@ -116,24 +123,24 @@ export default function TimetablePage() {
   const { data: subjects } = useSubjects();
 
   const filteredSections = sections?.filter(
-    (s) => !selectedDept || s.departmentId.toString() === selectedDept,
-  );
+    (s) => !selectedDept || String(s?.departmentId || "") === String(selectedDept),
+  ) || [];
 
   const filteredFaculty = useMemo(() => {
-    if (!selectedDept) return faculty;
+    if (!selectedDept) return faculty || [];
     // Faculty belonging to this dept
     const deptFacultyIds = new Set(
-      faculty
-        ?.filter((f) => f.departmentId.toString() === selectedDept)
+      (faculty || [])
+        .filter((f) => String(f?.departmentId || "") === String(selectedDept))
         .map((f) => f.id),
     );
     // Also include faculty who teach any subject in this department
-    subjects
-      ?.filter((s) => s.departmentId.toString() === selectedDept && s.facultyId)
+    (subjects || [])
+      .filter((s) => String(s?.departmentId || "") === String(selectedDept) && s?.facultyId)
       .forEach((s) => {
         deptFacultyIds.add(s.facultyId);
       });
-    return faculty?.filter((f) => deptFacultyIds.has(f.id));
+    return (faculty || []).filter((f) => deptFacultyIds.has(f.id));
   }, [faculty, subjects, selectedDept]);
 
   const normalizedSection =
@@ -156,6 +163,158 @@ export default function TimetablePage() {
 
   const isGenerating =
     generationStatus.isPolling || regenerateAllMutation.isPending;
+
+  // ── Safe-apply workflow (spec §11) ────────────────────────────────────────
+  // A finished job only staged its rows: the user reviews the outcome (with
+  // explainable diagnostics) and explicitly applies or discards it. The live
+  // timetable is untouched until "Apply".
+  const activeJobId = generationStatus.data?.jobId ?? null;
+  const generationFinished =
+    !!generationStatus.data &&
+    ["completed", "partial", "failed"].includes(generationStatus.data.status);
+
+  const { data: reviewJob } = useSchedulerJob(generationFinished ? activeJobId : null);
+  const { data: conflicts } = useConflicts();
+  const acceptStagedMutation = useAcceptStaged();
+  const discardStagedMutation = useDiscardStaged();
+  const cancelGenerationMutation = useCancelGeneration();
+
+  const reviewDiagnostics = useMemo(() => {
+    const diag = reviewJob?.diagnostics;
+    if (!diag || typeof diag !== "object") return [];
+    const list = [...(Array.isArray(diag.preflight) ? diag.preflight : [])];
+    Object.values(diag.sections ?? {}).forEach((items) => {
+      if (Array.isArray(items)) list.push(...items);
+    });
+    // Collapse repeated messages across sections ("no teacher" x12 is noise).
+    const seen = new Set();
+    return list.filter((item) => {
+      const key = `${item?.code}|${item?.message}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [reviewJob]);
+
+  const canApplyStaged =
+    generationStatus.data?.status === "completed" ||
+    (generationStatus.data?.status === "partial" &&
+      (generationStatus.data?.completedSections ?? 0) >
+        (generationStatus.data?.failedSections ?? 0));
+
+  const finishGenerationReview = () => generationStatus.reset();
+
+  const handleCancelGeneration = () => {
+    if (!activeJobId) return;
+    cancelGenerationMutation.mutate(activeJobId);
+  };
+
+  const handleAcceptStaged = () => {
+    if (!activeJobId) return;
+    acceptStagedMutation.mutate(
+      { jobId: activeJobId, label: `Generated ${new Date().toLocaleString()}` },
+      {
+        onSuccess: (res) => {
+          toast({
+            title: "Timetable applied",
+            description: `${res.entries} periods scheduled. Your previous timetable is kept in history.`,
+          });
+          finishGenerationReview();
+        },
+        onError: (err) =>
+          toast({ title: "Could not apply results", description: err.message, variant: "destructive" }),
+      },
+    );
+  };
+
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
+
+  // Export the currently selected scope (department/section) as a PDF report.
+  const handleExportPdf = async () => {
+    setIsExportingPdf(true);
+    try {
+      const result = await window.api.pdf.exportReport("timetable", {
+        sectionId: normalizedSection ? Number(normalizedSection) : undefined,
+        departmentId: selectedDept ? Number(selectedDept) : undefined,
+      });
+      if (result?.cancelled) return;
+      toast({ title: "Timetable PDF exported", description: result.path });
+    } catch (err) {
+      toast({ title: "Export failed", description: err.message, variant: "destructive" });
+    } finally {
+      setIsExportingPdf(false);
+    }
+  };
+
+  const handleDiscardStaged = () => {
+    if (!activeJobId) {
+      finishGenerationReview();
+      return;
+    }
+    discardStagedMutation.mutate(activeJobId, {
+      onSuccess: () => {
+        toast({
+          title: "Results discarded",
+          description: "Your existing timetable was not changed.",
+        });
+        finishGenerationReview();
+      },
+      onError: (err) => {
+        toast({ title: "Could not discard results", description: err.message, variant: "destructive" });
+        finishGenerationReview();
+      },
+    });
+  };
+
+  const renderReviewActions = () => (
+    <div className="mt-6 w-full max-w-2xl space-y-4">
+      {reviewDiagnostics.length > 0 && (
+        <div className="max-h-56 overflow-y-auto rounded-2xl border border-white/10 bg-white/5 p-4 space-y-2 text-left">
+          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
+            What the scheduler reported
+          </p>
+          {reviewDiagnostics.map((d, i) => (
+            <div key={`${d?.code}-${i}`} className="flex gap-2 text-sm">
+              <span className="shrink-0">
+                {d?.severity === "error" ? "\u2715" : d?.severity === "warning" ? "\u26a0" : "\u2139"}
+              </span>
+              <span className="text-slate-300">
+                {d?.section ? <strong className="text-white">{d.section}: </strong> : null}
+                {d?.message}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="flex flex-wrap items-center justify-center gap-3">
+        <Button
+          onClick={handleAcceptStaged}
+          disabled={!canApplyStaged || acceptStagedMutation.isPending}
+          className="premium-gradient gap-2 h-11 px-6 rounded-xl font-bold shadow-lg shadow-teal-500/25"
+        >
+          {acceptStagedMutation.isPending ? (
+            <><Loader2 className="w-4 h-4 animate-spin" /> Applying…</>
+          ) : (
+            <><CheckCircle2 className="w-4 h-4" /> Apply to timetable</>
+          )}
+        </Button>
+        <Button
+          variant="outline"
+          onClick={handleDiscardStaged}
+          disabled={discardStagedMutation.isPending}
+          className="gap-2 h-11 px-6 rounded-xl font-bold border-white/20 bg-white/5 text-white hover:bg-white/10 hover:text-white"
+        >
+          <Trash2 className="w-4 h-4" /> Discard results
+        </Button>
+      </div>
+
+      <p className="text-center text-xs text-slate-400">
+        Applying creates a new timetable version. Your previous timetable is kept and can be
+        restored from history.
+      </p>
+    </div>
+  );
 
   const handleGenerate = () => {
     if (
@@ -180,7 +339,9 @@ export default function TimetablePage() {
     });
   };
 
-  // React to generation completion/failure
+  // React to generation completion/failure. The overlay stays open until the
+  // user applies or discards the staged result (no auto-dismiss), because
+  // applying is an explicit decision that replaces the live timetable.
   useEffect(() => {
     if (!generationStatus.data) return;
     const { status, completedSections, totalSections, failedSections, error } =
@@ -188,25 +349,24 @@ export default function TimetablePage() {
 
     if (status === "completed") {
       toast({
-        title: "✅ Generation Complete!",
-        description: `Successfully generated timetables for ${totalSections} section(s).`,
+        title: "Generation complete — review and apply",
+        description: `${totalSections} section(s) solved. Apply to make this the active timetable.`,
       });
-      // Reset after a short delay so the user sees the success state
-      setTimeout(() => generationStatus.reset(), 2000);
     } else if (status === "partial") {
       toast({
-        title: "⚠️ Partial Success",
-        description: `${completedSections - failedSections} of ${totalSections} sections succeeded. ${failedSections} failed.`,
+        title: "Partially complete",
+        description: `${completedSections - failedSections} of ${totalSections} sections succeeded. ${failedSections} failed — see details.`,
         variant: "destructive",
       });
-      setTimeout(() => generationStatus.reset(), 3000);
     } else if (status === "failed") {
       toast({
-        title: "❌ Generation Failed",
+        title: "Generation failed",
         description: error || "All sections failed to generate.",
         variant: "destructive",
       });
-      setTimeout(() => generationStatus.reset(), 3000);
+    } else if (status === "cancelled") {
+      toast({ title: "Generation cancelled", description: "No changes were made to your timetable." });
+      generationStatus.reset();
     }
   }, [generationStatus.data]);
 
@@ -223,41 +383,44 @@ export default function TimetablePage() {
   ];
 
   const uniqueSlots = useMemo(() => {
-    if (!timeSlots) return [];
+    if (!Array.isArray(timeSlots)) return [];
 
     const slotsByTime = new Map();
     timeSlots.forEach((slot) => {
-      const key = `${slot.label}-${slot.startTime}-${slot.endTime}`;
+      if (!slot) return;
+      const key = `${slot.label || ""}-${slot.startTime || ""}-${slot.endTime || ""}`;
       if (!slotsByTime.has(key)) {
         slotsByTime.set(key, {
-          label: slot.label,
-          startTime: slot.startTime,
-          endTime: slot.endTime,
+          label: slot.label || "",
+          startTime: slot.startTime || "09:00",
+          endTime: slot.endTime || "10:00",
           idsByDay: {},
         });
       }
-      slotsByTime.get(key).idsByDay[slot.dayOfWeek] = slot.id;
+      const dayName = typeof slot.dayOfWeek === "number" ? days[slot.dayOfWeek] || days[0] : (slot.dayOfWeek || "Monday");
+      slotsByTime.get(key).idsByDay[dayName] = slot.id;
     });
 
     return Array.from(slotsByTime.values()).sort((a, b) =>
-      a.startTime.localeCompare(b.startTime),
+      (a.startTime || "").localeCompare(b.startTime || ""),
     );
   }, [timeSlots]);
 
   const activeDays = days.filter((day) =>
-    timeSlots?.some((slot) => slot.dayOfWeek === day),
+    (timeSlots || []).some((slot) => {
+      const dayName = typeof slot?.dayOfWeek === "number" ? days[slot.dayOfWeek] : slot?.dayOfWeek;
+      return dayName === day;
+    }),
   );
-
-  // formatTime moved to TimetableGrid
 
   const selectedDeptData = departments?.find(
-    (d) => d.id.toString() === selectedDept,
+    (d) => String(d?.id) === String(selectedDept),
   );
   const selectedSectionData = sections?.find(
-    (s) => s.id.toString() === selectedSection,
+    (s) => String(s?.id) === String(selectedSection),
   );
   const selectedFacultyData = faculty?.find(
-    (f) => f.id.toString() === selectedFaculty,
+    (f) => String(f?.id) === String(selectedFaculty),
   );
 
   // tableSubjects moved to TimetableGrid
@@ -280,6 +443,10 @@ const conflictCount = (() => {
     return conflicts;
   })();
 
+  // Prefer real conflict detection (teacher/room/section double-booking over
+  // the active version) over the legacy client-side cell-count proxy.
+  const realConflictCount = Array.isArray(conflicts) ? conflicts.length : null;
+
   return (
     <AppShell
       pageTitle="Timetable"
@@ -289,9 +456,14 @@ const conflictCount = (() => {
           <Button
             variant="outline"
             className="gap-2 h-10 px-4 border-slate-200 hover:border-teal-300 hover:text-teal-700 transition-all rounded-xl font-bold text-sm"
-            onClick={() => window.print()}
+            onClick={handleExportPdf}
+            disabled={isExportingPdf}
           >
-            <Printer className="w-4 h-4" /> Print
+            {isExportingPdf ? (
+              <><Loader2 className="w-4 h-4 animate-spin" /> Exporting…</>
+            ) : (
+              <><Printer className="w-4 h-4" /> Export PDF</>
+            )}
           </Button>
           {isOwner && (
             <Button
@@ -311,7 +483,7 @@ const conflictCount = (() => {
       stats={
         <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
           {[
-            { label: "Potential Conflicts", value: conflictCount,     unit: "cells", color: conflictCount > 0 ? "#e11d48" : "#059669" },
+            { label: "Conflicts", value: realConflictCount ?? conflictCount, unit: "cells", color: (realConflictCount ?? conflictCount) > 0 ? "#e11d48" : "#059669" },
             { label: "Active Days",          value: activeDays.length, unit: "days",  color: "#0891b2" },
             { label: "Time Slots",           value: uniqueSlots.length, unit: "slots", color: "#d97706" },
           ].map((s) => (
@@ -365,6 +537,7 @@ const conflictCount = (() => {
                     <p className="mt-3 text-slate-300 text-xl font-medium">
                       All {total} sections generated successfully.
                     </p>
+                    {renderReviewActions()}
                   </>
                 );
               }
@@ -386,6 +559,7 @@ const conflictCount = (() => {
                       {completed - failed} of {total} sections succeeded.{" "}
                       {failed} failed.
                     </p>
+                    {renderReviewActions()}
                   </>
                 );
               }
@@ -407,6 +581,7 @@ const conflictCount = (() => {
                       {generationStatus.data?.error ||
                         "Unable to solve constraints."}
                     </p>
+                    {renderReviewActions()}
                   </>
                 );
               }
@@ -467,6 +642,15 @@ const conflictCount = (() => {
                       and ensure fast results.
                     </p>
                   </motion.div>
+
+                  <Button
+                    variant="outline"
+                    onClick={handleCancelGeneration}
+                    disabled={cancelGenerationMutation.isPending || !activeJobId}
+                    className="mt-6 gap-2 rounded-xl border-white/20 bg-white/5 font-bold text-white hover:bg-white/10 hover:text-white"
+                  >
+                    <XCircle className="w-4 h-4" /> Cancel generation
+                  </Button>
                 </>
               );
             })()}
@@ -476,6 +660,25 @@ const conflictCount = (() => {
 
       <main className="flex-1 p-3 lg:p-0 print:m-0 print:p-0 overflow-y-auto">
         <div className="max-w-full mx-auto space-y-4">
+          {conflicts && conflicts.length > 0 && (
+            <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <ShieldAlert className="w-5 h-5 text-rose-600 shrink-0" />
+                <p className="font-bold text-rose-700 text-sm">
+                  {conflicts.length} scheduling conflict{conflicts.length === 1 ? "" : "s"} in the active timetable
+                </p>
+              </div>
+              <ul className="space-y-1 max-h-40 overflow-y-auto">
+                {conflicts.map((c, i) => (
+                  <li key={i} className="text-xs font-medium text-rose-700/90">
+                    {c.type === "teacher" ? "Teacher" : c.type === "classroom" ? "Room" : "Section"}{" "}
+                    <strong>{c.label}</strong> is booked {c.entries.length} times on {c.day} ({c.period}).
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           <div className="print:hidden">
             <Card className="p-3 lg:p-4 border border-slate-100 bg-white rounded-2xl" style={{ boxShadow: "0 2px 12px -4px rgba(0,0,0,0.06)" }}>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -581,6 +784,7 @@ const conflictCount = (() => {
                         facultyList={faculty}
                         sectionsList={sections}
                         isWebVisible={true}
+                        conflicts={conflicts}
                       />
                     ))}
                     {filteredFaculty?.map((fac) => (
@@ -599,6 +803,7 @@ const conflictCount = (() => {
                         facultyList={faculty}
                         sectionsList={sections}
                         isWebVisible={false}
+                        conflicts={conflicts}
                       />
                     ))}
                   </div>
@@ -618,6 +823,7 @@ const conflictCount = (() => {
                     facultyList={faculty}
                     sectionsList={sections}
                     isWebVisible={true}
+                    conflicts={conflicts}
                   />
                 )}
               </AnimatePresence>

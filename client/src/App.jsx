@@ -15,6 +15,8 @@ import Timetable from "@/pages/Timetable";
 import Subjects from "@/pages/Subjects";
 import Sections from "@/pages/Sections";
 import TimeSlots from "@/pages/TimeSlots";
+import History from "@/pages/History";
+import Reports from "@/pages/Reports";
 import Settings from "@/pages/Settings";
 
 /**
@@ -75,6 +77,12 @@ function Router() {
         </Route>
         <Route path="/timeslots">
           <ProtectedRoute component={TimeSlots} />
+        </Route>
+        <Route path="/history">
+          <ProtectedRoute component={History} />
+        </Route>
+        <Route path="/reports">
+          <ProtectedRoute component={Reports} />
         </Route>
         <Route path="/settings">
           <ProtectedRoute component={Settings} />

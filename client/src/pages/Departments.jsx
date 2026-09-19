@@ -6,11 +6,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Plus, Trash2, Search, ArrowUpDown, Pencil, Loader2, Building2, Fingerprint, FileSpreadsheet, Upload } from "lucide-react";
+import { Plus, Trash2, Search, ArrowUpDown, Pencil, Loader2, Building2, Fingerprint, FileSpreadsheet, Download } from "lucide-react";
 import { useDepartments, useCreateDepartment, useUpdateDepartment, useDeleteDepartment } from "@/hooks/use-master-data";
 import { useToast } from "@/hooks/use-toast";
-import { api } from "@shared/routes";
-import * as XLSX from "xlsx";
+import { departmentFormSchema } from "@/lib/schemas";
+import { exportToExcel } from "@/lib/export-excel";
+import { ImportDialog } from "@/components/ImportDialog";
 import { ExportHint } from "@/components/ExportHint";
 import { motion } from "framer-motion";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -25,63 +26,6 @@ const rowColors = [
   { bg: "bg-violet-50",  text: "text-violet-700",  ring: "border-violet-100" },
 ];
 
-function DepartmentImport({ departments, onImportComplete }) {
-  const [isImporting, setIsImporting] = useState(false);
-  const fileInputRef = useRef(null);
-  const { toast } = useToast();
-  const createMutation = useCreateDepartment();
-  const updateMutation = useUpdateDepartment();
-
-  const handleImport = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    setIsImporting(true);
-    const reader = new FileReader();
-    reader.onload = async (evt) => {
-      try {
-        const buffer = new Uint8Array(evt.target.result);
-        const wb = XLSX.read(buffer, { type: "array" });
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        const data = XLSX.utils.sheet_to_json(ws);
-        let successCount = 0, updateCount = 0, errorCount = 0;
-        for (const item of data) {
-          const keys = Object.keys(item);
-          const getVal = (...keys2) => { for (const k of keys2) { const f = keys.find(ck => ck.toLowerCase().trim() === k.toLowerCase().trim()); if (f && item[f] !== undefined && item[f] !== "") return item[f]; } return null; };
-          const name = getVal("Department Name","Department","Name","name","dept name","Dept Name");
-          const code = getVal("Department Code","Code","code","Dept Code","dept code");
-          if (name) {
-            const finalCode = code ? String(code) : String(name).toUpperCase().replace(/[^A-Z0-9]/g,"").slice(0,6);
-            const existing = departments?.find(d => String(d.name).toLowerCase().trim()===String(name).toLowerCase().trim() || String(d.code).toLowerCase().trim()===finalCode.toLowerCase().trim());
-            try {
-              if (existing) { await updateMutation.mutateAsync({ id: existing.id, name: String(name), code: finalCode }); updateCount++; }
-              else { await createMutation.mutateAsync({ name: String(name), code: finalCode }); successCount++; }
-            } catch { errorCount++; }
-          }
-        }
-        toast({ title: "Import Complete", description: `Imported ${successCount} new, updated ${updateCount} departments.${errorCount > 0 ? ` Failed ${errorCount}.` : ""}` });
-        if (onImportComplete) onImportComplete();
-      } catch (error) {
-        toast({ title: "Import Failed", description: error?.message, variant: "destructive" });
-      } finally {
-        setIsImporting(false);
-        if (fileInputRef.current) fileInputRef.current.value = "";
-      }
-    };
-    reader.readAsArrayBuffer(file);
-  };
-
-  return (
-    <div className="relative">
-      <Input type="file" accept=".xlsx,.xls" className="hidden" id="import-excel-dept" ref={fileInputRef} onChange={handleImport} disabled={isImporting} />
-      <Button variant="outline" className="gap-2 h-10 px-4 rounded-xl border border-slate-200 text-sm font-semibold hover:border-teal-300 hover:text-teal-700 transition-all" asChild disabled={isImporting}>
-        <label htmlFor="import-excel-dept" className="cursor-pointer">
-          {isImporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileSpreadsheet className="w-4 h-4" />}
-          {isImporting ? "Importing..." : "Import"}
-        </label>
-      </Button>
-    </div>
-  );
-}
 
 export default function Departments() {
   const [open, setOpen] = useState(false);
@@ -95,7 +39,7 @@ export default function Departments() {
   const deleteMutation = useDeleteDepartment();
 
   const form = useForm({
-    resolver: zodResolver(api.departments.create.input),
+    resolver: zodResolver(departmentFormSchema),
     defaultValues: { name: "", code: "" },
   });
 
@@ -103,11 +47,12 @@ export default function Departments() {
     const data = departments?.length > 0
       ? departments.map(d => ({ "Department Name": d.name, "Department Code": d.code }))
       : [{ "Department Name": "Example Dept", "Department Code": "EXM" }];
-    const ws = XLSX.utils.json_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Departments");
-    XLSX.writeFile(wb, "departments_template.xlsx");
-    localStorage.setItem("hasExportedOnce", "true");
+    exportToExcel({
+      kind: "Departments",
+      data,
+      defaultFileName: "departments_export.xlsx",
+      toast,
+    });
   };
 
   const onSubmit = (values) => {
@@ -130,8 +75,15 @@ export default function Departments() {
 
   const filtered = useMemo(() => {
     if (!departments) return [];
-    let r = departments.filter(d => d.name.toLowerCase().includes(searchTerm.toLowerCase()) || d.code.toLowerCase().includes(searchTerm.toLowerCase()));
-    if (sortConfig.key) r.sort((a, b) => a[sortConfig.key] < b[sortConfig.key] ? (sortConfig.direction === "asc" ? -1 : 1) : a[sortConfig.key] > b[sortConfig.key] ? (sortConfig.direction === "asc" ? 1 : -1) : 0);
+    let r = departments.filter(d => 
+      (d?.name || "").toLowerCase().includes(searchTerm.toLowerCase()) || 
+      (d?.code || "").toLowerCase().includes(searchTerm.toLowerCase())
+    );
+    if (sortConfig.key) r.sort((a, b) => {
+      const aVal = a[sortConfig.key] || "";
+      const bVal = b[sortConfig.key] || "";
+      return aVal < bVal ? (sortConfig.direction === "asc" ? -1 : 1) : aVal > bVal ? (sortConfig.direction === "asc" ? 1 : -1) : 0;
+    });
     return r;
   }, [departments, searchTerm, sortConfig]);
 
@@ -157,9 +109,9 @@ export default function Departments() {
               </motion.div>
 
               <motion.div initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} className="flex items-center gap-2.5 flex-wrap">
-                <DepartmentImport departments={departments} onImportComplete={refetch} />
+                <ImportDialog kind="departments" />
                 <Button variant="outline" className="gap-2 h-10 px-4 rounded-xl border border-slate-200 text-sm font-semibold hover:border-teal-300 hover:text-teal-700" onClick={handleExport}>
-                  <Upload className="w-4 h-4" /> Export
+                  <Download className="w-4 h-4" /> Export
                 </Button>
                 <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) { setEditingId(null); form.reset(); } }}>
                   <DialogTrigger asChild>

@@ -64,35 +64,50 @@ export function getPermissions(isOwner) {
   ];
 }
 
-export function buildActivityFeed(requests, timetableCount) {
+export function buildActivityFeed(historyJobs, timetableCount) {
   const items = [];
+  const list = Array.isArray(historyJobs) ? historyJobs : [];
 
-  (requests || [])
+  list
     .slice()
-    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+    .sort((a, b) => new Date(b?.createdAt || 0) - new Date(a?.createdAt || 0))
     .slice(0, 8)
-    .forEach((req) => {
-      const data = req.data || {};
-      let action = "Submitted request";
-      if (req.status === "approved") action = req.type === "edit" ? "Approved edit request" : "Approved deletion request";
-      else if (req.status === "rejected") action = "Rejected request";
-      else action = req.type === "edit" ? "Pending edit request" : "Pending deletion request";
+    .forEach((item) => {
+      if (!item) return;
+      if (item.status) {
+        // Scheduler generation job
+        let action = "Timetable Generation";
+        if (item.status === "completed") action = "Timetable generation completed";
+        else if (item.status === "failed") action = "Timetable generation failed";
+        else if (item.status === "running") action = "Timetable generation in progress";
+        else if (item.status === "queued") action = "Timetable generation queued";
 
-      items.push({
-        id: `req-${req.id}`,
-        action,
-        detail: `${data.table || "Record"}${data.id ? ` #${data.id}` : ""}`,
-        actor: req.requesterName || req.requesterEmail?.split("@")[0] || "User",
-        date: req.createdAt,
-        status: req.status,
-      });
+        items.push({
+          id: `job-${item.id}`,
+          action,
+          detail: `Generation Job #${item.id} (${item.status})`,
+          actor: "Scheduler",
+          date: item.createdAt || new Date().toISOString(),
+          status: item.status,
+        });
+      } else {
+        const data = item.data || {};
+        items.push({
+          id: `act-${item.id || Math.random()}`,
+          action: item.action || "Activity",
+          detail: `${data.table || "Record"}${data.id ? ` #${data.id}` : ""}`,
+          actor: item.actor || "User",
+          date: item.createdAt || new Date().toISOString(),
+          status: item.status || "info",
+        });
+      }
     });
 
   if (timetableCount > 0 && items.length < 8) {
     items.unshift({
       id: "timetable-gen",
-      action: "Timetable data available",
-      detail: `${timetableCount} scheduled slot${timetableCount === 1 ? "" : "s"} in workspace`,
+      action: "Timetable Active",
+      detail: `${timetableCount} scheduled slot${timetableCount === 1 ? "" : "s"} in institution`,
       actor: "System",
       date: new Date().toISOString(),
       status: "info",

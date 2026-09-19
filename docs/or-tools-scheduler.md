@@ -78,3 +78,32 @@ scheduler/
 
 Fixtures: small school (4 sections, 5×8 grid), college with labs, a teacher pinned 3 periods/week but needed 6 (infeasible), one lab room over-demanded, availability-heavy case.
 Assertions: no room/teacher/section clash; lab contiguity & morning/afternoon rules; availability respected; room-type respected; status mapping correct; diagnostics non-empty and human-readable on INFEASIBLE; unscheduled blocks reported; cancellation returns promptly; timeout yields TIMEOUT + partial diagnostics.
+
+## 5. Implementation status (as actually built)
+
+Keeping the proven CP-SAT model intact in `python-service/scheduler.py` was chosen over
+the package restructure in §3: the model is unchanged apart from additive constraints,
+which keeps the behaviour of existing timetables reproducible.
+
+**Implemented**
+
+| Item | Where |
+|---|---|
+| Explicit `status`: `OPTIMAL` / `FEASIBLE` / `INFEASIBLE` / `TIMEOUT` / `ERROR` | `generate_timetable` return value (previously one opaque error string) |
+| Structured `diagnostics[]` (`NO_ROOMS`, `NO_ASSIGNMENTS`, `NO_FEASIBLE_SLOT`, `HOURS_SHORTFALL`, `NO_SOLUTION`, `EMPTY_TIME_GRID`, `SOLVER_ERROR`) | `_build_diagnostics()` + `app.py` |
+| Teacher availability as a hard constraint (`teacherUnavailable`) | candidate pruning in the variable loop |
+| Teacher `maxPeriodsDay` (per teacher, default 7) and `maxPeriodsWeek` | hard constraints; replaces the hardcoded `<= 7` |
+| Room type / capacity (opt-in: `enforceRoomTypes`, `enforceCapacity`) | candidate filtering |
+| Configurable time limit and worker count | `timeLimitSeconds`, `maxWorkers` from `app_settings` |
+| No silent hour loss | blocks with zero candidate slots now return `INFEASIBLE` with an explanation instead of a timetable quietly missing periods |
+| Cancellation | HTTP abort from the main process + staged rows discarded |
+| Local lifecycle | spawned on a loopback port, health-checked, restarted with backoff, killed on quit (see `electron/services/scheduler.ts`) |
+
+**Still open** (documented, not claimed as done)
+
+- The `scheduler/` package split and the toggleable constraint registry from §3.
+- `solver.Assumptions` based minimal-conflict extraction (current diagnostics are computed from demand/supply and candidate pruning, not from an unsat core).
+- In-solver cancellation via a solution callback (`StopSearch()`); today cancellation aborts the HTTP request and discards staging.
+- Single-model multi-section solves; generation is still sequential per section (with staging-aware conflict avoidance).
+- Per-section max periods/day: supported by the solver payload but the v1 schema has no column for it.
+- Lunch/fixed/preferred-period rules beyond the existing break and lab logic.

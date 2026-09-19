@@ -98,6 +98,96 @@ def _lab_start_allowed(
     return not crosses_break
 
 
+def _sec_label(sec_id, section_by_id) -> str:
+    sec = section_by_id.get(sec_id) or {}
+    return sec.get("name") or f"Section {sec_id}"
+
+
+def _build_diagnostics(
+    all_blocks,
+    v_by_block,
+    scheduled_hours,
+    total_requested_hours,
+    section_by_id,
+    grid_capacity,
+):
+    """Explain which requested teaching hours could not be placed, and why.
+
+    Returning actionable per-subject items is what turns "constraints might be
+    too strict" into a fixable list (spec §9).
+    """
+    diagnostics = []
+
+    if grid_capacity <= 0:
+        diagnostics.append({
+            "code": "EMPTY_TIME_GRID",
+            "severity": "error",
+            "message": "No teaching periods are defined. Add time slots first.",
+        })
+
+    seen = set()
+    for b_idx, b in enumerate(all_blocks):
+        if v_by_block.get(b_idx):
+            continue
+        key = (b["section_id"], b["subject_id"])
+        if key in seen:
+            continue
+        seen.add(key)
+        diagnostics.append({
+            "code": "NO_FEASIBLE_SLOT",
+            "severity": "error",
+            "section": _sec_label(b["section_id"], section_by_id),
+            "subject": b["subject_name"],
+            "message": (
+                f"{b['subject_name']} ({'lab' if b['type'] == 'lab' else 'lecture'}) "
+                f"cannot be placed in {_sec_label(b['section_id'], section_by_id)}. "
+                "Check the teacher's availability, the room types/capacity and the time grid."
+            ),
+        })
+
+    # `scheduled_hours is None` means the solve produced no assignment at all
+    # (INFEASIBLE/TIMEOUT) — reporting "0 of N" there would be misleading, so
+    # report demand versus capacity instead.
+    if scheduled_hours is None:
+        for sec_id, requested in total_requested_hours.items():
+            if grid_capacity > 0 and requested > grid_capacity:
+                diagnostics.append({
+                    "code": "OVER_CAPACITY_DEMAND",
+                    "severity": "error",
+                    "section": _sec_label(sec_id, section_by_id),
+                    "message": (
+                        f"{_sec_label(sec_id, section_by_id)} requires {requested} weekly "
+                        f"periods but the week only has {grid_capacity} teaching periods. "
+                        "Reduce subject weekly hours or add time slots."
+                    ),
+                })
+        return diagnostics
+
+    for sec_id, requested in total_requested_hours.items():
+        scheduled = scheduled_hours.get(sec_id, 0)
+        if scheduled >= requested:
+            continue
+        message = (
+            f"{_sec_label(sec_id, section_by_id)}: {scheduled} of {requested} weekly "
+            "periods were scheduled."
+        )
+        if requested > grid_capacity:
+            message += (
+                f" The section asks for {requested} periods but the week only has "
+                f"{grid_capacity} teaching periods — reduce subject weekly hours or add slots."
+            )
+        else:
+            message += " Free up time slots or relax teacher/room constraints."
+        diagnostics.append({
+            "code": "HOURS_SHORTFALL",
+            "severity": "warning",
+            "section": _sec_label(sec_id, section_by_id),
+            "message": message,
+        })
+
+    return diagnostics
+
+
 def generate_timetable(data: dict):
 
     model = cp_model.CpModel()
@@ -144,7 +234,24 @@ def generate_timetable(data: dict):
 
     classrooms = data.get("classrooms", [])
     rooms = [c['roomNumber'] for c in classrooms]
-    if not rooms: return {"error": "No classrooms available."}
+    room_types = [str(c.get('type') or 'lecture').lower() for c in classrooms]
+    room_caps = [int(c.get('capacity') or 0) for c in classrooms]
+    if not rooms:
+        return {
+            "status": "ERROR",
+            "error": "No classrooms available.",
+            "diagnostics": [{
+                "code": "NO_ROOMS",
+                "severity": "error",
+                "message": "No classrooms are configured. Add at least one classroom or lab.",
+            }],
+        }
+
+    # Optional, data-driven hard constraints. Off by default so existing setups
+    # keep behaving exactly as before (spec §8: never add constraints blindly).
+    enforce_room_types = bool(data.get("enforceRoomTypes"))
+    enforce_capacity = bool(data.get("enforceCapacity"))
+    has_lab_rooms = any(t == 'lab' for t in room_types)
 
     sections  = data.get("sections", [])
     subjects  = data.get("subjects", [])
@@ -170,7 +277,19 @@ def generate_timetable(data: dict):
                 for _ in range(hours):
                     all_blocks.append({'section_id': sec_id, 'subject_id': sub.get('id'), 'subject_name': sub['name'], 'faculty_id': fac_id, 'type': 'lecture', 'size': 1})
 
-    if not all_blocks: return {"error": "No subjects assigned."}
+    if not all_blocks:
+        return {
+            "status": "ERROR",
+            "error": "No subjects assigned.",
+            "diagnostics": [{
+                "code": "NO_ASSIGNMENTS",
+                "severity": "error",
+                "message": (
+                    "No subject is assigned to a teacher for this section. "
+                    "Assign a teacher to each subject before generating."
+                ),
+            }],
+        }
     random.shuffle(all_blocks)
 
     day_period_indices = defaultdict(list)
@@ -198,14 +317,55 @@ def generate_timetable(data: dict):
         # Find indices
         did = None
         for i, d_name_alt in enumerate(days):
-            if d_name_alt == d_name: did = i; break
+            if str(d_name_alt).strip().lower() == str(d_name).strip().lower():
+                did = i
+                break
         pid = None
         for i, p_label_alt in enumerate(periods):
-            if p_label_alt == p_label: pid = i; break
+            if str(p_label_alt).strip().lower() == str(p_label).strip().lower():
+                pid = i
+                break
             
         if did is not None and pid is not None:
-            if occ.get('facultyId'): occ_fac.add((did, pid, occ['facultyId']))
-            if occ.get('room'): occ_room.add((did, pid, occ['room']))
+            fac_val = occ.get('facultyId')
+            if fac_val is not None:
+                try:
+                    occ_fac.add((did, pid, int(fac_val)))
+                except (ValueError, TypeError):
+                    occ_fac.add((did, pid, fac_val))
+            room_val = occ.get('room')
+            if room_val is not None:
+                occ_room.add((did, pid, str(room_val).strip().lower()))
+
+    # ─── Teacher availability / workload limits (hard constraints) ──────────
+    # teacherUnavailable: {teacherId: [timeSlotId, ...]} — those (teacher, slot)
+    # pairs are pruned from the model entirely.
+    unavailable_fac_slots = set()
+    for t_id, slot_ids in (data.get('teacherUnavailable') or {}).items():
+        try:
+            tid = int(t_id)
+        except (TypeError, ValueError):
+            continue
+        for slot_id in slot_ids or []:
+            try:
+                unavailable_fac_slots.add((tid, int(slot_id)))
+            except (TypeError, ValueError):
+                continue
+
+    faculty_by_id = {f['id']: f for f in data.get('faculty', [])}
+    section_by_id = {s['id']: s for s in sections}
+
+    def _faculty_day_limit(f_id):
+        limit = (faculty_by_id.get(f_id) or {}).get('maxPeriodsDay')
+        return int(limit) if limit else 7   # legacy default preserved
+
+    def _faculty_week_limit(f_id):
+        limit = (faculty_by_id.get(f_id) or {}).get('maxPeriodsWeek')
+        return int(limit) if limit else None
+
+    def _section_day_limit(s_id):
+        limit = (section_by_id.get(s_id) or {}).get('maxPeriodsDay')
+        return int(limit) if limit else None
 
     for b_idx, block in enumerate(all_blocks):
         size, f_id, s_id = block['size'], block['faculty_id'], block['section_id']
@@ -227,14 +387,38 @@ def generate_timetable(data: dict):
 
                     for r_idx in range(num_rooms):
                         room_name = rooms[r_idx]
-                        
+
+                        # Room type / capacity (opt-in). Labs need a lab room
+                        # when one exists; a section must fit in its room.
+                        if block_type == 'lab' and enforce_room_types and has_lab_rooms and room_types[r_idx] != 'lab':
+                            continue
+                        if enforce_capacity:
+                            strength = (section_by_id.get(s_id) or {}).get('strength')
+                            if strength and room_caps[r_idx] and room_caps[r_idx] < int(strength):
+                                continue
+
                         # Conflict Check: Does this block overlap with ANY occupied slot?
+                        # Also prunes slots where the teacher is unavailable.
                         conflict = False
+                        try:
+                            f_id_int = int(f_id)
+                        except (ValueError, TypeError):
+                            f_id_int = f_id
+                        room_clean = str(room_name).strip().lower()
+
                         for k in range(size):
                             p_idx = start_p + k
-                            if (d_idx, p_idx, f_id) in occ_fac: conflict = True; break
-                            if (d_idx, p_idx, room_name) in occ_room: conflict = True; break
-                        
+                            if (d_idx, p_idx, f_id_int) in occ_fac or (d_idx, p_idx, f_id) in occ_fac:
+                                conflict = True
+                                break
+                            if (d_idx, p_idx, room_clean) in occ_room:
+                                conflict = True
+                                break
+                            slot_id = slot_lookup.get((days[d_idx], periods[p_idx]))
+                            if slot_id is not None and ((f_id, slot_id) in unavailable_fac_slots or (f_id_int, slot_id) in unavailable_fac_slots):
+                                conflict = True
+                                break
+
                         if conflict: continue
                         
                         v = model.NewBoolVar(f'b{b_idx}_d{d_idx}_p{start_p}_r{r_idx}')
@@ -274,9 +458,23 @@ def generate_timetable(data: dict):
 
 
     for f_id in set(b['faculty_id'] for b in all_blocks):
+        day_limit = _faculty_day_limit(f_id)
+        week_limit = _faculty_week_limit(f_id)
         for d_idx in day_period_indices:
             fac_day = [v * block['size'] for b_idx, block in enumerate(all_blocks) if block['faculty_id'] == f_id for v in v_by_block_day[(b_idx, d_idx)]]
-            if fac_day: model.Add(sum(fac_day) <= 7)
+            if fac_day: model.Add(sum(fac_day) <= day_limit)
+        if week_limit:
+            fac_week = [v * block['size'] for b_idx, block in enumerate(all_blocks) if block['faculty_id'] == f_id for v in v_by_block[b_idx]]
+            if fac_week: model.Add(sum(fac_week) <= week_limit)
+
+    # Section maximum periods per day (soft data, hard when provided).
+    for s_id in set(b['section_id'] for b in all_blocks):
+        sec_limit = _section_day_limit(s_id)
+        if not sec_limit:
+            continue
+        for d_idx in day_period_indices:
+            sec_day = [v * block['size'] for b_idx, block in enumerate(all_blocks) if block['section_id'] == s_id for v in v_by_block_day[(b_idx, d_idx)]]
+            if sec_day: model.Add(sum(sec_day) <= sec_limit)
 
     subj_sec_lab = defaultdict(list)
     for b_idx, b in enumerate(all_blocks):
@@ -377,9 +575,37 @@ def generate_timetable(data: dict):
     # Objective: Maximize total scheduled, minimize B2B, minimize active days per section, and minimize late periods
     model.Maximize(- sum(b2b_penalty) * 10 - sum(sec_day_active_vars) * 50 - sum(late_period_vars))
 
+    grid_capacity = sum(len(v) for v in day_period_indices.values())
+
+    # Blocks with no candidate slot at all can never be placed. Fail loudly
+    # with an explanation instead of returning a timetable that silently
+    # dropped teaching hours (spec §9/§27).
+    if any(not v_by_block[b_idx] for b_idx in range(len(all_blocks))):
+        diagnostics = _build_diagnostics(
+            all_blocks, v_by_block, {}, total_requested_hours,
+            section_by_id, grid_capacity,
+        )
+        diagnostics.append({
+            "code": "NO_SOLUTION",
+            "severity": "error",
+            "message": (
+                "At least one subject cannot be placed anywhere in the week with the "
+                "current constraints, so no complete timetable exists for this section."
+            ),
+        })
+        return {
+            "status": "INFEASIBLE",
+            "diagnostics": diagnostics,
+            "error": (
+                "Some subjects cannot be placed at all. Review teacher availability, "
+                "lab period rules, room types and the weekly hours."
+            ),
+        }
+
     solver = cp_model.CpSolver()
-    solver.parameters.max_time_in_seconds = 20.0  # Fast per-section solves
-    solver.parameters.num_search_workers = 8     # Enable parallel search
+    # Solver limits are configurable from Settings (spec §7 timeouts).
+    solver.parameters.max_time_in_seconds = float(data.get("timeLimitSeconds") or 20.0)
+    solver.parameters.num_search_workers = int(data.get("maxWorkers") or 8)
     solver.parameters.random_seed = 42           # Deterministic behavior
     status = solver.Solve(model)
 
@@ -395,5 +621,39 @@ def generate_timetable(data: dict):
         
 
             
-        return {"timetable": timetable}
-    else: return {"error": "Constraints might be too strict."}
+        diagnostics = _build_diagnostics(
+            all_blocks, v_by_block, scheduled_hours, total_requested_hours,
+            section_by_id, grid_capacity,
+        )
+        return {
+            "timetable": timetable,
+            "status": "OPTIMAL" if status == cp_model.OPTIMAL else "FEASIBLE",
+            "diagnostics": diagnostics,
+        }
+
+    # INFEASIBLE / UNKNOWN (timeout) — explain, never just "too strict" (spec §9).
+    time_limit = float(data.get("timeLimitSeconds") or 20.0)
+    diagnostics = _build_diagnostics(
+        all_blocks, v_by_block, None, total_requested_hours,
+        section_by_id, grid_capacity,
+    )
+    diagnostics.extend([
+        {
+            "code": "NO_SOLUTION",
+            "severity": "error",
+            "message": (
+                "No valid timetable exists with the current constraints."
+                if status == cp_model.INFEASIBLE
+                else f"The solver ran out of time after {time_limit:g}s without a result."
+            ),
+        },
+    ])
+    return {
+        "status": "INFEASIBLE" if status == cp_model.INFEASIBLE else "TIMEOUT",
+        "diagnostics": diagnostics,
+        "error": (
+            "No valid timetable exists with the current constraints."
+            if status == cp_model.INFEASIBLE
+            else f"Solver timed out after {time_limit:g}s. Increase the time limit in Settings or simplify until this section solves."
+        ),
+    }

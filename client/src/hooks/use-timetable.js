@@ -4,10 +4,21 @@ import { getInstitutionId } from "@/lib/desktop-api";
 
 /**
  * Timetable hooks — same names/signatures as the legacy REST versions, backed
- * by IPC. Generation now goes through window.api.scheduler (added in the
- * scheduler phase); until that IPC domain exists, useRegenerateAll throws a
- * clear "not yet available" error instead of silently failing.
+ * by Electron IPC. Generation runs in the Electron main process (local Python
+ * + OR-Tools) and reports progress by push events, never by HTTP polling.
+ *
+ * Safe-apply workflow (spec §11): a finished job only stages its rows; the
+ * user reviews them and explicitly accepts, which creates a new active
+ * timetable version while keeping the previous one for rollback.
  */
+
+function schedulerGuard() {
+  if (!window.api?.scheduler) {
+    throw new Error(
+      "Timetable generation is unavailable: the desktop scheduler bridge is missing. Run the app through Electron."
+    );
+  }
+}
 
 export function useTimetable(filters) {
   return useQuery({
@@ -31,9 +42,7 @@ export function useGenerateTimetable() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (data) => {
-      if (!window.api.scheduler) {
-        throw new Error("Timetable generation arrives with the scheduler phase (IPC not wired yet).");
-      }
+      schedulerGuard();
       const institutionId = await getInstitutionId();
       return window.api.scheduler.generate({ ...data, institutionId });
     },
@@ -47,9 +56,7 @@ export function useRegenerateAll() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async () => {
-      if (!window.api.scheduler) {
-        throw new Error("Timetable generation arrives with the scheduler phase (IPC not wired yet).");
-      }
+      schedulerGuard();
       const institutionId = await getInstitutionId();
       return window.api.scheduler.generate({ allSections: true, institutionId });
     },
@@ -59,9 +66,125 @@ export function useRegenerateAll() {
   });
 }
 
+/** Cancel a running generation job (staged rows are discarded). */
+export function useCancelGeneration() {
+  return useMutation({
+    mutationFn: async (jobId) => {
+      schedulerGuard();
+      return window.api.scheduler.cancel(jobId);
+    },
+  });
+}
+
+/** Full job record incl. per-section status and explainable diagnostics. */
+export function useSchedulerJob(jobId) {
+  return useQuery({
+    queryKey: ["scheduler-job", jobId],
+    enabled: Boolean(jobId),
+    queryFn: () => window.api.scheduler.job(jobId),
+  });
+}
+
+export function useSchedulerHistory() {
+  return useQuery({
+    queryKey: ["scheduler-history"],
+    queryFn: async () => {
+      const institutionId = await getInstitutionId();
+      return window.api.scheduler.history(institutionId);
+    },
+  });
+}
+
+/** Pre-flight feasibility audit (no solving) — powers pre-generation hints. */
+export function useSchedulerAudit(enabled = true) {
+  return useQuery({
+    queryKey: ["scheduler-audit"],
+    enabled,
+    queryFn: async () => {
+      const institutionId = await getInstitutionId();
+      return window.api.scheduler.audit({ institutionId });
+    },
+  });
+}
+
+/** Promote staged results into a new active timetable version. */
+export function useAcceptStaged() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ jobId, label }) => {
+      schedulerGuard();
+      return window.api.scheduler.accept(jobId, label);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["timetable"] });
+      queryClient.invalidateQueries({ queryKey: ["conflicts"] });
+      queryClient.invalidateQueries({ queryKey: ["scheduler-history"] });
+      queryClient.invalidateQueries({ queryKey: ["timetable-versions"] });
+    },
+  });
+}
+
+/** Throw away staged results without touching the live timetable. */
+export function useDiscardStaged() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (jobId) => {
+      schedulerGuard();
+      return window.api.scheduler.discard(jobId);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["scheduler-history"] });
+    },
+  });
+}
+
+/** Real double-booking detection over the active timetable version. */
+export function useConflicts() {
+  return useQuery({
+    queryKey: ["conflicts"],
+    queryFn: async () => {
+      const institutionId = await getInstitutionId();
+      return window.api.timetable.conflicts(institutionId);
+    },
+  });
+}
+
+export function useTimetableVersions() {
+  return useQuery({
+    queryKey: ["timetable-versions"],
+    queryFn: async () => {
+      const institutionId = await getInstitutionId();
+      return window.api.timetable.versions(institutionId);
+    },
+  });
+}
+
+/** Restore an earlier timetable version by making it the active one. */
+export function useActivateVersion() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (versionId) => window.api.timetable.activateVersion(versionId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["timetable"] });
+      queryClient.invalidateQueries({ queryKey: ["timetable-versions"] });
+      queryClient.invalidateQueries({ queryKey: ["conflicts"] });
+    },
+  });
+}
+
+/** Delete a stored (non-active) version. */
+export function useDeleteVersion() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (versionId) => window.api.timetable.deleteVersion(versionId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["timetable-versions"] }),
+  });
+}
+
 /**
- * Progress hook. With the scheduler IPC present it subscribes to push events;
- * otherwise it stays idle (no polling, no fake progress).
+ * Progress hook. Subscribes to scheduler push events (no polling, no fake
+ * progress). Terminal states are kept so the UI can show the review step until
+ * the user accepts or discards the staged result.
  */
 export function useGenerationStatus() {
   const [jobId, setJobId] = useState(null);

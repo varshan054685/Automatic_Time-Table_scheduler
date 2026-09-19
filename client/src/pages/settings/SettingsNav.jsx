@@ -1,16 +1,10 @@
-import {
-  User,
-  Building2,
-  Link2,
-  ClipboardList,
-  ShieldAlert,
-} from "lucide-react";
+import { User, Building2, ShieldAlert } from "lucide-react";
 
+// Offline edition: the multi-user cloud sections (referrals, change requests)
+// were removed and are no longer listed here.
 export const SETTINGS_SECTIONS = [
   { id: "profile", label: "Profile", icon: User },
-  { id: "workspace", label: "Workspace", icon: Building2 },
-  { id: "referrals", label: "Referrals", icon: Link2 },
-  { id: "requests", label: "Requests", icon: ClipboardList, badge: true },
+  { id: "workspace", label: "Institution", icon: Building2 },
   { id: "danger", label: "Danger Zone", icon: ShieldAlert, danger: true },
 ];
 

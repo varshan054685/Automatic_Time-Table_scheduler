@@ -181,10 +181,13 @@ export function useCreateSection() {
   return useMutation({
     mutationFn: async (data) => {
       const institutionId = await getInstitutionId();
+      // The form field is `classroomId`; the column is `default_classroom_id`.
+      const { classroomId, ...rest } = data;
       return window.api.sections.create({
-        ...data,
+        ...rest,
         year: data.year != null ? Number(data.year) : null,
         semester: data.semester != null ? Number(data.semester) : null,
+        defaultClassroomId: classroomId ? Number(classroomId) : null,
         institutionId,
       });
     },
@@ -198,12 +201,18 @@ export function useCreateSection() {
 export function useUpdateSection() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, ...data }) =>
-      window.api.sections.update(id, {
-        ...data,
+    mutationFn: async ({ id, ...data }) => {
+      const { classroomId, ...rest } = data;
+      const payload = {
+        ...rest,
         year: data.year != null ? Number(data.year) : null,
         semester: data.semester != null ? Number(data.semester) : null,
-      }),
+      };
+      if (classroomId !== undefined) {
+        payload.defaultClassroomId = classroomId ? Number(classroomId) : null;
+      }
+      return window.api.sections.update(id, payload);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk.sections });
       queryClient.invalidateQueries({ queryKey: qk.timetable });

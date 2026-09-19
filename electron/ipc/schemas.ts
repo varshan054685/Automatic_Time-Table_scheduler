@@ -99,6 +99,64 @@ export const timetableFilters = z.object({
 
 export const backupRestoreInput = z.object({ id: z.string().min(1).max(200) });
 
+// ─── Scheduler ─────────────────────────────────────────────────────────
+export const generateInput = z
+  .object({
+    allSections: z.boolean().optional(),
+    sectionIds: z.array(idSchema).max(1000).optional(),
+    institutionId: optionalIdSchema,
+    timeLimitSeconds: z.number().min(1).max(600).optional(),
+  })
+  .optional();
+
+export const auditInput = z
+  .object({ institutionId: optionalIdSchema, sectionIds: z.array(idSchema).max(1000).optional() })
+  .optional();
+
+export const acceptStagedInput = z.object({
+  jobId: idSchema,
+  label: z.string().max(120).optional(),
+});
+
+export type GenerateInput = z.infer<typeof generateInput>;
+export type AuditInput = z.infer<typeof auditInput>;
+
+// ─── Excel import/export ───────────────────────────────────────────────
+export const importKindSchema = z.enum([
+  "departments",
+  "classrooms",
+  "faculty",
+  "subjects",
+  "sections",
+  "timeslots",
+]);
+
+export const excelPreviewInput = z.object({
+  kind: importKindSchema,
+  institutionId: optionalIdSchema,
+});
+
+export const excelCommitInput = z.object({ batchId: idSchema });
+export const excelTemplateInput = z.object({ kind: importKindSchema });
+export const excelExportDataInput = z.object({
+  kind: z.string(),
+  data: z.array(z.record(z.unknown())),
+  defaultFileName: z.string().optional(),
+});
+
+export type ExcelPreviewInput = z.infer<typeof excelPreviewInput>;
+export type ImportKindName = z.infer<typeof importKindSchema>;
+
+// ─── PDF reports ───────────────────────────────────────────────────────
+export const pdfExportInput = z.object({
+  kind: z.enum(["timetable", "teacherWorkload", "roomUtilization", "analytics"]),
+  institutionId: optionalIdSchema,
+  sectionId: optionalIdSchema,
+  departmentId: optionalIdSchema,
+});
+
+export type PdfExportInput = z.infer<typeof pdfExportInput>;
+
 export const settingsInput = z.object({
   key: z.string().min(1).max(100),
   value: z.unknown(),

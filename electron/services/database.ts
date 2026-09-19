@@ -101,6 +101,22 @@ export function closeDatabase(): void {
   }
 }
 
+/**
+ * Flush pending writes to disk without closing the connection.
+ *
+ * Used by the pre-update gate (spec §15) before a backup is taken: the install
+ * may still be refused, in which case the application keeps running, so the
+ * connection must remain usable.
+ */
+export function flushDatabase(): void {
+  if (!db) return;
+  try {
+    db.pragma("wal_checkpoint(TRUNCATE)");
+  } catch (err) {
+    logError("WAL checkpoint failed", err, "db");
+  }
+}
+
 /** Run a mutation inside a transaction; rolls back on throw. */
 export function inTransaction<T>(fn: (db: DB) => T): T {
   const d = getDb();
@@ -109,4 +125,4 @@ export function inTransaction<T>(fn: (db: DB) => T): T {
 
 export { getSchemaVersion, createBackup };
 export type { BackupInfo };
-export const LATEST_SCHEMA_VERSION = 1; // keep in sync with migrations/index.ts
+export const LATEST_SCHEMA_VERSION = 2; // keep in sync with migrations/sqlite/*.sql

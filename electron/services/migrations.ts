@@ -23,7 +23,29 @@ export interface MigrationResult {
   to: number;
 }
 
-const MIGRATIONS_DIR = path.resolve(process.cwd(), "migrations", "sqlite");
+/**
+ * Where the numbered SQL migrations live. Resolution order matters for
+ * packaging: `process.cwd()` is NOT the app root once the app is installed, so
+ * prefer an explicit override and then the app's own directory.
+ */
+function defaultMigrationsDir(): string {
+  const candidates: string[] = [];
+  if (process.env.TTS_MIGRATIONS_DIR) candidates.push(process.env.TTS_MIGRATIONS_DIR);
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { app } = require("electron") as typeof import("electron");
+    if (app?.getAppPath) {
+      candidates.push(path.join(app.getAppPath(), "migrations", "sqlite"));
+      if (process.resourcesPath) candidates.push(path.join(process.resourcesPath, "migrations", "sqlite"));
+    }
+  } catch {
+    // Not running under Electron (unit tests) — fall through to cwd.
+  }
+  candidates.push(path.resolve(process.cwd(), "migrations", "sqlite"));
+  return candidates.find((dir) => fs.existsSync(dir)) ?? candidates[candidates.length - 1];
+}
+
+const MIGRATIONS_DIR = defaultMigrationsDir();
 
 export function loadMigrations(dir: string = MIGRATIONS_DIR): Migration[] {
   if (!fs.existsSync(dir)) return [];

@@ -8,6 +8,8 @@ import {
   GraduationCap,
   CalendarDays,
   Clock,
+  History,
+  FileBarChart,
   LogOut,
   Menu,
   X,
@@ -37,6 +39,8 @@ const navItems = [
   { label: "Subjects",    href: "/subjects",     icon: BookOpen,        color: "text-lime-400" },
   { label: "Time Slots",  href: "/timeslots",    icon: Clock,           color: "text-amber-400" },
   { label: "Timetable",   href: "/timetable",    icon: CalendarDays,    color: "text-orange-400" },
+  { label: "History",     href: "/history",      icon: History,         color: "text-violet-400" },
+  { label: "Reports",     href: "/reports",      icon: FileBarChart,    color: "text-rose-400" },
 ];
 
 export function Sidebar() {

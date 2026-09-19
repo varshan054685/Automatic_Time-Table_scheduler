@@ -1,34 +1,67 @@
-/**
- * Electron main process. Owns the database, all services and the IPC surface.
- * The renderer is fully sandboxed and only sees window.api (see preload.ts).
- */
-import { app, BrowserWindow, shell } from "electron";
+import { app, BrowserWindow, shell, Menu } from "electron";
 import path from "path";
+import fs from "fs";
 import { initDatabase, closeDatabase } from "./services/database";
 import { registerAllIpc, activateIpc, handleRestore } from "./ipc/register";
 import { log, logError } from "./services/logger";
 import { getAppPaths } from "./services/paths";
-import { overrideAppPathsForTests } from "./services/paths";
+import { stopSolver } from "./services/scheduler";
 
 let mainWindow: BrowserWindow | null = null;
 let smokesDone = false;
 
-const isDev = !app.isPackaged;
+// Windows AppUserModelID for notifications and taskbar branding
+if (process.platform === "win32") {
+  app.setAppUserModelId("com.timetablescheduler.app");
+}
+app.setName("Automatic Timetable Scheduler");
 
 // Route logs into userData/logs even before window creation.
 process.on("uncaughtException", (err) => logError("Uncaught exception", err, "main"));
 process.on("unhandledRejection", (reason) => logError("Unhandled rejection", reason, "main"));
 
+function getAppIcon(): string | undefined {
+  const isWin = process.platform === "win32";
+  const candidates = [
+    // Resources directory (packaged / runtime)
+    path.join(process.resourcesPath || "", isWin ? "icon.ico" : "icon.png"),
+    path.join(process.resourcesPath || "", "icon.png"),
+    // Development / project root paths
+    path.join(process.cwd(), "resources", isWin ? "icon.ico" : "icon.png"),
+    path.join(process.cwd(), "resources", "icon.png"),
+    path.join(process.cwd(), "build", isWin ? "icon.ico" : "icon.png"),
+    path.join(process.cwd(), "build", "icon.png"),
+    path.join(__dirname, "..", "..", "resources", isWin ? "icon.ico" : "icon.png"),
+    path.join(__dirname, "..", "..", "resources", "icon.png"),
+    path.join(__dirname, "..", "..", "build", isWin ? "icon.ico" : "icon.png"),
+    path.join(__dirname, "..", "..", "build", "icon.png"),
+  ];
+
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) {
+      return candidate;
+    }
+  }
+  return undefined;
+}
+
 function createWindow(): void {
+  const isDev = !app.isPackaged;
+  const appIcon = getAppIcon();
+
+  // Hide default menu bar for a clean native look
+  Menu.setApplicationMenu(null);
+
   mainWindow = new BrowserWindow({
-    width: 1400,
-    height: 900,
+    width: 1440,
+    height: 920,
     minWidth: 1024,
     minHeight: 700,
     show: false,
-    backgroundColor: "#f8fafc",
+    autoHideMenuBar: true,
+    backgroundColor: "#0b0f19",
     title: "Automatic Timetable Scheduler",
-    icon: path.join(process.env.VITE_DEV_SERVER_URL ? "" : process.resourcesPath || "", "icon.png"),
+    ...(appIcon ? { icon: appIcon } : {}),
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,   // spec §22
@@ -39,7 +72,14 @@ function createWindow(): void {
     },
   });
 
-  mainWindow.once("ready-to-show", () => mainWindow?.show());
+  mainWindow.setMenuBarVisibility(false);
+
+  mainWindow.once("ready-to-show", () => {
+    mainWindow?.show();
+    if (appIcon && mainWindow && process.platform === "win32") {
+      mainWindow.setIcon(appIcon);
+    }
+  });
 
   // Open external links in the system browser, never in-app.
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
@@ -63,7 +103,10 @@ function createWindow(): void {
 /** Headless boot path used by `electron . --smoke` (CI verification). */
 async function runSmokeTest(): Promise<void> {
   smokesDone = true;
-  const paths = getAppPaths();
+  // Keep CI runs hermetic: never write into the developer's real userData.
+  const { overrideAppPathsForTests } = await import("./services/paths");
+  const smokeRoot = path.join(process.cwd(), ".smoke-user-data");
+  const paths = overrideAppPathsForTests(smokeRoot);
   const init = await initDatabase();
   log(`SMOKE OK database initialized v${init.versionAfter} (${init.applied} migrations)`, "main");
 
@@ -96,12 +139,93 @@ async function runSmokeTest(): Promise<void> {
   if (listBackups().length < 1) throw new Error("backup not listed");
 
   log(`SMOKE OK teacher=${teacher.id} room=${room.id} stats=${JSON.stringify(stats)} backup=${backup.id}`, "main");
+
+  // ── Scheduler end-to-end: local Python + OR-Tools, no network ──────────
+  const {
+    startGeneration, getJob, acceptStaged, getConflicts, audit, stopSolver,
+  } = await import("./services/scheduler");
+  const { DAY_NAMES } = await import("./services/days");
+
+  const periodDefs = [
+    { label: "P1", start: "09:00", end: "09:50" },
+    { label: "P2", start: "09:50", end: "10:40" },
+    { label: "P3", start: "10:40", end: "11:30" },
+    { label: "P4", start: "11:30", end: "12:20" },
+  ];
+  for (let dayIdx = 0; dayIdx < 5; dayIdx++) {
+    periodDefs.forEach((p, i) => {
+      insertRow("time_slots", {
+        institutionId: inst.id,
+        dayOfWeek: dayIdx,
+        startTime: p.start,
+        endTime: p.end,
+        label: p.label,
+        type: "teaching",
+        sortOrder: i + 1,
+      });
+    });
+  }
+
+  const section = insertRow("sections", {
+    institutionId: inst.id,
+    departmentId: dept.id,
+    name: "A",
+    year: 1,
+    semester: 1,
+    strength: 60,
+  });
+  insertRow("subjects", {
+    institutionId: inst.id, code: "CS101", name: "Mathematics", type: "lecture",
+    weeklyHours: 4, departmentId: dept.id, facultyId: teacher.id, sectionId: section.id,
+  });
+  insertRow("subjects", {
+    institutionId: inst.id, code: "CS102", name: "Physics", type: "lecture",
+    weeklyHours: 3, departmentId: dept.id, facultyId: teacher.id, sectionId: section.id,
+  });
+
+  const sectionB = insertRow("sections", {
+    institutionId: inst.id,
+    departmentId: dept.id,
+    name: "B",
+    year: 1,
+    semester: 1,
+    strength: 60,
+  });
+  insertRow("subjects", {
+    institutionId: inst.id, code: "CS103", name: "Chemistry", type: "lecture",
+    weeklyHours: 4, departmentId: dept.id, facultyId: teacher.id, sectionId: sectionB.id,
+  });
+
+  const preflight = audit({ institutionId: inst.id as number });
+  if (!preflight.ok) throw new Error(`audit reported blocking issues: ${JSON.stringify(preflight.issues)}`);
+  log(`SMOKE OK audit ok (${preflight.teachingSlots} teaching slots, ${DAY_NAMES.length} day names)`, "main");
+
+  const { jobId } = await startGeneration({ allSections: true, institutionId: inst.id as number });
+  const deadline = Date.now() + 120_000;
+  let job: Record<string, unknown> = {};
+  while (Date.now() < deadline) {
+    job = getJob(jobId);
+    if (!["queued", "running"].includes(String(job.status))) break;
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  if (job.status !== "completed") {
+    throw new Error(`generation job ${jobId} did not complete: ${JSON.stringify(job.diagnostics)}`);
+  }
+
+  const accepted = acceptStaged(jobId, "smoke");
+  if (accepted.entries <= 0) throw new Error("no timetable entries were promoted");
+  const conflicts = getConflicts(inst.id as number);
+  if (conflicts.length > 0) throw new Error(`conflicts detected: ${JSON.stringify(conflicts)}`);
+  log(`SMOKE OK generation job=${jobId} version=${accepted.versionId} entries=${accepted.entries} conflicts=0`, "main");
+
+  stopSolver();
   log(`SMOKE OK userData=${paths.root}`, "main");
   console.log("SMOKE_OK");
   app.exit(0);
 }
 
 app.whenReady().then(async () => {
+  const isDev = !app.isPackaged;
   const smoke = process.argv.includes("--smoke");
   try {
     if (smoke) {
@@ -148,5 +272,6 @@ app.on("window-all-closed", () => {
 });
 
 app.on("before-quit", () => {
+  stopSolver();
   if (!smokesDone) closeDatabase();
 });

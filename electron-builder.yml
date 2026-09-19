@@ -1,0 +1,80 @@
+# electron-builder configuration — Windows + Linux installers (spec §8).
+#
+# Build order (see package.json):
+#   npm run build          → renderer  (dist/public)
+#   npm run build:electron → main + preload (dist/electron)
+#   npm run build:solver   → bundled Python solver (python-service/dist/timetable-solver)
+#   npm run desktop:build  → installers in release/
+#
+# The `beforePack` hook fails the build if the solver bundle is missing, so a
+# release can never ship without its offline scheduler.
+
+appId: com.timetablescheduler.app
+productName: Automatic Timetable Scheduler
+copyright: Copyright © 2026
+
+directories:
+  output: release
+  buildResources: build
+
+files:
+  - dist/electron/**/*
+  - dist/public/**/*
+  - package.json
+  - "!**/*.map"
+  - "!**/node_modules/*/{CHANGELOG.md,README.md,readme.md}"
+
+# Everything the app needs at runtime, outside the asar archive.
+extraResources:
+  # Versioned SQL migrations (SchedulerService/database.ts resolves these).
+  - from: migrations/sqlite
+    to: migrations/sqlite
+  # Excel import/export templates.
+  - from: excel
+    to: excel
+  # Standalone solver runtime (PyInstaller onedir bundle).
+  - from: python-service/dist/timetable-solver
+    to: solver
+  - from: resources/icon.png
+    to: icon.png
+  - from: resources/icon.ico
+    to: icon.ico
+
+# Native modules cannot be loaded from inside an asar archive.
+asarUnpack:
+  - "**/*.node"
+  - node_modules/better-sqlite3/**
+
+beforePack: script/verify-solver-bundle.cjs
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  icon: build/icon.ico
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  # User data lives in app.getPath("userData") — never delete it on uninstall.
+  deleteAppDataOnUninstall: false
+
+linux:
+  target:
+    - AppImage
+    - deb
+  category: Education
+  synopsis: Offline timetable scheduler for schools and colleges
+  icon: build/icon.png
+
+# Auto-update provider (spec §14).
+# electron-updater reads this to locate GitHub Releases assets.
+publish:
+  provider: github
+  owner: varshan054685
+  repo: Automatic_Time-Table_scheduler
+  releaseType: draft

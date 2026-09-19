@@ -6,74 +6,17 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Plus, Trash2, Search, ArrowUpDown, Pencil, Upload, Loader2, GraduationCap, Mail, Fingerprint, Building2, FileSpreadsheet } from "lucide-react";
+import { Plus, Trash2, Search, ArrowUpDown, Pencil, Upload, Loader2, Download, GraduationCap, Mail, Fingerprint, Building2, FileSpreadsheet, CalendarClock } from "lucide-react";
+import { AvailabilityDialog } from "@/components/AvailabilityDialog";
 import { useFaculty, useCreateFaculty, useUpdateFaculty, useDeleteFaculty, useDepartments } from "@/hooks/use-master-data";
 import { useToast } from "@/hooks/use-toast";
-import { api } from "@shared/routes";
+import { facultyFormSchema } from "@/lib/schemas";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import * as XLSX from "xlsx";
+import { exportToExcel } from "@/lib/export-excel";
+import { ImportDialog } from "@/components/ImportDialog";
 import { ExportHint } from "@/components/ExportHint";
 import { motion } from "framer-motion";
 
-function FacultyImport({ departments, faculty, onImportComplete }) {
-  const [isImporting, setIsImporting] = useState(false);
-  const fileInputRef = useRef(null);
-  const { toast } = useToast();
-  const createMutation = useCreateFaculty();
-  const updateMutation = useUpdateFaculty();
-
-  const handleImport = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    setIsImporting(true);
-    const reader = new FileReader();
-    reader.onload = async (evt) => {
-      try {
-        const buffer = new Uint8Array(evt.target.result);
-        const wb = XLSX.read(buffer, { type: "array" });
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        const data = XLSX.utils.sheet_to_json(ws);
-        let successCount = 0, updateCount = 0, errorCount = 0;
-        const errors = [];
-        for (let i = 0; i < data.length; i++) {
-          const item = data[i];
-          const rowNum = i + 2;
-          const name = item["Faculty Name"]||item["Name"]||item.name||item.Name||item["Full Name"];
-          const emailRaw = item["Email"]||item.email||item.Email;
-          const code = item["Faculty Code"]||item["Code"]||item.code||item.Code;
-          const deptSearch = item["Department"]||item.department||item.Department;
-          if (name) {
-            const dept = departments?.find(d => String(d.name).toLowerCase().trim()===String(deptSearch||"").toLowerCase().trim() || String(d.code).toLowerCase().trim()===String(deptSearch||"").toLowerCase().trim());
-            const deptId = dept ? dept.id : (departments && departments.length > 0 ? departments[0].id : null);
-            if (!deptId) { errors.push(`Row ${rowNum}: No dept for "${deptSearch}"`); errorCount++; continue; }
-            const email = emailRaw && String(emailRaw).includes("@") ? String(emailRaw).trim() : null;
-            const existing = faculty?.find(f => (code && String(f.code).toLowerCase()===String(code).toLowerCase()) || (email && String(f.email).toLowerCase()===String(email).toLowerCase()));
-            try {
-              if (existing) { await updateMutation.mutateAsync({ id: existing.id, name: String(name), code: code ? String(code) : existing.code, email: email||existing.email, departmentId: deptId||existing.departmentId, availability: existing.availability||[] }); updateCount++; }
-              else { await createMutation.mutateAsync({ name: String(name), code: code ? String(code) : `FAC${Date.now()}${successCount}`, email, departmentId: deptId, availability: [] }); successCount++; }
-            } catch (err) { errors.push(`Row ${rowNum}: ${err.message}`); errorCount++; }
-          }
-        }
-        toast({ title: "Import Complete", description: `Imported ${successCount} new, updated ${updateCount}.${errorCount > 0 ? ` Failed ${errorCount}.` : ""}`, variant: errorCount > 0 ? "destructive" : "default" });
-        if (onImportComplete) onImportComplete();
-      } catch (error) { toast({ title: "Import Failed", description: error?.message, variant: "destructive" }); }
-      finally { setIsImporting(false); if (fileInputRef.current) fileInputRef.current.value = ""; }
-    };
-    reader.readAsArrayBuffer(file);
-  };
-
-  return (
-    <div className="relative">
-      <Input type="file" accept=".xlsx,.xls" className="hidden" id="import-excel-fac" ref={fileInputRef} onChange={handleImport} disabled={isImporting} />
-      <Button variant="outline" className="gap-2 h-10 px-4 rounded-xl border border-slate-200 text-sm font-semibold hover:border-teal-300 hover:text-teal-700 transition-all" asChild disabled={isImporting}>
-        <label htmlFor="import-excel-fac" className="cursor-pointer">
-          {isImporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileSpreadsheet className="w-4 h-4" />}
-          {isImporting ? "Importing..." : "Import"}
-        </label>
-      </Button>
-    </div>
-  );
-}
 
 const avatarGradients = [
   "linear-gradient(135deg,#0f9f87,#0891b2)",
@@ -89,6 +32,8 @@ export default function Faculty() {
   const [editingId, setEditingId] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [sortConfig, setSortConfig] = useState({ key: null, direction: "asc" });
+  // Teacher whose availability grid is being edited (null = dialog closed).
+  const [availabilityTeacher, setAvailabilityTeacher] = useState(null);
   const { toast } = useToast();
   const { data: faculty, isLoading, refetch } = useFaculty();
   const { data: departments } = useDepartments();
@@ -97,7 +42,7 @@ export default function Faculty() {
   const deleteMutation = useDeleteFaculty();
 
   const form = useForm({
-    resolver: zodResolver(api.faculty.create.input),
+    resolver: zodResolver(facultyFormSchema),
     defaultValues: { name: "", code: "", departmentId: 0, email: "", availability: [] },
   });
 
@@ -105,15 +50,22 @@ export default function Faculty() {
     const data = faculty?.length > 0
       ? faculty.map(f => ({ "Faculty Code": f.code, "Faculty Name": f.name, "Email": f.email, "Department": departments?.find(d => d.id === f.departmentId)?.name || "" }))
       : [{ "Faculty Code": "FAC001", "Faculty Name": "Dr. Alice", "Email": "alice@college.edu", "Department": "Computer Science" }];
-    const ws = XLSX.utils.json_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Faculty");
-    XLSX.writeFile(wb, "faculty_template.xlsx");
-    localStorage.setItem("hasExportedOnce", "true");
+    exportToExcel({
+      kind: "Faculty",
+      data,
+      defaultFileName: "faculty_export.xlsx",
+      toast,
+    });
   };
 
   const onSubmit = (values) => {
-    const data = { ...values, departmentId: Number(values.departmentId) };
+    const data = {
+      name: values.name.trim(),
+      code: values.code?.trim() || "",
+      departmentId: Number(values.departmentId) || null,
+      email: values.email?.trim() || null,
+      availability: Array.isArray(values.availability) ? values.availability : [],
+    };
     if (editingId) {
       updateMutation.mutate({ id: editingId, ...data }, {
         onSuccess: () => { setOpen(false); setEditingId(null); form.reset(); toast({ title: "Faculty updated" }); },
@@ -127,14 +79,36 @@ export default function Faculty() {
     }
   };
 
-  const handleEdit = (f) => { setEditingId(f.id); form.reset({ name: f.name, code: f.code||"", departmentId: f.departmentId, email: f.email||"", availability: f.availability||[] }); setOpen(true); };
+  const handleEdit = (f) => {
+    setEditingId(f.id);
+    let avail = f.availability;
+    if (typeof avail === "string") {
+      try { avail = JSON.parse(avail); } catch { avail = []; }
+    }
+    form.reset({
+      name: f.name || "",
+      code: f.code || "",
+      departmentId: f.departmentId || 0,
+      email: f.email || "",
+      availability: Array.isArray(avail) ? avail : [],
+    });
+    setOpen(true);
+  };
   const handleDelete = (id) => { if (confirm("Delete this faculty member?")) deleteMutation.mutate(id); };
   const handleSort = (key) => { setSortConfig(prev => ({ key, direction: prev.key === key && prev.direction === "asc" ? "desc" : "asc" })); };
 
   const filtered = useMemo(() => {
     if (!faculty) return [];
-    let r = faculty.filter(f => f.name.toLowerCase().includes(searchTerm.toLowerCase()) || f.code?.toLowerCase().includes(searchTerm.toLowerCase()) || f.email?.toLowerCase().includes(searchTerm.toLowerCase()));
-    if (sortConfig.key) r.sort((a, b) => a[sortConfig.key] < b[sortConfig.key] ? (sortConfig.direction === "asc" ? -1 : 1) : a[sortConfig.key] > b[sortConfig.key] ? (sortConfig.direction === "asc" ? 1 : -1) : 0);
+    let r = faculty.filter(f => 
+      (f?.name || "").toLowerCase().includes(searchTerm.toLowerCase()) || 
+      (f?.code || "").toLowerCase().includes(searchTerm.toLowerCase()) || 
+      (f?.email || "").toLowerCase().includes(searchTerm.toLowerCase())
+    );
+    if (sortConfig.key) r.sort((a, b) => {
+      const aVal = a[sortConfig.key] || "";
+      const bVal = b[sortConfig.key] || "";
+      return aVal < bVal ? (sortConfig.direction === "asc" ? -1 : 1) : aVal > bVal ? (sortConfig.direction === "asc" ? 1 : -1) : 0;
+    });
     return r;
   }, [faculty, searchTerm, sortConfig]);
 
@@ -158,9 +132,9 @@ export default function Faculty() {
               </motion.div>
 
               <motion.div initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} className="flex items-center gap-2.5 flex-wrap">
-                <FacultyImport departments={departments} faculty={faculty} onImportComplete={refetch} />
+                <ImportDialog kind="faculty" />
                 <Button variant="outline" className="gap-2 h-10 px-4 rounded-xl border border-slate-200 text-sm font-semibold hover:border-teal-300 hover:text-teal-700" onClick={handleExport}>
-                  <Upload className="w-4 h-4" /> Export
+                  <Download className="w-4 h-4" /> Export
                 </Button>
                 <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) { setEditingId(null); form.reset(); } }}>
                   <DialogTrigger asChild>
@@ -202,12 +176,12 @@ export default function Faculty() {
                           <FormField control={form.control} name="departmentId" render={({ field }) => (
                             <FormItem>
                               <FormLabel className="text-sm font-bold text-slate-700">Department</FormLabel>
-                              <Select onValueChange={(val) => field.onChange(parseInt(val))} value={field.value?.toString()}>
+                              <Select onValueChange={(val) => field.onChange(parseInt(val, 10) || 0)} value={field.value ? String(field.value) : undefined}>
                                 <FormControl>
-                                  <SelectTrigger className="h-11 rounded-xl"><SelectValue placeholder="Select" /></SelectTrigger>
+                                  <SelectTrigger className="h-11 rounded-xl"><SelectValue placeholder="Select Department" /></SelectTrigger>
                                 </FormControl>
                                 <SelectContent className="rounded-xl">
-                                  {departments?.map(d => <SelectItem key={d.id} value={d.id.toString()}>{d.name}</SelectItem>)}
+                                  {departments?.map(d => <SelectItem key={d.id} value={String(d.id)}>{d.name}</SelectItem>)}
                                 </SelectContent>
                               </Select>
                               <FormMessage />
@@ -260,7 +234,7 @@ export default function Faculty() {
                 {filtered.map((f, idx) => {
                   const grad = avatarGradients[idx % avatarGradients.length];
                   const deptName = departments?.find(d => d.id === f.departmentId)?.name || "—";
-                  const initials = f.name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
+                  const initials = (f?.name || "FA").split(" ").filter(Boolean).map(w => w[0] || "").join("").toUpperCase().slice(0, 2) || "FA";
                   return (
                     <motion.div
                       key={f.id}
@@ -281,6 +255,13 @@ export default function Faculty() {
                           <p className="text-[11px] text-slate-400 font-mono font-bold mt-0.5">{f.code || "—"}</p>
                         </div>
                         <div className="flex items-center gap-1.5 shrink-0">
+                          <button
+                            onClick={() => setAvailabilityTeacher(f)}
+                            title="Teaching availability"
+                            className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-teal-600 hover:bg-teal-50 transition-all"
+                          >
+                            <CalendarClock className="w-3.5 h-3.5" />
+                          </button>
                           <button onClick={() => handleEdit(f)} className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-teal-600 hover:bg-teal-50 transition-all">
                             <Pencil className="w-3.5 h-3.5" />
                           </button>
@@ -316,6 +297,12 @@ export default function Faculty() {
           </div>
         </div>
       </div>
+
+      <AvailabilityDialog
+        teacher={availabilityTeacher}
+        open={Boolean(availabilityTeacher)}
+        onOpenChange={(v) => { if (!v) setAvailabilityTeacher(null); }}
+      />
     </div>
   );
 }

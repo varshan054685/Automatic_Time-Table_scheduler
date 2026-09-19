@@ -1,4 +1,11 @@
+# Local solver service dependencies (bundled with the desktop app).
+#
+# NOTE: ortools >= 9.12 imports pandas at module load
+# (ortools/sat/python/cp_model.py), so pandas is effectively a required
+# transitive dependency of the CP-SAT solver. pandas 3.x wheels are blocked by
+# Windows Application Control policies on some managed machines, so pin <3.
 fastapi
 uvicorn
-ortools
+ortools==9.15.6755
+pandas<3
 pydantic

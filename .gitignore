@@ -124,3 +124,7 @@ TODO.md
 release/
 dist/electron/
 
+# Hermetic Electron smoke-test data (never the real userData dir)
+.smoke-user-data/
+.smoke-tmp/
+

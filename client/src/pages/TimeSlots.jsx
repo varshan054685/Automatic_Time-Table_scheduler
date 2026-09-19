@@ -1,35 +1,48 @@
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { Sidebar } from "@/components/Sidebar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
-import { Plus, Trash2, Pencil, Calendar, Upload, Download, Loader2, Sparkles, Clock, CalendarDays, MousePointer2, Settings2, FileSpreadsheet, ChevronRight, Activity } from "lucide-react";
+import { Plus, Trash2, Pencil, Download, Loader2, Clock, CalendarDays, Settings2, ChevronRight } from "lucide-react";
 import { useTimeSlots, useCreateTimeSlot, useUpdateTimeSlot, useDeleteTimeSlot } from "@/hooks/use-master-data";
 import { useToast } from "@/hooks/use-toast";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
-import * as XLSX from "xlsx";
+import { exportToExcel } from "@/lib/export-excel";
+import { ImportDialog } from "@/components/ImportDialog";
 import { ExportHint } from "@/components/ExportHint";
 import { motion, AnimatePresence } from "framer-motion";
 
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
+function normalizeDay(d) {
+  if (typeof d === "number") return DAYS[d] || DAYS[0];
+  if (typeof d === "string") {
+    const num = parseInt(d, 10);
+    if (!isNaN(num) && DAYS[num]) return DAYS[num];
+    if (DAYS.includes(d)) return d;
+    // Capitalize first letter if needed
+    const found = DAYS.find(day => day.toLowerCase() === d.toLowerCase());
+    if (found) return found;
+  }
+  return "Monday";
+}
+
 function TimePicker({ value, onChange }) {
-  const [hours, minutes] = value.split(":");
-  const hNum = parseInt(hours);
+  const valStr = typeof value === "string" ? value : "09:00";
+  const parts = valStr.split(":");
+  const hours = parts[0] || "09";
+  const minutes = parts[1] || "00";
+  const hNum = parseInt(hours, 10) || 9;
   const isPM = hNum >= 12;
   const displayHours = hNum % 12 || 12;
 
   const updateTime = (newH, newM, newIsPM) => {
-    let finalH = parseInt(newH) % 12;
+    let finalH = parseInt(newH, 10) % 12;
     if (newIsPM) finalH += 12;
-    const timeStr = `${finalH.toString().padStart(2, '0')}:${newM.toString().padStart(2, '0')}`;
-    onChange(timeStr);
+    const timeStr = `${finalH.toString().padStart(2, "0")}:${(newM || "00").toString().padStart(2, "0")}`;
+    if (onChange) onChange(timeStr);
   };
 
   return (
@@ -40,7 +53,7 @@ function TimePicker({ value, onChange }) {
             <SelectValue />
           </SelectTrigger>
           <SelectContent className="rounded-xl border-slate-100">
-            {Array.from({ length: 12 }, (_, i) => i + 1).map(h => (
+            {Array.from({ length: 12 }, (_, i) => i + 1).map((h) => (
               <SelectItem key={h} value={h.toString()} className="font-bold">{h}</SelectItem>
             ))}
           </SelectContent>
@@ -51,7 +64,7 @@ function TimePicker({ value, onChange }) {
             <SelectValue />
           </SelectTrigger>
           <SelectContent className="rounded-xl border-slate-100">
-            {["00", "05", "10", "15", "20", "25", "30", "35", "40", "45", "50", "55"].map(m => (
+            {["00", "05", "10", "15", "20", "25", "30", "35", "40", "45", "50", "55"].map((m) => (
               <SelectItem key={m} value={m} className="font-bold">{m}</SelectItem>
             ))}
           </SelectContent>
@@ -85,10 +98,10 @@ function BulkTimeSlotDialog({ onSuccess, editingGroup = null, onClose }) {
   
   const form = useForm({
     defaultValues: editingGroup ? {
-      days: editingGroup.map(s => s.dayOfWeek),
-      label: editingGroup[0].label,
-      startTime: editingGroup[0].startTime,
-      endTime: editingGroup[0].endTime
+      days: editingGroup.map(s => normalizeDay(s.dayOfWeek)),
+      label: editingGroup[0]?.label || "Period 1",
+      startTime: editingGroup[0]?.startTime || "09:00",
+      endTime: editingGroup[0]?.endTime || "10:00"
     } : {
       days: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
       label: "Period 1",
@@ -100,7 +113,7 @@ function BulkTimeSlotDialog({ onSuccess, editingGroup = null, onClose }) {
   const onSubmit = async (values) => {
     try {
       if (editingGroup) {
-        if (values.days.length === 0) {
+        if (!values.days || values.days.length === 0) {
           toast({ title: "Configuration Error", description: "Select at least one day for this slot group", variant: "destructive" });
           return;
         }
@@ -108,11 +121,12 @@ function BulkTimeSlotDialog({ onSuccess, editingGroup = null, onClose }) {
         const newDays = [...values.days];
         
         for (const oldSlot of editingGroup) {
-          const dayIndex = newDays.indexOf(oldSlot.dayOfWeek);
+          const oldDay = normalizeDay(oldSlot.dayOfWeek);
+          const dayIndex = newDays.indexOf(oldDay);
           if (dayIndex !== -1) {
             await updateMutation.mutateAsync({
               id: oldSlot.id,
-              dayOfWeek: oldSlot.dayOfWeek,
+              dayOfWeek: oldDay,
               label: values.label,
               startTime: values.startTime,
               endTime: values.endTime
@@ -133,7 +147,7 @@ function BulkTimeSlotDialog({ onSuccess, editingGroup = null, onClose }) {
         }
         toast({ title: "Group Sync Complete", description: "All instances of this time slot have been synchronized." });
       } else {
-        if (values.days.length === 0) {
+        if (!values.days || values.days.length === 0) {
           toast({ title: "Configuration Error", description: "At least one target day is required", variant: "destructive" });
           return;
         }
@@ -172,22 +186,22 @@ function BulkTimeSlotDialog({ onSuccess, editingGroup = null, onClose }) {
                     control={form.control}
                     name="days"
                     render={({ field }) => (
-                        <button
-                            type="button"
-                            onClick={() => {
-                                const checked = field.value?.includes(day);
-                                return checked
-                                    ? field.onChange(field.value?.filter((value) => value !== day))
-                                    : field.onChange([...field.value, day])
-                            }}
-                            className={`px-4 py-2 rounded-xl text-[10px] font-black transition-all border-2 ${
-                                field.value?.includes(day)
-                                    ? 'premium-gradient text-white border-teal-500 shadow-lg shadow-teal-500/20 scale-105'
-                                    : 'bg-white text-slate-500 border-slate-100 hover:border-slate-200 hover:text-slate-700'
-                            }`}
-                        >
-                            {day.slice(0, 3).toUpperCase()}
-                        </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const checked = field.value?.includes(day);
+                          return checked
+                            ? field.onChange(field.value?.filter((value) => value !== day))
+                            : field.onChange([...(field.value || []), day]);
+                        }}
+                        className={`px-4 py-2 rounded-xl text-[10px] font-black transition-all border-2 ${
+                          field.value?.includes(day)
+                            ? 'premium-gradient text-white border-teal-500 shadow-lg shadow-teal-500/20 scale-105'
+                            : 'bg-white text-slate-500 border-slate-100 hover:border-slate-200 hover:text-slate-700'
+                        }`}
+                      >
+                        {day.slice(0, 3).toUpperCase()}
+                      </button>
                     )}
                   />
                 ))}
@@ -206,8 +220,8 @@ function BulkTimeSlotDialog({ onSuccess, editingGroup = null, onClose }) {
               </FormLabel>
               <FormControl>
                 <div className="relative">
-                    <Clock className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
-                    <Input className="h-14 pl-12 rounded-2xl bg-slate-50/50 border-slate-100 border-2 font-black text-slate-900 focus:border-indigo-500 focus:bg-white transition-all" placeholder="e.g. Period 1 or Lunch Break" {...field} />
+                  <Clock className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
+                  <Input className="h-14 pl-12 rounded-2xl bg-slate-50/50 border-slate-100 border-2 font-black text-slate-900 focus:border-indigo-500 focus:bg-white transition-all" placeholder="e.g. Period 1 or Lunch Break" {...field} />
                 </div>
               </FormControl>
             </FormItem>
@@ -247,94 +261,6 @@ function BulkTimeSlotDialog({ onSuccess, editingGroup = null, onClose }) {
   );
 }
 
-function TimeSlotImport({ timeSlots, onImportComplete, variant = "outline" }) {
-  const [isImporting, setIsImporting] = useState(false);
-  const fileInputRef = useRef(null);
-  const { toast } = useToast();
-  const createMutation = useCreateTimeSlot();
-  const updateMutation = useUpdateTimeSlot();
-
-  const handleImport = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    setIsImporting(true);
-    const reader = new FileReader();
-
-    reader.onload = async (evt) => {
-      try {
-        const buffer = new Uint8Array(evt.target.result);
-        const wb = XLSX.read(buffer, { type: "array" });
-        const wsname = wb.SheetNames[0];
-        const ws = wb.Sheets[wsname];
-        const data = XLSX.utils.sheet_to_json(ws);
-
-        let successCount = 0;
-        let errorCount = 0;
-
-        // Erase all existing data to prevent duplication
-        if (timeSlots && timeSlots.length > 0) {
-          try {
-            // Sequential deletion is safer for large datasets to avoid overloading the socket
-            for (const s of timeSlots) {
-              await deleteMutation.mutateAsync(s.id);
-            }
-          } catch (err) {
-            console.error("Failed to delete existing time slots:", err);
-          }
-        }
-
-        for (const item of data) {
-          const dayOfWeek = item.Day || item.dayOfWeek;
-          const label = item.Label || item.label;
-          const startTime = item["Start Time"] || item.startTime;
-          const endTime = item["End Time"] || item.endTime;
-
-          if (dayOfWeek && label && startTime && endTime) {
-            try {
-              await createMutation.mutateAsync({
-                dayOfWeek,
-                label,
-                startTime,
-                endTime
-              });
-              successCount++;
-            } catch (err) {
-              errorCount++;
-            }
-          }
-        }
-
-        toast({ 
-          title: "Import Chain Resolved", 
-          description: `Ingested ${successCount} entries. ${errorCount > 0 ? `${errorCount} failures observed.` : ""}`,
-        });
-        
-        if (onImportComplete) onImportComplete();
-      } catch (error) {
-        toast({ title: "IO Error", description: "Failed to parse academic data stream.", variant: "destructive" });
-      } finally {
-        setIsImporting(false);
-        if (fileInputRef.current) fileInputRef.current.value = "";
-      }
-    };
-    reader.readAsArrayBuffer(file);
-  };
-
-  return (
-    <div className="relative">
-      <Input type="file" accept=".xlsx, .xls" className="hidden" id="import-excel" ref={fileInputRef} onChange={handleImport} disabled={isImporting} />
-      <Button variant={variant} className={`gap-2 h-11 px-6 rounded-xl font-bold transition-all ${variant === 'outline' ? 'border-2 border-slate-200' : ''}`} asChild disabled={isImporting}>
-        <label htmlFor="import-excel" className="cursor-pointer">
-          {isImporting ? <Loader2 className="w-4 h-4 animate-spin text-indigo-600" /> : <FileSpreadsheet className="w-4 h-4" />}
-          {isImporting ? "Injecting Data..." : "Import Dataset"}
-        </label>
-      </Button>
-    </div>
-  );
-}
-
-
 export default function TimeSlots() {
   const [bulkOpen, setBulkOpen] = useState(false);
   const [editGroup, setEditGroup] = useState(null);
@@ -342,35 +268,39 @@ export default function TimeSlots() {
   const { data: timeSlots, isLoading, refetch } = useTimeSlots();
   const deleteMutation = useDeleteTimeSlot();
 
-  const handleExport = () => {
+  const handleExport = async () => {
     const data = timeSlots?.map(slot => ({
-      Day: slot.dayOfWeek,
+      Day: normalizeDay(slot.dayOfWeek),
       Label: slot.label,
       "Start Time": slot.startTime,
       "End Time": slot.endTime
     }));
-    const ws = XLSX.utils.json_to_sheet(data || []);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "TimeSlots");
-    XLSX.writeFile(wb, "timeslots.xlsx");
-    localStorage.setItem("hasExportedOnce", "true");
+    await exportToExcel({
+      kind: "TimeSlots",
+      data: data || [],
+      defaultFileName: "timeslots_export.xlsx",
+      toast
+    });
   };
 
   const uniquePeriods = useMemo(() => {
-    if (!timeSlots) return [];
+    if (!Array.isArray(timeSlots)) return [];
     const seen = new Set();
     return timeSlots
       .filter(slot => {
-        const key = `${slot.label}-${slot.startTime}-${slot.endTime}`;
+        if (!slot) return false;
+        const key = `${slot.label || ""}-${slot.startTime || ""}-${slot.endTime || ""}`;
         if (seen.has(key)) return false;
         seen.add(key);
         return true;
       })
-      .sort((a, b) => a.startTime.localeCompare(b.startTime));
+      .sort((a, b) => (a.startTime || "").localeCompare(b.startTime || ""));
   }, [timeSlots]);
 
   const handleEdit = (prototypeSlot) => {
+    if (!Array.isArray(timeSlots)) return;
     const relatedSlots = timeSlots.filter(s => 
+      s &&
       s.label === prototypeSlot.label && 
       s.startTime === prototypeSlot.startTime && 
       s.endTime === prototypeSlot.endTime
@@ -379,14 +309,15 @@ export default function TimeSlots() {
   };
 
   const formatTime = (time24) => {
-    const [h, m] = time24.split(":");
-    const hNum = parseInt(h);
+    if (!time24 || typeof time24 !== "string") return "09:00 AM";
+    const parts = time24.split(":");
+    const h = parts[0] || "09";
+    const m = parts[1] || "00";
+    const hNum = parseInt(h, 10) || 9;
     const ampm = hNum >= 12 ? 'PM' : 'AM';
     const h12 = hNum % 12 || 12;
-    return `${h12}:${m} ${ampm}`;
+    return `${h12}:${m.padStart(2, "0")} ${ampm}`;
   };
-
-
 
   return (
     <div className="flex min-h-screen">
@@ -407,9 +338,9 @@ export default function TimeSlots() {
               </motion.div>
               
               <div className="flex items-center gap-2.5 flex-wrap">
-                <TimeSlotImport timeSlots={timeSlots} onImportComplete={refetch} />
+                <ImportDialog kind="timeslots" />
                 <Button variant="outline" className="gap-2 h-10 px-4 rounded-xl border border-slate-200 text-sm font-semibold hover:border-teal-300 hover:text-teal-700" onClick={handleExport}>
-                  <Upload className="w-4 h-4" /> Export
+                  <Download className="w-4 h-4" /> Export
                 </Button>
                 <Dialog open={bulkOpen} onOpenChange={setBulkOpen}>
                   <DialogTrigger asChild>
@@ -462,11 +393,13 @@ export default function TimeSlots() {
               ) : (
                 <AnimatePresence mode="popLayout">
                   <div className="divide-y divide-slate-50">
-                    {uniquePeriods.map((slot, idx) => {
+                    {uniquePeriods.map((slot) => {
                       const activeDaysGroup = Array.from(new Set(
-                        timeSlots.filter(s => s.label === slot.label && s.startTime === slot.startTime).map(s => s.dayOfWeek)
+                        (Array.isArray(timeSlots) ? timeSlots : [])
+                          .filter(s => s && s.label === slot.label && s.startTime === slot.startTime)
+                          .map(s => normalizeDay(s.dayOfWeek))
                       )).sort((a, b) => DAYS.indexOf(a) - DAYS.indexOf(b));
-                      const isBreak = slot.label.toLowerCase().includes("break") || slot.label.toLowerCase().includes("lunch");
+                      const isBreak = (slot.label || "").toLowerCase().includes("break") || (slot.label || "").toLowerCase().includes("lunch");
 
                       return (
                         <motion.div
@@ -491,11 +424,15 @@ export default function TimeSlots() {
                           </div>
 
                           <div className="flex flex-wrap gap-1">
-                            {activeDaysGroup.map(d => (
-                              <span key={d} className="px-2 py-0.5 bg-teal-50 text-teal-700 text-[9px] font-black uppercase tracking-wide rounded border border-teal-100">
-                                {d.slice(0, 3)}
-                              </span>
-                            ))}
+                            {activeDaysGroup.map(d => {
+                              const dayStr = String(d || "");
+                              const shortName = dayStr.length >= 3 ? dayStr.slice(0, 3) : dayStr || "Day";
+                              return (
+                                <span key={dayStr} className="px-2 py-0.5 bg-teal-50 text-teal-700 text-[9px] font-black uppercase tracking-wide rounded border border-teal-100">
+                                  {shortName}
+                                </span>
+                              );
+                            })}
                           </div>
 
                           <div className="flex items-center gap-1.5">
@@ -503,7 +440,13 @@ export default function TimeSlots() {
                               <Pencil className="w-3.5 h-3.5" />
                             </button>
                             <button
-                              onClick={() => { if (confirm(`Delete all ${activeDaysGroup.length} instances of this period?`)) { timeSlots.filter(s => s.label === slot.label && s.startTime === slot.startTime).forEach(s => deleteMutation.mutate(s.id)); } }}
+                              onClick={() => {
+                                if (confirm(`Delete all ${activeDaysGroup.length} instances of this period?`)) {
+                                  (timeSlots || [])
+                                    .filter(s => s && s.label === slot.label && s.startTime === slot.startTime)
+                                    .forEach(s => deleteMutation.mutate(s.id));
+                                }
+                              }}
                               className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-rose-500 hover:bg-rose-50 transition-all"
                             >
                               <Trash2 className="w-3.5 h-3.5" />

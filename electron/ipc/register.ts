@@ -13,7 +13,7 @@ import path from "path";
 import { getAppPaths } from "../services/paths";
 import { getDb, getSchemaVersion } from "../services/database";
 import {
-  list, insertRow, updateRow, deleteRow,
+  list, insertRow, updateRow, deleteRow, getTimeSlots,
   getOrCreateDefaultInstitution, createInstitutionWithYear, activateAcademicYear, getActiveYear,
   getTeacherAvailability, setTeacherAvailability,
   getTimetableEntries, getDashboardStats,
@@ -22,6 +22,13 @@ import {
   createBackup, listBackups, deleteBackup, verifyBackupFile,
 } from "../services/backup";
 import { getSetting, setSetting, getAllSettings } from "../services/settings";
+import {
+  audit, startGeneration, cancelGeneration, getJob, getHistory, getStaged,
+  acceptStaged, discardStaged, getVersions, activateVersion, deleteVersion,
+  getConflicts, ensureSolverRunning,
+} from "../services/scheduler";
+import { previewImport, commitImport, saveTemplate, listImportBatches, exportDataToExcel } from "../services/excel";
+import { exportReportPdf } from "../services/pdf";
 import { log, logError } from "../services/logger";
 import { dayNameToIndex } from "../services/days";
 import * as S from "./schemas";
@@ -47,6 +54,16 @@ export function registerAllIpc(): void {
   register("api:system:quit", null, () => {
     app.quit();
     return { ok: true };
+  });
+
+  // ─── database diagnostics (Settings → Data/About) ──────────────────────
+  register("api:database:status", null, () => ({
+    schemaVersion: getSchemaVersion(getDb()),
+    paths: getAppPaths(),
+  }));
+  register("api:database:integrity", null, () => {
+    const result = getDb().pragma("integrity_check", { simple: true }) as string;
+    return { ok: /^ok$/i.test(result), result };
   });
 
   register("api:system:openPath", z.enum(["backups", "exports", "imports", "reports", "logs", "database"]), (kind) => {
@@ -175,7 +192,7 @@ export function registerAllIpc(): void {
   register("api:classrooms:delete", S.idSchema, (id) => deleteRow("classrooms", id as number));
 
   register("api:timeSlots:list", S.optionalIdSchema, (institutionId) =>
-    institutionId ? list("time_slots", "institution_id = ?", [institutionId]) : list("time_slots"));
+    getTimeSlots(institutionId ? Number(institutionId) : undefined));
   register("api:timeSlots:create", S.timeSlotInput, (a) => {
     const d = a as { institutionId: number; dayOfWeek: string | number; startTime: string; endTime: string; label: string; type: string; sortOrder: number };
     const dayIndex = typeof d.dayOfWeek === "number" ? d.dayOfWeek : dayNameToIndex(d.dayOfWeek);
@@ -214,9 +231,61 @@ export function registerAllIpc(): void {
     S.timetableFilters.partial().extend({ institutionId: S.optionalIdSchema }),
     (a) => getTimetableEntries((a ?? {}) as never)
   );
-  register("api:timetable:versions", S.optionalIdSchema, (institutionId) =>
-    institutionId ? list("timetable_versions", "institution_id = ?", [institutionId]) : list("timetable_versions"));
+  register("api:timetable:versions", S.optionalIdSchema, (institutionId) => getVersions(institutionId as number | undefined));
+  register("api:timetable:conflicts", S.optionalIdSchema, (institutionId) => getConflicts(institutionId as number | undefined));
+  register("api:timetable:activateVersion", S.idSchema, (versionId) => activateVersion(versionId as number));
+  register("api:timetable:deleteVersion", S.idSchema, (versionId) => deleteVersion(versionId as number));
   register("api:dashboard:stats", S.idSchema, (institutionId) => getDashboardStats(institutionId as number));
+
+  // ─── scheduler (local Python + OR-Tools) ──────────────────────────────
+  register("api:scheduler:ready", null, async () => {
+    const port = await ensureSolverRunning();
+    return { ready: true, port };
+  });
+  register("api:scheduler:generate", S.generateInput, (a) => {
+    const input = (a ?? {}) as NonNullable<S.GenerateInput>;
+    return startGeneration({ ...input, institutionId: input.institutionId ?? undefined });
+  });
+  register("api:scheduler:cancel", S.idSchema, (jobId) => cancelGeneration(jobId as number));
+  register("api:scheduler:job", S.idSchema, (jobId) => getJob(jobId as number));
+  register("api:scheduler:history", S.optionalIdSchema, (institutionId) => getHistory(institutionId as number | undefined));
+  register("api:scheduler:staged", S.idSchema, (jobId) => getStaged(jobId as number));
+  register("api:scheduler:accept", S.acceptStagedInput, (a) => {
+    const { jobId, label } = a as { jobId: number; label?: string };
+    return acceptStaged(jobId, label);
+  });
+  register("api:scheduler:discard", S.idSchema, (jobId) => discardStaged(jobId as number));
+  register("api:scheduler:audit", S.auditInput, (a) => {
+    const input = (a ?? {}) as { institutionId?: number | null; sectionIds?: number[] };
+    return audit({ sectionIds: input.sectionIds, institutionId: input.institutionId ?? undefined });
+  });
+
+  // ─── Excel import / export (offline) ──────────────────────────────────
+  register("api:excel:preview", S.excelPreviewInput, (a) => {
+    const input = a as S.ExcelPreviewInput;
+    return previewImport({ kind: input.kind, institutionId: input.institutionId ?? undefined });
+  });
+  register("api:excel:commit", S.excelCommitInput, (a) =>
+    commitImport({ batchId: (a as { batchId: number }).batchId })
+  );
+  register("api:excel:template", S.excelTemplateInput, (a) =>
+    saveTemplate({ kind: (a as { kind: S.ImportKindName }).kind })
+  );
+  register("api:excel:exportData", S.excelExportDataInput, (a) =>
+    exportDataToExcel(a as { kind: string; data: Record<string, unknown>[]; defaultFileName?: string })
+  );
+  register("api:excel:batches", null, () => listImportBatches());
+
+  // ─── PDF reports (offline, printToPDF) ────────────────────────────────
+  register("api:pdf:export", S.pdfExportInput, (a) => {
+    const input = a as S.PdfExportInput;
+    return exportReportPdf({
+      kind: input.kind,
+      institutionId: input.institutionId ?? undefined,
+      sectionId: input.sectionId ?? undefined,
+      departmentId: input.departmentId ?? undefined,
+    });
+  });
 
   // ─── backups ───────────────────────────────────────────────────────────
   // NOTE: api:backup:restore is re-registered in main.ts (handleRestore) because

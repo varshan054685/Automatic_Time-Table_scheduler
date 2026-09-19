@@ -10,182 +10,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Plus, Trash2, Search, ArrowUpDown, Pencil, Upload, Loader2, Download, LayoutGrid, Building2, School, GraduationCap, Calendar, FileSpreadsheet } from "lucide-react";
 import { useSections, useCreateSection, useUpdateSection, useDeleteSection, useDepartments, useClassrooms } from "@/hooks/use-master-data";
 import { useToast } from "@/hooks/use-toast";
-import { api } from "@shared/routes";
+import { sectionFormSchema } from "@/lib/schemas";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import * as XLSX from "xlsx";
+import { exportToExcel } from "@/lib/export-excel";
+import { ImportDialog } from "@/components/ImportDialog";
 import { ExportHint } from "@/components/ExportHint";
 import { motion } from "framer-motion";
 
-function SectionImport({ departments, classrooms, sections, onImportComplete }) {
-  const [isImporting, setIsImporting] = useState(false);
-  const fileInputRef = useRef(null);
-  const { toast } = useToast();
-  const createMutation = useCreateSection();
-  const updateMutation = useUpdateSection();
-
-  const handleImport = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    setIsImporting(true);
-    const reader = new FileReader();
-
-    reader.onload = async (evt) => {
-      try {
-        const buffer = new Uint8Array(evt.target.result);
-        const wb = XLSX.read(buffer, { type: "array" });
-        const wsname = wb.SheetNames[0];
-        const ws = wb.Sheets[wsname];
-        const data = XLSX.utils.sheet_to_json(ws);
-
-        let successCount = 0;
-        let updateCount = 0;
-        let errorCount = 0;
-        const errors = [];
-
-        // Helper to find value from object with case-insensitive keys and space-tolerant search
-        const getVal = (obj, ...keys) => {
-          const objKeys = Object.keys(obj);
-          for (const k of keys) {
-            const foundKey = objKeys.find(ok => ok.toLowerCase().trim() === k.toLowerCase().trim());
-            if (foundKey) return obj[foundKey];
-          }
-          return null;
-        };
-
-        const clean = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]/g, "").trim();
-        
-        // Helper to extract first digit or Roman numeral (I-X)
-        const parseOrdinal = (val) => {
-          if (!val) return null;
-          const s = String(val).toUpperCase().trim();
-          const roman = { 'I': 1, 'II': 2, 'III': 3, 'IV': 4, 'V': 5, 'VI': 6, 'VII': 7, 'VIII': 8, 'IX': 9, 'X': 10 };
-          if (roman[s]) return roman[s];
-          const match = s.match(/\d+/);
-          return match ? parseInt(match[0]) : null;
-        };
-
-        for (let i = 0; i < data.length; i++) {
-          const item = data[i];
-          const rowNum = i + 2; // Assuming header is row 1
-          const name = getVal(item, "Section Name", "Name", "Section", "Class", "Class Name");
-          const yearRaw = getVal(item, "Year", "Study Year");
-          const semesterRaw = getVal(item, "Semester", "Sem");
-          const deptSearch = getVal(item, "Department", "Dept", "Department Code", "Dept Code");
-          const classroomSearch = getVal(item, "Classroom", "Room", "Class Room", "Room Number");
-
-          if (name) {
-            // Also try to extract year from name if missing
-            let yearNum = parseOrdinal(yearRaw);
-            if (!yearNum) {
-              const nameParts = String(name).split(/[\s-]+/);
-              for (const p of nameParts) {
-                const pNum = parseOrdinal(p);
-                if (pNum) { yearNum = pNum; break; }
-              }
-            }
-            const semesterNum = parseOrdinal(semesterRaw);
-            const searchDeptClean = clean(deptSearch);
-            
-            const dept = departments?.find(d => {
-              const dNameClean = clean(d.name);
-              const dCodeClean = clean(d.code);
-              // Flexible matching: exact clean match OR code match OR prefix/suffix match
-              return (searchDeptClean && (
-                dNameClean === searchDeptClean || 
-                dCodeClean === searchDeptClean ||
-                dNameClean.includes(searchDeptClean) ||
-                searchDeptClean.includes(dNameClean)
-              ));
-            });
-            
-            const deptId = dept ? dept.id : (item.departmentId ? Number(item.departmentId) : 0);
-
-            const searchRoomClean = clean(classroomSearch);
-            const classroom = classrooms?.find(c => {
-              const rNumClean = clean(c.roomNumber);
-              return (searchRoomClean && (rNumClean === searchRoomClean || rNumClean.includes(searchRoomClean)));
-            });
-            const classroomId = classroom ? classroom.id : (item.classroomId ? Number(item.classroomId) : null);
-
-            // Check for existing section
-            const nameClean = clean(name);
-            const existing = sections?.find(s => 
-              clean(s.name) === nameClean && 
-              Number(s.year) === (yearNum || s.year) &&
-              Number(s.semester) === (semesterNum || s.semester)
-            );
-
-            const payload = {
-              name: String(name),
-              year: Number(yearNum || 1), 
-              semester: Number(semesterNum || 1),
-              departmentId: Number(deptId),
-              classroomId: classroomId
-            };
-
-            try {
-              if (existing) {
-                await updateMutation.mutateAsync({
-                  id: existing.id,
-                  ...payload,
-                  departmentId: Number(deptId || existing.departmentId),
-                  classroomId: classroomId || existing.classroomId
-                });
-                updateCount++;
-              } else {
-                if (!deptId) {
-                  const msg = `Row ${rowNum}: No department found for "${deptSearch}"`;
-                  console.warn(msg);
-                  errors.push(msg);
-                  errorCount++;
-                  continue;
-                }
-                await createMutation.mutateAsync(payload);
-                successCount++;
-              }
-            } catch (err) {
-              const msg = `Row ${rowNum} (${name}): ${err.message || 'Unknown error'}`;
-              console.error(`Import failed for row ${rowNum}:`, { payload, error: err });
-              errors.push(msg);
-              errorCount++;
-            }
-          }
-        }
-
-        const summary = `Imported ${successCount} new, updated ${updateCount} sections.`;
-        const errorSummary = errorCount > 0 ? ` Failed ${errorCount} records: ${errors.slice(0, 2).join("; ")}${errorCount > 2 ? "..." : ""}` : "";
-
-        toast({ 
-          title: "Import Complete", 
-          description: summary + errorSummary,
-          variant: errorCount > 0 ? "destructive" : "default"
-        });
-        
-        if (onImportComplete) onImportComplete();
-      } catch (error) {
-        console.error("Excel import error:", error);
-        toast({ title: "Import Failed", description: error?.message || "Failed to read Excel file", variant: "destructive" });
-      } finally {
-        setIsImporting(false);
-        if (fileInputRef.current) fileInputRef.current.value = "";
-      }
-    };
-    reader.readAsArrayBuffer(file);
-  };
-
-  return (
-    <div className="relative">
-      <Input type="file" accept=".xlsx, .xls" className="hidden" id="import-excel" ref={fileInputRef} onChange={handleImport} disabled={isImporting} />
-      <Button variant="outline" className="gap-2 h-11 px-6 rounded-xl border-2 border-slate-200 font-bold hover:bg-slate-50 hover:border-slate-300 transition-all" asChild disabled={isImporting}>
-        <label htmlFor="import-excel" className="cursor-pointer">
-          {isImporting ? <Loader2 className="w-4 h-4 animate-spin text-indigo-600" /> : <FileSpreadsheet className="w-4 h-4" />}
-          {isImporting ? "Injecting Data..." : "Import Dataset"}
-        </label>
-      </Button>
-    </div>
-  );
-}
 
 export default function Sections() {
   const [open, setOpen] = useState(false);
@@ -201,7 +32,7 @@ export default function Sections() {
   const deleteMutation = useDeleteSection();
 
   const form = useForm({
-    resolver: zodResolver(api.sections.create.input),
+    resolver: zodResolver(sectionFormSchema),
     defaultValues: { name: "", year: 1, semester: 1, departmentId: 0, classroomId: 0 },
   });
 
@@ -222,11 +53,12 @@ export default function Sections() {
           "Classroom": "101"
         }];
         
-    const ws = XLSX.utils.json_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Sections");
-    XLSX.writeFile(wb, "sections_template.xlsx");
-    localStorage.setItem("hasExportedOnce", "true");
+    exportToExcel({
+      kind: "Sections",
+      data,
+      defaultFileName: "sections_export.xlsx",
+      toast,
+    });
   };
 
   const onSubmit = (values) => {
@@ -293,15 +125,17 @@ export default function Sections() {
     if (!sections) return [];
     
     let result = sections.filter(section => 
-      section.name.toLowerCase().includes(searchTerm.toLowerCase())
+      (section?.name || "").toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     if (sortConfig.key) {
       result.sort((a, b) => {
-        if (a[sortConfig.key] < b[sortConfig.key]) {
+        const aVal = a[sortConfig.key] || "";
+        const bVal = b[sortConfig.key] || "";
+        if (aVal < bVal) {
           return sortConfig.direction === 'asc' ? -1 : 1;
         }
-        if (a[sortConfig.key] > b[sortConfig.key]) {
+        if (aVal > bVal) {
           return sortConfig.direction === 'asc' ? 1 : -1;
         }
         return 0;
@@ -328,9 +162,9 @@ export default function Sections() {
                 <p className="text-sm text-slate-500 font-medium mt-0.5">Coordinate class groups and academic cohorts.</p>
               </motion.div>
               <motion.div initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} className="flex items-center gap-2.5 flex-wrap">
-                <SectionImport departments={departments} classrooms={classrooms} sections={sections} onImportComplete={refetch} />
+                <ImportDialog kind="sections" />
                 <Button variant="outline" className="gap-2 h-10 px-4 rounded-xl border border-slate-200 text-sm font-semibold hover:border-teal-300 hover:text-teal-700" onClick={handleExport}>
-                  <Upload className="w-4 h-4" /> Export
+                  <Download className="w-4 h-4" /> Export
                 </Button>
                 <Dialog open={open} onOpenChange={(v) => { setOpen(v); if(!v) { setEditingId(null); form.reset(); } }}>
                   <DialogTrigger asChild>

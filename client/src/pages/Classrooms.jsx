@@ -10,118 +10,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Plus, Trash2, Search, ArrowUpDown, Pencil, Upload, Loader2, Download, School, Hash, Users, Laptop, FileSpreadsheet } from "lucide-react";
 import { useClassrooms, useCreateClassroom, useUpdateClassroom, useDeleteClassroom } from "@/hooks/use-master-data";
 import { useToast } from "@/hooks/use-toast";
-import { api } from "@shared/routes";
+import { classroomFormSchema } from "@/lib/schemas";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import * as XLSX from "xlsx";
+import { exportToExcel } from "@/lib/export-excel";
+import { ImportDialog } from "@/components/ImportDialog";
 import { ExportHint } from "@/components/ExportHint";
 import { motion } from "framer-motion";
 
-function ClassroomImport({ classrooms, onImportComplete }) {
-  const [isImporting, setIsImporting] = useState(false);
-  const fileInputRef = useRef(null);
-  const { toast } = useToast();
-  const createMutation = useCreateClassroom();
-  const updateMutation = useUpdateClassroom();
-
-  const handleImport = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    setIsImporting(true);
-    const reader = new FileReader();
-
-    reader.onload = async (evt) => {
-      try {
-        const buffer = new Uint8Array(evt.target.result);
-        const wb = XLSX.read(buffer, { type: "array" });
-        const wsname = wb.SheetNames[0];
-        const ws = wb.Sheets[wsname];
-        const data = XLSX.utils.sheet_to_json(ws);
-
-        let successCount = 0;
-        let updateCount = 0;
-        let errorCount = 0;
-        const errors = [];
-
-        for (let i = 0; i < data.length; i++) {
-          const item = data[i];
-          const rowNum = i + 2;
-          const keys = Object.keys(item);
-          const getVal = (...possibleKeys) => {
-            for (const k of possibleKeys) {
-              const found = keys.find(ck => ck.toLowerCase().trim() === k.toLowerCase().trim());
-              if (found !== undefined && item[found] !== undefined && item[found] !== "") return item[found];
-            }
-            return null;
-          };
-
-          const roomNumber = getVal("Room Number", "Room No", "Room No.", "Room", "Classroom", "room number", "room", "RoomNumber", "roomNumber");
-          const capacityRaw = getVal("Capacity", "capacity", "Seats", "seats", "Size", "size");
-          const capacity = Math.max(1, parseInt(capacityRaw || 0) || 30); // Default to 30 if missing or invalid
-          const typeRaw = getVal("Type", "type", "Room Type", "room type", "Classroom Type");
-
-          if (roomNumber) {
-            const existing = classrooms?.find(c => String(c.roomNumber).toLowerCase() === String(roomNumber).toLowerCase());
-            
-            try {
-              if (existing) {
-                await updateMutation.mutateAsync({
-                  id: existing.id,
-                  roomNumber: String(roomNumber),
-                  capacity: capacity,
-                  type: typeRaw ? (String(typeRaw).toLowerCase().includes("lab") ? "lab" : "lecture") : existing.type
-                });
-                updateCount++;
-              } else {
-                await createMutation.mutateAsync({ 
-                  roomNumber: String(roomNumber), 
-                  capacity: capacity, 
-                  type: typeRaw ? (String(typeRaw).toLowerCase().includes("lab") ? "lab" : "lecture") : "lecture"
-                });
-                successCount++;
-              }
-            } catch (err) {
-              const msg = `Row ${rowNum} (${roomNumber}): ${err.message || 'Validation failed'}`;
-              console.error(msg, err);
-              errors.push(msg);
-              errorCount++;
-            }
-          }
-        }
-
-        const summary = `Imported ${successCount} new, updated ${updateCount} classrooms.`;
-        const errorSummary = errorCount > 0 ? ` Failed ${errorCount} records: ${errors.slice(0, 2).join("; ")}${errorCount > 2 ? "..." : ""}` : "";
-
-        toast({ 
-          title: "Import Complete", 
-          description: summary + errorSummary,
-          variant: errorCount > 0 ? "destructive" : "default"
-        });
-        
-        if (onImportComplete) onImportComplete();
-      } catch (error) {
-        console.error("Excel import error:", error);
-        toast({ title: "Import Failed", description: error?.message || "Failed to read Excel file", variant: "destructive" });
-      } finally {
-        setIsImporting(false);
-        if (fileInputRef.current) fileInputRef.current.value = "";
-      }
-    };
-    reader.readAsArrayBuffer(file);
-  };
-
-  return (
-    <div className="relative">
-      <Input type="file" accept=".xlsx, .xls" className="hidden" id="import-excel" ref={fileInputRef} onChange={handleImport} disabled={isImporting} />
-      <Button variant="outline" className="gap-2 h-11 px-6 rounded-xl border-2 border-slate-200 font-bold hover:bg-slate-50 hover:border-slate-300 transition-all" asChild disabled={isImporting}>
-        <label htmlFor="import-excel" className="cursor-pointer">
-          {isImporting ? <Loader2 className="w-4 h-4 animate-spin text-indigo-600" /> : <FileSpreadsheet className="w-4 h-4" />}
-          {isImporting ? "Injecting Data..." : "Import Dataset"}
-        </label>
-      </Button>
-    </div>
-  );
-}
 
 export default function Classrooms() {
   const [open, setOpen] = useState(false);
@@ -135,7 +30,7 @@ export default function Classrooms() {
   const deleteMutation = useDeleteClassroom();
 
   const form = useForm({
-    resolver: zodResolver(api.classrooms.create.input),
+    resolver: zodResolver(classroomFormSchema),
     defaultValues: { roomNumber: "", capacity: 0, type: "lecture" },
   });
 
@@ -152,11 +47,12 @@ export default function Classrooms() {
           "Type": "lecture"
         }];
         
-    const ws = XLSX.utils.json_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Classrooms");
-    XLSX.writeFile(wb, "classrooms_template.xlsx");
-    localStorage.setItem("hasExportedOnce", "true");
+    exportToExcel({
+      kind: "Classrooms",
+      data,
+      defaultFileName: "classrooms_export.xlsx",
+      toast,
+    });
   };
 
   const onSubmit = (values) => {
@@ -210,15 +106,17 @@ export default function Classrooms() {
     if (!classrooms) return [];
     
     let result = classrooms.filter(room => 
-      room.roomNumber.toLowerCase().includes(searchTerm.toLowerCase())
+      String(room?.roomNumber || "").toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     if (sortConfig.key) {
       result.sort((a, b) => {
-        if (a[sortConfig.key] < b[sortConfig.key]) {
+        const aVal = a[sortConfig.key] || "";
+        const bVal = b[sortConfig.key] || "";
+        if (aVal < bVal) {
           return sortConfig.direction === 'asc' ? -1 : 1;
         }
-        if (a[sortConfig.key] > b[sortConfig.key]) {
+        if (aVal > bVal) {
           return sortConfig.direction === 'asc' ? 1 : -1;
         }
         return 0;
@@ -247,9 +145,9 @@ export default function Classrooms() {
               </motion.div>
 
               <motion.div initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} className="flex items-center gap-2.5 flex-wrap">
-                <ClassroomImport classrooms={classrooms} onImportComplete={refetch} />
+                <ImportDialog kind="classrooms" />
                 <Button variant="outline" className="gap-2 h-10 px-4 rounded-xl border border-slate-200 text-sm font-semibold hover:border-teal-300 hover:text-teal-700" onClick={handleExport}>
-                  <Upload className="w-4 h-4" /> Export
+                  <Download className="w-4 h-4" /> Export
                 </Button>
                 <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) { setEditingId(null); form.reset(); } }}>
                   <DialogTrigger asChild>

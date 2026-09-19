@@ -1,126 +1,117 @@
 # Automatic Timetable Scheduler
 
-A multi-user SaaS web application that generates conflict-free academic timetables using constraint programming (Google OR-Tools CP-SAT).
+A **fully offline desktop application** (Windows + Linux) that generates
+conflict-free timetables for schools and colleges using constraint programming
+(Google OR-Tools CP-SAT).
 
-## Tech Stack
+There is no server, no cloud account and no internet requirement. All academic
+data lives in a local SQLite database in the OS user-data directory, and the
+solver runs as a local process on `127.0.0.1`.
+
+## What it does
+
+- Create an institution (school or college) with academic years
+- Manage departments/classes, sections, subjects, teachers, classrooms/labs and time slots
+- Define teacher availability and workload limits
+- Generate timetables with a CP-SAT solver (progress, cancellation, partial results)
+- Review the generated timetable **before** it replaces the current one; every accepted
+  result is kept as a restorable version
+- Detect conflicts (teacher, room and section double-booking)
+- Import master data from Excel with a **row-level validation preview**
+- Back up and restore the database; migrations upgrade existing data safely
+- Optional application updates from GitHub Releases (the only feature that uses the network)
+
+## Tech stack
 
 | Layer | Technology |
 |---|---|
-| Frontend | React 18, Vite, TailwindCSS, Framer Motion, TanStack Query |
-| Backend | Node.js, Express.js, TypeScript |
-| Database | PostgreSQL + Drizzle ORM |
-| Auth | Passport.js (Local + Google OAuth 2.0), bcrypt |
-| Scheduler | Python 3, FastAPI, Google OR-Tools CP-SAT |
-| Email | SendGrid (primary), Nodemailer/SMTP (fallback) |
+| Desktop shell | Electron (context isolation, no node integration in the renderer) |
+| UI | React 18, Vite, TailwindCSS, Framer Motion, TanStack Query, wouter |
+| Local data | SQLite via `better-sqlite3` + a versioned migration runner |
+| Solver | Python 3, FastAPI, Google OR-Tools CP-SAT (spawned by the main process) |
+| Spreadsheets | SheetJS (`xlsx`) parsed in the main process |
 
 ## Architecture
 
-```
-Browser (React/Vite)
-      ↕  HTTP/JSON
-Express Server (Node.js/TypeScript)
-      ↕  Drizzle ORM
-PostgreSQL Database
-      ↕  HTTP (internal)
-Python FastAPI Microservice (OR-Tools Solver)
+```text
+React renderer (sandboxed)
+   │  window.api.*  (narrow, zod-validated IPC; push events for progress)
+Electron main process
+   ├── DatabaseService   SQLite + migrations + backups
+   ├── SchedulerService  generation jobs, staging, diagnostics, conflicts
+   ├── ExcelService      import preview / commit, templates
+   ├── SettingsService   app settings
+   └── Logger            rotating logs in userData/logs
+   │  spawn (127.0.0.1, random port, health-checked)
+Python solver service (FastAPI + OR-Tools CP-SAT)
 ```
 
-## Prerequisites
+## Requirements
+
+Running a **packaged build** requires nothing — no Node.js, no Python, no database.
+
+For development you need:
 
 - Node.js 20+
-- Python 3.10+
-- PostgreSQL database
+- Python 3.11+ **only** if you want to work on the solver
+  (`python-service/venv` with `pip install -r python-service/requirements.txt`)
 
-## Setup
-
-### 1. Clone & install dependencies
+## Development
 
 ```bash
-git clone <repo-url>
-cd Automatic_Time-Table_scheduler
-npm install
-```
+npm install                 # installs deps and rebuilds native modules for Electron
 
-### 2. Configure environment
-
-```bash
-cp .env.example .env
-# Fill in DATABASE_URL, SESSION_SECRET, and any optional keys
-```
-
-See `.env.example` for all available variables (Google OAuth, SendGrid, SMTP, Gemini API).
-
-### 3. Set up the database
-
-```bash
-npm run db:push
-```
-
-### 4. Set up the Python service
-
-```bash
-cd python-service
-python -m venv venv
-
-# Windows
-venv\Scripts\activate
-# macOS/Linux
-source venv/bin/activate
-
-pip install -r requirements.txt
-```
-
-### 5. Run in development
-
-```bash
+# Terminal 1 — renderer (Vite on http://localhost:5173)
+npm run dev:client
+# Terminal 2 — Electron shell (builds main/preload, then launches)
+npm run dev:electron
+# or both at once
 npm run dev
+
+# Solver only (used automatically by the app; run standalone when debugging)
+npm run dev:python
 ```
 
-This starts the Node backend, Vite dev server, and Python FastAPI service concurrently.
+Useful checks:
 
-| Service | URL |
-|---|---|
-| Frontend | http://localhost:5173 |
-| Backend API | http://localhost:5173/api |
-| Python solver | http://localhost:8000 |
-
-## Available Scripts
-
-| Command | Description |
-|---|---|
-| `npm run dev` | Start all services in development mode |
-| `npm run build` | Build the frontend |
-| `npm run backend-build` | Bundle the Node.js server |
-| `npm run start` | Run the production server |
-| `npm run db:push` | Push schema changes to the database |
-| `npm run check` | TypeScript type check |
-
-## Project Structure
-
-```
-├── client/          # React frontend (Vite)
-├── server/          # Express backend (TypeScript)
-├── shared/          # Shared types and Zod schema
-├── python-service/  # FastAPI + OR-Tools scheduler
-├── migrations/      # Drizzle SQL migrations
-├── docs/            # Feature documentation
-└── excel/           # Excel import templates
+```bash
+npm run check        # TypeScript (strict)
+npm run build        # renderer bundle
+npm run build:electron
+npm run test:parse   # unit tests for the Excel parsing helpers
+npm run desktop:smoke  # headless end-to-end: migrate → generate → accept → conflicts
 ```
 
-## Features
+## Packaging
 
-- **Workspace-based multi-tenancy** — Owner and Viewer roles with invite codes
-- **Master data management** — Departments, classrooms, faculty, sections, subjects, time slots
-- **AI timetable generation** — CP-SAT solver with hard constraints (no double-bookings) and soft optimisation
-- **Excel import/export** — Bulk import faculty and subjects via spreadsheet
-- **Change request workflow** — Viewers submit edit/delete requests; Owners approve or reject
-- **Google OAuth + OTP auth** — Email-based OTP for registration and password reset
-- **AI Chatbot assistant** — Powered by Gemini 2.0 Flash
+```bash
+npm run build:solver   # PyInstaller bundle of the Python solver (needs pyinstaller in the venv)
+npm run desktop:build  # Windows NSIS + Linux AppImage/deb into release/
+```
+
+`electron-builder.yml` ships the migrations, the Excel templates and the solver
+bundle as `extraResources`. A `beforePack` guard refuses to package if the solver
+bundle is missing, so a release can never ship without its scheduler.
+
+## Where your data lives
+
+```text
+<OS user-data>/Automatic Timetable Scheduler/
+├── database/timetable.db     (+ -wal / -shm)
+├── backups/                  automatic + manual snapshots
+├── exports/  imports/  reports/
+└── logs/                     main.log, db.log, scheduler.log, updater.log
+```
+
+The installation directory only holds the application itself; uninstalling never
+deletes your data.
 
 ## Documentation
 
-See the [`docs/`](./docs/) folder for detailed feature documentation and the [user guide](./docs/user-guide.md).
-
-## License
-
-MIT
+- [`docs/implementation-status.md`](docs/implementation-status.md) — what is built, what is verified, what remains
+- [`docs/offline-architecture.md`](docs/offline-architecture.md) — analysis of the original web app and the target design
+- [`docs/database-design.md`](docs/database-design.md) — SQLite schema and migration strategy
+- [`docs/desktop-architecture.md`](docs/desktop-architecture.md) — process model, IPC surface, solver lifecycle
+- [`docs/update-system.md`](docs/update-system.md) — auto-update design and safety gates
+- [`docs/migration-plan.md`](docs/migration-plan.md) — phased transformation plan
+- [`docs/or-tools-scheduler.md`](docs/or-tools-scheduler.md) — solver constraints and diagnostics

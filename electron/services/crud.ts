@@ -39,8 +39,12 @@ function assertTableName(table: string): void {
 /** Internal raw list (snake_case rows). */
 function rawList(table: string, where = "1=1", params: unknown[] = []): Row[] {
   assertTableName(table);
+  const hasOrder = /\bORDER\s+BY\b/i.test(where);
+  const sql = hasOrder
+    ? `SELECT * FROM ${table} WHERE ${where}`
+    : `SELECT * FROM ${table} WHERE ${where} ORDER BY id`;
   return getDb()
-    .prepare(`SELECT * FROM ${table} WHERE ${where} ORDER BY id`)
+    .prepare(sql)
     .all(...params) as Row[];
 }
 
@@ -51,22 +55,43 @@ export function list(table: string, where = "1=1", params: unknown[] = []): Row[
 
 export function getOne(table: string, id: number): Row | undefined {
   assertTableName(table);
-  return mapRow(getDb().prepare(`SELECT * FROM ${table} WHERE id = ?`).get(assertId(id)));
+  const row = mapRow(getDb().prepare(`SELECT * FROM ${table} WHERE id = ?`).get(assertId(id))) as Row | undefined;
+  if (row && table === "time_slots" && typeof row.dayOfWeek === "number") {
+    row.dayOfWeek = dayIndexToName(row.dayOfWeek);
+  }
+  return row;
+}
+
+export function getTimeSlots(institutionId?: number): Row[] {
+  const where = institutionId ? "institution_id = ?" : "1=1";
+  const params = institutionId ? [institutionId] : [];
+  const rows = rawList("time_slots", `${where} ORDER BY day_of_week, sort_order, start_time`, params);
+  return rows.map((r) => {
+    const mapped = mapRow(r) as Row;
+    if (typeof mapped.dayOfWeek === "number") {
+      mapped.dayOfWeek = dayIndexToName(mapped.dayOfWeek);
+    }
+    return mapped;
+  });
 }
 
 export function insertRow(table: string, data: Record<string, unknown>): Row {
   assertTableName(table);
   const mapped: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(data)) {
-    mapped[k.replace(/([a-z0-9])([A-Z])/g, "$1_$2").toLowerCase()] = v; // camel→snake
+    if (v !== undefined) {
+      const col = k.replace(/([a-z0-9])([A-Z])/g, "$1_$2").toLowerCase(); // camel→snake
+      mapped[col] = Array.isArray(v) || (typeof v === "object" && v !== null) ? JSON.stringify(v) : v;
+    }
   }
   const keys = Object.keys(mapped);
   if (keys.length === 0) throw new Error("Nothing to insert");
   const cols = keys.join(", ");
   const marks = keys.map(() => "?").join(", ");
+  const values = keys.map((k) => (mapped[k] === undefined ? null : mapped[k]));
   const info = getDb()
     .prepare(`INSERT INTO ${table} (${cols}) VALUES (${marks})`)
-    .run(...keys.map((k) => mapped[k]));
+    .run(...values);
   return getOne(table, Number(info.lastInsertRowid))!;
 }
 
@@ -74,14 +99,18 @@ export function updateRow(table: string, id: number, data: Record<string, unknow
   assertTableName(table);
   const mapped: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(data)) {
-    mapped[k.replace(/([a-z0-9])([A-Z])/g, "$1_$2").toLowerCase()] = v;
+    if (v !== undefined) {
+      const col = k.replace(/([a-z0-9])([A-Z])/g, "$1_$2").toLowerCase();
+      mapped[col] = Array.isArray(v) || (typeof v === "object" && v !== null) ? JSON.stringify(v) : v;
+    }
   }
   const keys = Object.keys(mapped);
-  if (keys.length === 0) throw new Error("Nothing to update");
+  if (keys.length === 0) return getOne(table, id)!;
   const sets = keys.map((k) => `${k} = ?`).join(", ");
+  const values = keys.map((k) => (mapped[k] === undefined ? null : mapped[k]));
   getDb()
     .prepare(`UPDATE ${table} SET ${sets} WHERE id = ?`)
-    .run(...keys.map((k) => mapped[k]), assertId(id));
+    .run(...values, assertId(id));
   return getOne(table, id)!;
 }
 
@@ -97,8 +126,8 @@ export function deleteRow(table: string, id: number): void {
  * creating it (with a default academic year) on first call.
  */
 export function getOrCreateDefaultInstitution(defaultName = "My Institution"): Row {
-  const existing = rawList("institutions", "1=1 ORDER BY id LIMIT 1");
-  if (existing.length > 0) return mapRow(existing[0]);
+  const existing = getDb().prepare("SELECT * FROM institutions ORDER BY id LIMIT 1").get() as Row | undefined;
+  if (existing) return mapRow(existing)!;
 
   return inTransaction((db) => {
     const yearName = `${new Date().getFullYear()}-${String(new Date().getFullYear() + 1).slice(2)}`;

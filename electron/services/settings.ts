@@ -1,7 +1,7 @@
-/**
- * SettingsService — typed key/value application settings in SQLite.
- */
 import { getDb } from "./database";
+import { app } from "electron";
+import fs from "fs";
+import path from "path";
 
 export const DEFAULT_SETTINGS = {
   "app.institutionName": "",
@@ -50,4 +50,44 @@ export function getAllSettings(): Record<string, unknown> {
     }
   }
   return out;
+}
+
+/**
+ * Returns the directory used previously for file dialogs (persisted in SQLite).
+ * Falls back to OS standard folders (Documents / Desktop / Downloads / cwd).
+ */
+export function getLastUsedDirectory(category: "import" | "export" | "general" = "general"): string {
+  const saved = (getSetting<string>(`last_dir_${category}`) as string) || (getSetting<string>("last_dir_general") as string);
+  if (saved && typeof saved === "string" && fs.existsSync(saved)) {
+    return saved;
+  }
+  try {
+    const docs = app.getPath("documents");
+    if (fs.existsSync(docs)) return docs;
+    const desktop = app.getPath("desktop");
+    if (fs.existsSync(desktop)) return desktop;
+    const downloads = app.getPath("downloads");
+    if (fs.existsSync(downloads)) return downloads;
+  } catch {
+    // fallback if app module is unavailable
+  }
+  return process.cwd();
+}
+
+/**
+ * Persists the chosen directory so future file pickers open in the same location.
+ */
+export function setLastUsedDirectory(category: "import" | "export" | "general", fileOrDirPath: string): void {
+  try {
+    if (!fileOrDirPath) return;
+    const dir = fs.existsSync(fileOrDirPath) && fs.statSync(fileOrDirPath).isDirectory()
+      ? fileOrDirPath
+      : path.dirname(fileOrDirPath);
+    if (fs.existsSync(dir)) {
+      setSetting(`last_dir_${category}`, dir);
+      setSetting("last_dir_general", dir);
+    }
+  } catch {
+    // ignore
+  }
 }

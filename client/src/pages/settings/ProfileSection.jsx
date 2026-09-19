@@ -37,7 +37,7 @@ import {
   Check,
   X,
   Zap,
-  ClipboardList,
+  History,
   Activity,
   Loader2,
 } from "lucide-react";
@@ -65,9 +65,12 @@ export function ProfileSection({ onNavigate }) {
   const { data: timetable = [] } = useTimetable({});
 
   // Activity feed from local generation history (cloud change requests removed).
-  const { data: requests = [] } = useQuery({
-    queryKey: ["institution-current"],
-    queryFn: async () => ensureInstitution(),
+  const { data: historyJobs = [] } = useQuery({
+    queryKey: ["scheduler-history"],
+    queryFn: async () => {
+      const inst = await ensureInstitution();
+      return window.api.scheduler.history(inst?.id);
+    },
   });
 
   const [profileData, setProfileData] = useState({
@@ -156,7 +159,7 @@ export function ProfileSection({ onNavigate }) {
     timetable,
   });
 
-  const activityFeed = buildActivityFeed(requests, timetable.length);
+  const activityFeed = buildActivityFeed(historyJobs, timetable?.length || 0);
 
   const initials = user?.name
     ? user.name.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2)
@@ -215,10 +218,17 @@ export function ProfileSection({ onNavigate }) {
                   {roleLabel}
                 </span>
               </div>
-              <p className="text-sm text-slate-500 font-medium flex items-center gap-1.5">
-                <Mail className="w-3.5 h-3.5" />
-                {user?.email}
-              </p>
+              {user?.email ? (
+                <p className="text-sm text-slate-500 font-medium flex items-center gap-1.5">
+                  <Mail className="w-3.5 h-3.5" />
+                  {user.email}
+                </p>
+              ) : (
+                <p className="text-xs text-slate-400 font-medium flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-teal-500 inline-block"></span>
+                  Local Offline Workspace
+                </p>
+              )}
               {user?.createdAt && (
                 <p className="text-xs text-slate-400 mt-1 flex items-center gap-1.5">
                   <CalendarDays className="w-3 h-3" />
@@ -372,7 +382,7 @@ export function ProfileSection({ onNavigate }) {
               { icon: Pencil, label: "Edit Profile", action: () => window.scrollTo({ top: 0, behavior: "smooth" }) },
               { icon: Building2, label: "View Workspace", action: () => onNavigate("workspace") },
               { icon: Zap, label: "Generate Timetable", action: () => navigate("/timetable") },
-              { icon: ClipboardList, label: "Manage Requests", action: () => onNavigate("requests") },
+              { icon: History, label: "Generation History", action: () => navigate("/history") },
             ].map(({ icon: Icon, label, action }) => (
               <button
                 key={label}

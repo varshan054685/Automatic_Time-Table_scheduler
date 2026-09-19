@@ -17,10 +17,14 @@ declare global {
       };
       database: {
         status(): Promise<{ schemaVersion: number; paths: Record<string, string> }>;
+        integrity(): Promise<{ ok: boolean; result: string }>;
       };
       institutions: {
         current(): Promise<Record<string, unknown> & { id: number; name: string; type: string; academicYear: string | null; activeYearId: number | null }>;
+        list(): Promise<Array<Record<string, unknown>>>;
+        create(data: unknown): Promise<Record<string, unknown>>;
         update(id: number, data: unknown): Promise<Record<string, unknown>>;
+        delete(id: number): Promise<void>;
       };
       academicYears: {
         list(institutionId?: number): Promise<Array<Record<string, unknown>>>;
@@ -69,6 +73,26 @@ declare global {
       timetable: {
         entries(filters?: { versionId?: number; sectionId?: number; teacherId?: number; classroomId?: number; institutionId?: number }): Promise<Array<Record<string, unknown>>>;
         versions(institutionId?: number): Promise<Array<Record<string, unknown>>>;
+        conflicts(institutionId?: number): Promise<Array<Record<string, unknown>>>;
+        activateVersion(versionId: number): Promise<{ ok: boolean }>;
+        deleteVersion(versionId: number): Promise<{ ok: boolean }>;
+      };
+      scheduler: {
+        ready(): Promise<{ ready: boolean; port: number }>;
+        generate(opts?: {
+          allSections?: boolean;
+          sectionIds?: number[];
+          institutionId?: number;
+          timeLimitSeconds?: number;
+        }): Promise<{ jobId: number }>;
+        cancel(jobId: number): Promise<{ ok: boolean }>;
+        job(jobId: number): Promise<Record<string, unknown>>;
+        history(institutionId?: number): Promise<Array<Record<string, unknown>>>;
+        staged(jobId: number): Promise<Array<Record<string, unknown>>>;
+        accept(jobId: number, label?: string): Promise<{ versionId: number; entries: number }>;
+        discard(jobId: number): Promise<{ ok: boolean }>;
+        audit(opts?: { institutionId?: number; sectionIds?: number[] }): Promise<Record<string, unknown>>;
+        onProgress(cb: (progress: Record<string, unknown>) => void): () => void;
       };
       dashboard: {
         stats(institutionId: number): Promise<Record<string, number>>;
@@ -84,6 +108,21 @@ declare global {
         all(): Promise<Record<string, unknown>>;
         get(key: string): Promise<unknown>;
         set(key: string, value: unknown): Promise<{ ok: boolean }>;
+      };
+      pdf: {
+        exportReport(
+          kind: "timetable" | "teacherWorkload" | "roomUtilization" | "analytics",
+          opts?: { sectionId?: number; departmentId?: number; institutionId?: number },
+        ): Promise<{ path?: string; sizeBytes?: number; cancelled?: boolean }>;
+      };
+      excel: {
+        preview(kind: string, institutionId?: number): Promise<Record<string, unknown>>;
+        commit(batchId: number): Promise<{ kind: string; created: number; updated: number; batchId: number }>;
+        template(kind: string): Promise<{ path?: string; cancelled?: boolean }>;
+        batches(): Promise<Array<Record<string, unknown>>>;
+      };
+      data: {
+        resetAll(): Promise<{ ok: boolean }>;
       };
     };
   }

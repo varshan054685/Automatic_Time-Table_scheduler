@@ -1,6 +1,9 @@
 # Migration Plan — Web SaaS → Offline Desktop
 
 > Phase 2 deliverable. Production code changes start **only after approval** of this plan.
+>
+> **Current progress: see [`implementation-status.md`](./implementation-status.md)** —
+> phases 1–4 are implemented, phase 5 is mostly done, 6–8 remain.
 
 ## 1. Current architecture (summary)
 React+Vite SPA → Express/TS API (passport auth, workspaces, change requests, sync) → PostgreSQL/Drizzle → axios → FastAPI + OR-Tools CP-SAT → staging → atomic promote. Full trace in offline-architecture.md.

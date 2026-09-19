@@ -1,3 +1,8 @@
+> ⚠️ **Removed in the offline desktop edition.** This document describes the
+> original multi-user cloud web application. Workspaces, change requests,
+> OAuth/OTP authentication and role management no longer exist in this build —
+> see [`implementation-status.md`](../implementation-status.md).
+
 # Authentication
 
 ## Purpose
