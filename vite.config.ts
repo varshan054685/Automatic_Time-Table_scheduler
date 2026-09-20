@@ -11,6 +11,7 @@ import path from "path";
  * missing proxy can never silently fall back to a remote backend.
  */
 export default defineConfig({
+  base: "./",
   plugins: [react()],
   css: {
     postcss: import.meta.dirname,

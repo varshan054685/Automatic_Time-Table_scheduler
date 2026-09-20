@@ -59,7 +59,7 @@ function createWindow(): void {
     minHeight: 700,
     show: false,
     autoHideMenuBar: true,
-    backgroundColor: "#0b0f19",
+    backgroundColor: "#f8fafc",
     title: "Automatic Timetable Scheduler",
     ...(appIcon ? { icon: appIcon } : {}),
     webPreferences: {
@@ -73,6 +73,14 @@ function createWindow(): void {
   });
 
   mainWindow.setMenuBarVisibility(false);
+
+  mainWindow.webContents.on("did-fail-load", (_event, errorCode, errorDescription, validatedURL) => {
+    logError("Renderer failed to load", new Error(`${errorDescription} (${errorCode}) at ${validatedURL}`), "main");
+  });
+
+  mainWindow.webContents.on("render-process-gone", (_event, details) => {
+    logError("Renderer process gone", new Error(`${details.reason} (exitCode=${details.exitCode})`), "main");
+  });
 
   mainWindow.once("ready-to-show", () => {
     mainWindow?.show();
