@@ -6,6 +6,7 @@ import { registerAllIpc, activateIpc, handleRestore } from "./ipc/register";
 import { log, logError } from "./services/logger";
 import { getAppPaths } from "./services/paths";
 import { stopSolver } from "./services/scheduler";
+import { initUpdater, disposeUpdater } from "./services/updater";
 
 let mainWindow: BrowserWindow | null = null;
 let smokesDone = false;
@@ -16,9 +17,22 @@ if (process.platform === "win32") {
 }
 app.setName("Automatic Timetable Scheduler");
 
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) {
+  app.quit();
+} else {
+  app.on("second-instance", () => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
+    }
+  });
+}
+
 // Route logs into userData/logs even before window creation.
 process.on("uncaughtException", (err) => logError("Uncaught exception", err, "main"));
 process.on("unhandledRejection", (reason) => logError("Unhandled rejection", reason, "main"));
+
 
 function getAppIcon(): string | undefined {
   const isWin = process.platform === "win32";
@@ -252,6 +266,8 @@ app.whenReady().then(async () => {
     activateIpc();
     log("IPC activated", "main");
 
+    initUpdater();
+
     createWindow();
 
     app.on("activate", () => {
@@ -280,6 +296,7 @@ app.on("window-all-closed", () => {
 });
 
 app.on("before-quit", () => {
+  disposeUpdater();
   stopSolver();
   if (!smokesDone) closeDatabase();
 });

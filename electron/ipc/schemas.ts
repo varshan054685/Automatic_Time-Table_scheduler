@@ -161,3 +161,10 @@ export const settingsInput = z.object({
   key: z.string().min(1).max(100),
   value: z.unknown(),
 });
+
+// ─── Updater options ───────────────────────────────────────────────────
+export const updaterAutoOptionInput = z.object({
+  key: z.enum(["autoCheck", "autoDownload"]),
+  value: z.boolean(),
+});
+

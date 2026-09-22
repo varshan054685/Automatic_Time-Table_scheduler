@@ -37,3 +37,70 @@ export async function ensureInstitution() {
   institutionIdCache = inst.id;
   return inst;
 }
+
+/**
+ * Updater client with graceful fallbacks for browser/dev testing.
+ */
+export const updaterApi = {
+  async status() {
+    if (typeof window !== "undefined" && window.api?.updater) {
+      return await window.api.updater.status();
+    }
+    return {
+      state: "unsupported",
+      currentVersion: "1.0.0-dev",
+      latestVersion: null,
+      releaseName: null,
+      releaseDate: null,
+      releaseNotes: null,
+      progress: null,
+      message: null,
+      code: null,
+      silent: true,
+      updateSupported: false,
+      unsupportedReason: "Running in browser / dev mode without Electron updater bridge.",
+      canCheck: false,
+      canDownload: false,
+      canInstall: false,
+      preInstallBackup: null,
+      autoCheck: true,
+      autoDownload: false,
+    };
+  },
+
+  async check() {
+    if (typeof window !== "undefined" && window.api?.updater) {
+      return await window.api.updater.check();
+    }
+    return this.status();
+  },
+
+  async download() {
+    if (typeof window !== "undefined" && window.api?.updater) {
+      return await window.api.updater.download();
+    }
+    return this.status();
+  },
+
+  async install() {
+    if (typeof window !== "undefined" && window.api?.updater) {
+      return await window.api.updater.install();
+    }
+    return { ok: false, code: "UNSUPPORTED", message: "Desktop environment required.", status: await this.status() };
+  },
+
+  async setAutoOption(key, value) {
+    if (typeof window !== "undefined" && window.api?.updater) {
+      return await window.api.updater.setAutoOption(key, value);
+    }
+    return this.status();
+  },
+
+  onEvent(cb) {
+    if (typeof window !== "undefined" && window.api?.updater?.onEvent) {
+      return window.api.updater.onEvent(cb);
+    }
+    return () => {};
+  },
+};
+

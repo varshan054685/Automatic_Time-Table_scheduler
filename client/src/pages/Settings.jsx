@@ -4,6 +4,7 @@ import { AppShell } from "@/components/AppShell";
 import { SettingsNav, SETTINGS_SECTIONS } from "./settings/SettingsNav";
 import { ProfileSection } from "./settings/ProfileSection";
 import { WorkspaceSection } from "./settings/WorkspaceSection";
+import { UpdateSection } from "./settings/UpdateSection";
 import { DangerZoneSection } from "./settings/DangerZoneSection";
 import { useUser } from "@/hooks/use-auth";
 import { AnimatePresence } from "framer-motion";
@@ -43,12 +44,15 @@ export default function Settings() {
         return <ProfileSection key="profile" onNavigate={handleNavigate} />;
       case "workspace":
         return <WorkspaceSection key="workspace" />;
+      case "updates":
+        return <UpdateSection key="updates" />;
       case "danger":
         return <DangerZoneSection key="danger" />;
       default:
         return <ProfileSection key="profile" onNavigate={handleNavigate} />;
     }
   };
+
 
   return (
     <AppShell

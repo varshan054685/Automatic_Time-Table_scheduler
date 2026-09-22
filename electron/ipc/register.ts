@@ -29,9 +29,17 @@ import {
 } from "../services/scheduler";
 import { previewImport, commitImport, saveTemplate, listImportBatches, exportDataToExcel } from "../services/excel";
 import { exportReportPdf } from "../services/pdf";
+import {
+  getStatus,
+  checkForUpdates,
+  downloadUpdate,
+  installUpdate,
+  setAutoOption,
+} from "../services/updater";
 import { log, logError } from "../services/logger";
 import { dayNameToIndex } from "../services/days";
 import * as S from "./schemas";
+
 
 type Handler = (args: unknown) => Promise<unknown> | unknown;
 
@@ -343,6 +351,16 @@ export function registerAllIpc(): void {
     wipe();
     log("All academic data reset (danger zone)", "db");
     return { ok: true };
+  });
+
+  // ─── updater (GitHub Releases) ─────────────────────────────────────────
+  register("api:updater:status", null, () => getStatus());
+  register("api:updater:check", null, () => checkForUpdates({ auto: false }));
+  register("api:updater:download", null, () => downloadUpdate());
+  register("api:updater:install", null, () => installUpdate());
+  register("api:updater:setAutoOption", S.updaterAutoOptionInput, (a) => {
+    const { key, value } = a as { key: "autoCheck" | "autoDownload"; value: boolean };
+    return setAutoOption(key, value);
   });
 
   // Keep log for diagnostics

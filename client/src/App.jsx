@@ -19,6 +19,8 @@ import TimeSlots from "@/pages/TimeSlots";
 import History from "@/pages/History";
 import Reports from "@/pages/Reports";
 import Settings from "@/pages/Settings";
+import { UpdateBanner } from "@/components/update/UpdateBanner";
+
 
 /**
  * Offline desktop routing. No login gate and no workspace-setup dialog —
@@ -108,6 +110,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <Toaster />
+        <UpdateBanner />
         <Router hook={useHashLocation}>
           <AppRouter />
         </Router>
@@ -117,3 +120,4 @@ function App() {
 }
 
 export default App;
+

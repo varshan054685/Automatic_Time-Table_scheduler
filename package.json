@@ -1,7 +1,8 @@
 {
   "name": "automatic-timetable-scheduler",
   "productName": "Automatic Timetable Scheduler",
-  "version": "1.0.0",
+  "version": "1.0.1",
+
   "type": "module",
   "license": "MIT",
   "description": "Offline desktop timetable scheduler for schools and colleges (Electron + SQLite + OR-Tools).",
@@ -12,10 +13,12 @@
     "dev:electron": "npm run build:electron && node script/launch-electron.cjs",
     "dev:python": "cd python-service && venv\\Scripts\\python.exe -m uvicorn app:app --host 127.0.0.1 --port 8000 --reload",
     "check": "tsc",
-    "test": "npm run test:parse && npm run test:templates",
+    "test": "npm run test:parse && npm run test:templates && npm run test:updater",
     "test:parse": "tsx script/test-import-parse.ts",
     "test:templates": "tsx script/test-pdf-templates.ts",
+    "test:updater": "tsx script/test-updater.ts",
     "build": "vite build",
+
     "build:electron": "tsx script/build-electron.ts",
     "build:solver": "tsx script/build-solver.ts",
     "rebuild:native": "electron-builder install-app-deps",

@@ -157,7 +157,19 @@ const api = {
     exportReport: (kind: string, opts?: { sectionId?: number; departmentId?: number; institutionId?: number }) =>
       invoke("api:pdf:export", { kind, ...(opts ?? {}) }),
   },
-  // updater is added in its phase
+  updater: {
+    status: () => invoke("api:updater:status"),
+    check: () => invoke("api:updater:check"),
+    download: () => invoke("api:updater:download"),
+    install: () => invoke("api:updater:install"),
+    setAutoOption: (key: "autoCheck" | "autoDownload", value: boolean) =>
+      invoke("api:updater:setAutoOption", { key, value }),
+    onEvent: (cb: (status: Record<string, unknown>) => void) => {
+      const listener = (_e: unknown, payload: Record<string, unknown>) => cb(payload);
+      ipcRenderer.on("updater:event", listener);
+      return () => ipcRenderer.removeListener("updater:event", listener);
+    },
+  },
 };
 
 // Type-only declaration merged by the renderer via global.d.ts

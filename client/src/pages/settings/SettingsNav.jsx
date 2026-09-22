@@ -1,12 +1,13 @@
-import { User, Building2, ShieldAlert } from "lucide-react";
+import { User, Building2, ShieldAlert, RefreshCw } from "lucide-react";
 
-// Offline edition: the multi-user cloud sections (referrals, change requests)
-// were removed and are no longer listed here.
+// Offline edition: settings navigation options
 export const SETTINGS_SECTIONS = [
   { id: "profile", label: "Profile", icon: User },
   { id: "workspace", label: "Institution", icon: Building2 },
+  { id: "updates", label: "Updates", icon: RefreshCw },
   { id: "danger", label: "Danger Zone", icon: ShieldAlert, danger: true },
 ];
+
 
 export function SettingsNav({ active, onChange, pendingCount = 0 }) {
   return (

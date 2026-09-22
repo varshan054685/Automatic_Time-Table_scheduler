@@ -124,6 +124,39 @@ declare global {
       data: {
         resetAll(): Promise<{ ok: boolean }>;
       };
+      updater: {
+        status(): Promise<{
+          state: string;
+          currentVersion: string;
+          latestVersion: string | null;
+          releaseName: string | null;
+          releaseDate: string | null;
+          releaseNotes: string | null;
+          progress: {
+            percent: number;
+            transferred: number;
+            total: number;
+            bytesPerSecond: number;
+          } | null;
+          message: string | null;
+          code: string | null;
+          silent: boolean;
+          updateSupported: boolean;
+          unsupportedReason: string | null;
+          canCheck: boolean;
+          canDownload: boolean;
+          canInstall: boolean;
+          preInstallBackup: string | null;
+          autoCheck: boolean;
+          autoDownload: boolean;
+        }>;
+        check(): Promise<Record<string, unknown>>;
+        download(): Promise<Record<string, unknown>>;
+        install(): Promise<{ ok: boolean; code: string; message: string; status: Record<string, unknown> }>;
+        setAutoOption(key: "autoCheck" | "autoDownload", value: boolean): Promise<Record<string, unknown>>;
+        onEvent(cb: (status: Record<string, unknown>) => void): () => void;
+      };
     };
   }
 }
+

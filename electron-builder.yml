@@ -71,10 +71,9 @@ linux:
   synopsis: Offline timetable scheduler for schools and colleges
   icon: build/icon.png
 
-# Auto-update provider (spec §14).
-# electron-updater reads this to locate GitHub Releases assets.
 publish:
   provider: github
   owner: varshan054685
   repo: Automatic_Time-Table_scheduler
-  releaseType: draft
+  releaseType: release
+
