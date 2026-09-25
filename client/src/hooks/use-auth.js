@@ -16,10 +16,15 @@ export function useUser() {
     queryFn: async () => {
       const inst = await ensureInstitution();
       const profileName = await window.api.settings.get("profile.name");
+      const profileEmail = await window.api.settings.get("profile.email");
+      const profilePhone = await window.api.settings.get("profile.phone");
+      const profileAvatar = await window.api.settings.get("profile.avatar");
       return {
         id: 1,
         name: (profileName && String(profileName)) || "Local User",
-        email: null,
+        email: (profileEmail && String(profileEmail)) || "",
+        phoneNumber: (profilePhone && String(profilePhone)) || "",
+        avatar: (profileAvatar && String(profileAvatar)) || "",
         role: "owner",
         workspace: {
           id: inst.id,

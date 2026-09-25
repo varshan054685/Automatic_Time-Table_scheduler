@@ -104,14 +104,28 @@ export function ProfileSection({ onNavigate }) {
 
   const hasChanges = JSON.stringify(profileData) !== savedSnapshot;
 
-  // Local profile: display name is stored in app settings (no online account).
+  // Local profile: display name, email, phone, and avatar are stored in app settings (no online account).
   const updateProfileMutation = useMutation({
     mutationFn: async (data) => {
       await window.api.settings.set("profile.name", data.name || "Local User");
+      await window.api.settings.set("profile.email", data.email || "");
+      await window.api.settings.set("profile.phone", data.phoneNumber || "");
+      await window.api.settings.set("profile.avatar", data.avatar || "");
       return { ok: true };
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries();
+    onSuccess: (_res, variables) => {
+      queryClient.setQueryData(["local-user"], (old) =>
+        old
+          ? {
+              ...old,
+              name: variables.name || "Local User",
+              email: variables.email || "",
+              phoneNumber: variables.phoneNumber || "",
+              avatar: variables.avatar || "",
+            }
+          : old
+      );
+      queryClient.invalidateQueries({ queryKey: ["local-user"] });
       toast({ title: "Profile updated successfully" });
     },
     onError: () => {

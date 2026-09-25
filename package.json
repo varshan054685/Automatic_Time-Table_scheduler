@@ -1,7 +1,7 @@
 {
   "name": "automatic-timetable-scheduler",
   "productName": "Automatic Timetable Scheduler",
-  "version": "1.0.1",
+  "version": "1.0.2",
 
   "type": "module",
   "license": "MIT",
@@ -24,8 +24,10 @@
     "rebuild:native": "electron-builder install-app-deps",
     "desktop:dev": "npm run dev:electron",
     "desktop:smoke": "npm run build:electron && node script/launch-electron.cjs --smoke",
-    "desktop:build": "npm run build && npm run build:electron && npm run build:solver && electron-builder --win --linux",
+    "desktop:build": "npm run build && npm run build:electron && npm run build:solver && electron-builder --win",
+    "desktop:build:all": "npm run build && npm run build:electron && npm run build:solver && electron-builder --win --linux",
     "desktop:build:dir": "npm run build && npm run build:electron && electron-builder --dir",
+
     "postinstall": "electron-builder install-app-deps"
   },
   "dependencies": {
